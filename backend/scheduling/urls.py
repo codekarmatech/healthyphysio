@@ -13,5 +13,5 @@ router.register(r'reschedule-requests', views.RescheduleRequestViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('validate-session-code/<str:code>/', views.validate_session_code, name='validate_session_code'),
+    path('validate-session-code/<str:code>/', views.validate_session_code_api, name='validate_session_code'),
 ]

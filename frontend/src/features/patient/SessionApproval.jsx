@@ -1,7 +1,7 @@
 /**
  * Purpose: Patient-side check-in approval UI
- * Connected to: POST /api/attendance/approve/
- * Props/Params: sessionCode (string), therapistPhoto (encrypted URL)
+ * Connected Endpoints: POST /api/attendance/approve/
+ * Validation: Session code format, XSS prevention
  */
 
 import React, { useState } from 'react';

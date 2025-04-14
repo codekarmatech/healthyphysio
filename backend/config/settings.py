@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -48,8 +48,11 @@ INSTALLED_APPS = [
     'users',
     'scheduling',
     'attendance',
+    'audit_logs',  # Add this line
+    'websocket',   # Add this if you've created it
 ]
 
+# Add our custom middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -59,6 +62,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'audit_logs.middleware.AuditLogMiddleware',  # Add audit log middleware
+    'users.middleware.AuthMonitorMiddleware',    # Add auth monitoring middleware
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -80,13 +85,14 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+# Update ASGI application to include WebSocket monitoring
 ASGI_APPLICATION = 'config.asgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-ATABASES = {
+DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'healthyphysio'),
@@ -183,7 +189,7 @@ ENCRYPTED_FILES = {
 }
 
 
-# Add this to the settings.py file
+# Add to settings.py
 
 # JWT Settings
 from datetime import timedelta
@@ -215,3 +221,31 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(hours=1),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=7),
 }
+
+# Add JWT to REST_FRAMEWORK authentication classes
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+# Add channels authentication
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+# Add a properly formatted encryption key
+# This is a randomly generated key for development - in production use environment variables
+# Add this import at the top of the file
+from cryptography.fernet import Fernet
+
+FIELD_ENCRYPTION_KEY = Fernet.generate_key().decode()

@@ -1,7 +1,7 @@
 /**
  * Purpose: Provides JWT authentication and user role management
- * Connected to: POST /api/auth/login/, POST /api/auth/refresh/
- * Props/Params: children (React nodes)
+ * Connected Endpoints: POST /api/auth/login/, POST /api/auth/refresh/
+ * Validation: Token expiry, role-based access control
  */
 
 import React, { createContext, useState, useContext, useEffect } from 'react';
@@ -20,6 +20,15 @@ export const AuthProvider = ({ children }) => {
       // In Phase 3, this will validate with the backend
       try {
         const tokenData = JSON.parse(atob(token.split('.')[1]));
+        
+        // Check token expiration
+        const currentTime = Math.floor(Date.now() / 1000);
+        if (tokenData.exp && tokenData.exp < currentTime) {
+          console.error('Token expired');
+          logout();
+          return;
+        }
+        
         setUser({
           id: tokenData.user_id,
           role: tokenData.role,
@@ -38,18 +47,18 @@ export const AuthProvider = ({ children }) => {
     // This will be replaced with actual API call in Phase 3
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Purpose: Generate secure dummy token for development only
+        // Development-only mock token generator
         const payload = {
           user_id: 1,
           role: credentials?.role || 'patient',
           name: credentials?.username || 'Test User',
-          exp: Math.floor(Date.now() / 1000) + 3600 // 1 hour expiry
+          exp: Math.floor(Date.now() / 1000) + 3600 // 1-hour expiry
         };
         
-        // Create a proper JWT structure (header.payload.signature)
+        // Create JWT structure (header.payload.signature)
         const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
         const payloadStr = btoa(JSON.stringify(payload));
-        const dummyToken = `${header}.${payloadStr}.dummy-signature-for-dev`;
+        const dummyToken = `${header}.${payloadStr}.development-signature`;
         
         localStorage.setItem('token', dummyToken);
         setToken(dummyToken);
@@ -76,15 +85,19 @@ export const AuthProvider = ({ children }) => {
   const hasRole = (requiredRole) => {
     if (!user) return false;
     
-    // Role hierarchy: admin > therapist/doctor > patient
+    // Role hierarchy: admin > therapist > doctor > patient
     if (user.role === 'admin') return true;
     if (requiredRole === user.role) return true;
     
-    // Doctor/therapist role differentiation
-    if (user.role === 'doctor' && requiredRole === 'therapist') return false;
-    if (user.role === 'therapist' && requiredRole === 'doctor') return false;
+    const roleHierarchy = {
+      'admin': 4,
+      'therapist': 3,
+      'doctor': 2,
+      'patient': 1
+    };
     
-    return false;
+    // Check if user's role is higher in hierarchy than required role
+    return roleHierarchy[user.role] > roleHierarchy[requiredRole];
   };
 
   return (

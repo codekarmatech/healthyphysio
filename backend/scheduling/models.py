@@ -11,6 +11,7 @@ from django.utils import timezone
 from users.models import User, Patient, Therapist
 import random
 import string
+import uuid
 
 class Appointment(models.Model):
     class Status(models.TextChoices):
@@ -22,7 +23,7 @@ class Appointment(models.Model):
     
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='appointments')
     therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='appointments')
-    session_code = models.CharField(max_length=20, unique=True, editable=False)
+    session_code = models.CharField(max_length=10, unique=True, blank=True)
     datetime = models.DateTimeField()
     duration_minutes = models.IntegerField(default=60)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
@@ -33,9 +34,9 @@ class Appointment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def save(self, *args, **kwargs):
-        # Generate session code if not already set
+        # Generate a unique session code if not provided
         if not self.session_code:
-            self.session_code = self._generate_session_code()
+            self.session_code = str(uuid.uuid4())[:10].upper()
         super().save(*args, **kwargs)
     
     def _generate_session_code(self):

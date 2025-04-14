@@ -1,15 +1,20 @@
 """
 Purpose: API views for attendance tracking
-Connected to: Session management
+Connected to: Session attendance management
 """
 
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from .models import Session, Assessment, AssessmentVersion
-from .serializers import SessionSerializer, AssessmentSerializer, AssessmentVersionSerializer
+from django.utils import timezone
+from django.shortcuts import get_object_or_404
+
+# Fix the import names to match the actual class names in permissions.py
+from users.permissions import IsAdminUser, IsTherapistUser, IsPatientUser
 from scheduling.models import Appointment
-from users.permissions import IsAdminUser, IsTherapist, IsPatient
+# Import the correct models - Session and Assessment instead of AttendanceRecord
+from .models import Session, Assessment, AssessmentVersion
+from .serializers import SessionSerializer, AssessmentSerializer
 
 class SessionViewSet(viewsets.ModelViewSet):
     queryset = Session.objects.all()
@@ -76,7 +81,7 @@ class AssessmentViewSet(viewsets.ModelViewSet):
             )
 
 @api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated, IsPatient])
+@permission_classes([permissions.IsAuthenticated, IsPatientUser])  # Change IsPatient to IsPatientUser
 def approve_checkin(request, session_code):
     try:
         appointment = Appointment.objects.get(session_code=session_code)

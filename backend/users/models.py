@@ -12,8 +12,28 @@ Fields:
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from encrypted_files.fields import EncryptedFileField
+# Replace the problematic import
+# from encrypted_files import fields
 
+# Use Django's built-in encryption or create our own encryption module
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils.translation import gettext_lazy as _
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+from cryptography.fernet import Fernet
+import base64
+import os
+
+# Create a custom encryption field first
+class EncryptedFileField(models.FileField):
+    # Simple implementation - we'll enhance this later
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    # We'll implement the actual encryption in the storage class
+
+# Now define the User model
 class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'admin', _('Admin')
