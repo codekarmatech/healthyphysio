@@ -9,6 +9,7 @@ import json
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.core.serializers.json import DjangoJSONEncoder
 
 User = get_user_model()
 
@@ -35,16 +36,18 @@ class AuditLog(models.Model):
     integrity_hash = models.CharField(max_length=64)
     
     def save(self, *args, **kwargs):
-        # Generate integrity hash before saving
-        if not self.integrity_hash:
-            self.generate_integrity_hash()
+        # Generate timestamp if not provided
+        if not self.timestamp:
+            self.timestamp = timezone.now()
+            
+        # Generate integrity hash
+        self.generate_integrity_hash()
+        
         super().save(*args, **kwargs)
     
     def generate_integrity_hash(self):
-        """Generate a SHA-256 hash of the log entry for integrity verification"""
-        # Create a dictionary of all fields except the hash itself
+        # Create a dictionary of the fields to hash
         data = {
-            'user_id': self.user.id if self.user else None,
             'action': self.action,
             'model_name': self.model_name,
             'object_id': self.object_id,
@@ -53,12 +56,14 @@ class AuditLog(models.Model):
             'new_state': self.new_state,
             'ip_address': self.ip_address,
             'user_agent': self.user_agent,
-            'timestamp': self.timestamp.isoformat() if self.timestamp else timezone.now().isoformat(),
+            'timestamp': self.timestamp.isoformat() if hasattr(self.timestamp, 'isoformat') else str(self.timestamp),
+            'user_id': str(self.user.id) if self.user else None,
         }
         
-        # Convert to JSON string and hash
-        json_data = json.dumps(data, sort_keys=True)
-        self.integrity_hash = hashlib.sha256(json_data.encode()).hexdigest()
+        # Convert to JSON using Django's JSON encoder which handles dates and UUIDs
+        json_data = json.dumps(data, sort_keys=True, cls=DjangoJSONEncoder)
+        hash_object = hashlib.sha256(json_data.encode())
+        self.integrity_hash = hash_object.hexdigest()
     
     def verify_integrity(self):
         """Verify the integrity of the log entry by recomputing the hash"""

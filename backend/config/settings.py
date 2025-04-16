@@ -95,11 +95,11 @@ ASGI_APPLICATION = 'config.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'healthyphysio'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': 'physiodb',
+        'USER': 'pwuser',
+        'PASSWORD': 'P@27473915',  # Replace with your actual password
+        'HOST': 'localhost',  # Use localhost for local development
+        'PORT': '5432',
     }
 }
 

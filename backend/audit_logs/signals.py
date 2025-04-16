@@ -11,6 +11,9 @@ from django.db import models
 import inspect
 import threading
 from .models import AuditLog
+from django.core.serializers.json import DjangoJSONEncoder
+import json
+import sys
 
 # Thread local storage to track current user from request
 _thread_locals = threading.local()
@@ -34,11 +37,19 @@ EXCLUDED_MODELS = [
     'Session',
     'ContentType',
     'Permission',
+    'Migration',  # Add Migration model to excluded models
 ]
+
+# Check if we're running migrations
+RUNNING_MIGRATIONS = 'migrate' in sys.argv
 
 @receiver(pre_save)
 def pre_save_handler(sender, instance, **kwargs):
     """Store the pre-save state of the instance"""
+    # Skip if running migrations
+    if RUNNING_MIGRATIONS:
+        return
+        
     # Skip excluded models
     if sender.__name__ in EXCLUDED_MODELS:
         return
@@ -63,6 +74,10 @@ def pre_save_handler(sender, instance, **kwargs):
 @receiver(post_save)
 def post_save_handler(sender, instance, created, **kwargs):
     """Create an audit log entry after a model is saved"""
+    # Skip if running migrations
+    if RUNNING_MIGRATIONS:
+        return
+        
     # Skip excluded models
     if sender.__name__ in EXCLUDED_MODELS:
         return
@@ -91,15 +106,22 @@ def post_save_handler(sender, instance, created, **kwargs):
         if not isinstance(field, models.FileField)  # Skip file fields
     }
     
-    # Create the audit log
+    # When creating the AuditLog, ensure any datetime objects are properly serialized
+    if previous_state:
+        previous_state = json.loads(json.dumps(previous_state, cls=DjangoJSONEncoder))
+    
+    # Fix: Use current_state instead of new_state
+    if current_state:
+        current_state = json.loads(json.dumps(current_state, cls=DjangoJSONEncoder))
+    
     AuditLog.objects.create(
         user=user,
         action=action,
-        model_name=sender.__name__,
+        model_name=sender.__name__,  # Fix: Use sender.__name__ instead of model_name
         object_id=str(instance.pk),
         object_repr=str(instance)[:255],
         previous_state=previous_state,
-        new_state=current_state,
+        new_state=current_state,  # Fix: Use current_state instead of new_state
         ip_address=ip_address,
         user_agent=user_agent
     )
@@ -107,6 +129,10 @@ def post_save_handler(sender, instance, created, **kwargs):
 @receiver(post_delete)
 def post_delete_handler(sender, instance, **kwargs):
     """Create an audit log entry after a model is deleted"""
+    # Skip if running migrations
+    if RUNNING_MIGRATIONS:
+        return
+        
     # Skip excluded models
     if sender.__name__ in EXCLUDED_MODELS:
         return
