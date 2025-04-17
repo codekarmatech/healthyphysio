@@ -21,7 +21,7 @@ Connected to: All app URLs
 """
 
 """
-URL Configuration for HealthyPhysio
+URL Configuration for PhysioWay
 """
 from django.contrib import admin
 from django.urls import path, include
