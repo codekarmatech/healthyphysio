@@ -1,119 +1,151 @@
-/**
- * Purpose: Provides JWT authentication and user role management
- * Connected Endpoints: POST /api/auth/login/, POST /api/auth/refresh/
- * Validation: Token expiry, role-based access control
- */
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import axios from 'axios';
 
-import React, { createContext, useState, useContext, useEffect } from 'react';
+const AuthContext = createContext();
 
-const AuthContext = createContext(null);
+export function useAuth() {
+  return useContext(AuthContext);
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+export function AuthProvider({ children }) {
+  const stored = localStorage.getItem('user');
+  const [currentUser, setCurrentUser] = useState(
+    stored ? JSON.parse(stored) : null
+  );
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if token exists and validate it
-    if (token) {
-      // For now, just decode the token to get user info
-      // In Phase 3, this will validate with the backend
+    // Check if user is already logged in
+    const checkAuthStatus = async () => {
       try {
-        const tokenData = JSON.parse(atob(token.split('.')[1]));
+        const token = localStorage.getItem('token');
         
-        // Check token expiration
-        const currentTime = Math.floor(Date.now() / 1000);
-        if (tokenData.exp && tokenData.exp < currentTime) {
-          console.error('Token expired');
-          logout();
-          return;
+        if (token) {
+          // Set default auth header for all requests
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          
+          // Fetch user data
+          const response = await axios.get('/api/auth/me');
+          setCurrentUser(response.data);
         }
-        
-        setUser({
-          id: tokenData.user_id,
-          role: tokenData.role,
-          name: tokenData.name || 'User'
-        });
       } catch (error) {
-        console.error('Invalid token', error);
-        logout();
+        console.error('Error checking auth status:', error);
+        // Clear token if invalid
+        localStorage.removeItem('token');
+        axios.defaults.headers.common['Authorization'] = '';
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
-  }, [token]);
-
-  const login = async (credentials) => {
-    // In Phase 1, we'll use dummy data
-    // This will be replaced with actual API call in Phase 3
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Development-only mock token generator
-        const payload = {
-          user_id: 1,
-          role: credentials?.role || 'patient',
-          name: credentials?.username || 'Test User',
-          exp: Math.floor(Date.now() / 1000) + 3600 // 1-hour expiry
-        };
-        
-        // Create JWT structure (header.payload.signature)
-        const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-        const payloadStr = btoa(JSON.stringify(payload));
-        const dummyToken = `${header}.${payloadStr}.development-signature`;
-        
-        localStorage.setItem('token', dummyToken);
-        setToken(dummyToken);
-        
-        setUser({
-          id: payload.user_id,
-          role: payload.role,
-          name: payload.name
-        });
-        
-        resolve({ success: true });
-      }, 500);
-    });
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
-  };
-
-  const isAuthenticated = () => !!user;
-
-  const hasRole = (requiredRole) => {
-    if (!user) return false;
-    
-    // Role hierarchy: admin > therapist > doctor > patient
-    if (user.role === 'admin') return true;
-    if (requiredRole === user.role) return true;
-    
-    const roleHierarchy = {
-      'admin': 4,
-      'therapist': 3,
-      'doctor': 2,
-      'patient': 1
     };
-    
-    // Check if user's role is higher in hierarchy than required role
-    return roleHierarchy[user.role] > roleHierarchy[requiredRole];
+
+    checkAuthStatus();
+  }, []);
+
+  const login = async (identifier, password) => {
+    try {
+      setError('');
+      const response = await api.post('/auth/login/', {
+                username: identifier,
+                email:    identifier,
+                phone:    identifier,
+                password
+              });
+      const { access, refresh, user } = response.data;
+      localStorage.setItem('token', access);
+      localStorage.setItem('refreshToken', refresh);
+      
+      // Save token and set user
+      localStorage.setItem('token', access);
+      localStorage.setItem('user', JSON.stringify(user));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+      setCurrentUser(user);
+      
+      // Redirect based on user role
+      if (user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (user.role === 'doctor') {
+        navigate('/dashboard');
+      } else if (user.role === 'therapist') {
+        navigate('/dashboard');
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.response?.data?.message || 'Failed to login');
+      throw error;
+    }
+  };
+
+  const register = async (userData) => {
+    try {
+      setError('');
+      const response = await api.post('/auth/register/', userData);
+      return response.data;
+    } catch (error) {
+      console.error('Registration error:', error);
+      setError(error.response?.data?.message || 'Failed to register');
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await axios.post('/api/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear user data regardless of API response
+      localStorage.removeItem('token');
+      axios.defaults.headers.common['Authorization'] = '';
+      setCurrentUser(null);
+      navigate('/login');
+    }
+  };
+
+  const resetPassword = async (email) => {
+    try {
+      setError('');
+      const response = await axios.post('/api/auth/reset-password', { email });
+      return response.data;
+    } catch (error) {
+      console.error('Reset password error:', error);
+      setError(error.response?.data?.message || 'Failed to reset password');
+      throw error;
+    }
+  };
+
+  const updateProfile = async (userData) => {
+    try {
+      setError('');
+      const response = await axios.put('/api/auth/profile', userData);
+      setCurrentUser(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      setError(error.response?.data?.message || 'Failed to update profile');
+      throw error;
+    }
+  };
+
+  const value = {
+    user: currentUser,
+    loading,
+    error,
+    login,
+    register,
+    logout,
+    resetPassword,
+    updateProfile
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      logout, 
-      isAuthenticated, 
-      hasRole,
-      loading 
-    }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => useContext(AuthContext);
-
-export default AuthContext;
+}

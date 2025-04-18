@@ -30,6 +30,7 @@ ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
+# Add corsheaders to INSTALLED_APPS
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -53,10 +54,11 @@ INSTALLED_APPS = [
 ]
 
 # Add our custom middleware
+# Add corsheaders middleware at the top of the middleware list
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Add this line at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -165,12 +167,19 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
+# Add CORS settings
+# CORS_ALLOW_ALL_ORIGINS = False  # More secure to specify allowed origins
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
+# Add these settings to your settings.py file if they're not already there
+CORS_ALLOW_ALL_ORIGINS = True  # For development only, set to False in production
 
+# Or specify allowed origins:
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000",
+#     "http://127.0.0.1:3000",
+# ]
+# For development, you might want to allow credentials
+CORS_ALLOW_CREDENTIALS = True
 # Channels settings
 CHANNEL_LAYERS = {
     'default': {

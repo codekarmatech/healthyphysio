@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
-const PatientDashboard = ({ user }) => {
+const PatientDashboard = () => {
+  const { user } = useAuth(); // Get user from context instead of props
   const [stats, setStats] = useState({
     upcomingAppointments: 0,
     completedSessions: 0,

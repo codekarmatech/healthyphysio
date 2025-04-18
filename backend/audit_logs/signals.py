@@ -14,6 +14,7 @@ from .models import AuditLog
 from django.core.serializers.json import DjangoJSONEncoder
 import json
 import sys
+from django.forms.models import model_to_dict
 
 # Thread local storage to track current user from request
 _thread_locals = threading.local()
@@ -72,7 +73,8 @@ def pre_save_handler(sender, instance, **kwargs):
         instance._pre_save_state = {}
 
 @receiver(post_save)
-def post_save_handler(sender, instance, created, **kwargs):
+# Instead of trying to JSON dump the entire model instance, create a serializable dict
+def log_model_change(sender, instance, created, **kwargs):
     """Create an audit log entry after a model is saved"""
     # Skip if running migrations
     if RUNNING_MIGRATIONS:
@@ -112,18 +114,49 @@ def post_save_handler(sender, instance, created, **kwargs):
     
     # Fix: Use current_state instead of new_state
     if current_state:
-        current_state = json.loads(json.dumps(current_state, cls=DjangoJSONEncoder))
+        # Convert instance into plain dict of its fields (FKs → IDs)
+        state_dict     = model_to_dict(instance, fields=[f.name for f in instance._meta.fields])
+        current_state  = state_dict
     
+    # Create a serializable data dictionary instead of using the raw instance
+    serialized_data = {
+        'id': instance.id,
+        # Add other relevant fields, but avoid FK objects directly
+    }
+    
+    # If there's a user FK, just store the ID and username
+    if hasattr(instance, 'user') and instance.user:
+        serialized_data['user_id'] = instance.user.id
+        serialized_data['username'] = instance.user.username
+    
+    # Use DjangoJSONEncoder for safe serialization
+    # Create a serializable representation
+    serializable_data = {}
+    for field in instance._meta.fields:
+        field_name = field.name
+        field_value = getattr(instance, field_name)
+        
+        # Handle non-serializable types
+        if hasattr(field_value, 'pk'):
+            # For foreign keys, just store the ID
+            serializable_data[field_name + '_id'] = field_value.pk
+        elif isinstance(field_value, (str, int, float, bool, type(None))):
+            # These types are JSON serializable
+            serializable_data[field_name] = field_value
+    model_name = sender.__name__
+    object_repr = str(instance)[:255]
     AuditLog.objects.create(
         user=user,
         action=action,
-        model_name=sender.__name__,  # Fix: Use sender.__name__ instead of model_name
-        object_id=str(instance.pk),
-        object_repr=str(instance)[:255],
-        previous_state=previous_state,
-        new_state=current_state,  # Fix: Use current_state instead of new_state
+        model_name=sender.__name__,
+        object_id=str(instance.id),
+        object_repr=object_repr,
+        previous_state=(previous_state if not created else None),
+        new_state=serialized_data,
         ip_address=ip_address,
-        user_agent=user_agent
+        user_agent=user_agent,
+        # timestamp is auto‑populated by auto_now_add
+        # integrity_hash will be generated in AuditLog.save()
     )
 
 @receiver(post_delete)

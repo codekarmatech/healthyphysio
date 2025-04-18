@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
-const TherapistDashboard = ({ user }) => {
+const TherapistDashboard = () => {
+  const { user } = useAuth(); // Get user from context instead of props
   const [stats, setStats] = useState({
     upcomingAppointments: 0,
     todayAppointments: 0,
@@ -78,11 +80,11 @@ const TherapistDashboard = ({ user }) => {
               <div className="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
                 <div className="ml-3 relative">
                   <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-700 mr-2">{user.firstName} {user.lastName}</span>
+                    <span className="text-sm font-medium text-gray-700 mr-2">{user.first_name} {user.last_name}</span>
                     <button className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                       <span className="sr-only">Open user menu</span>
-                      <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                        {user.firstName.charAt(0)}
+                      <div className="h-8 w-8 rounded-full …">
+                       {(user.first_name || '').charAt(0).toUpperCase()}
                       </div>
                     </button>
                   </div>
@@ -393,6 +395,191 @@ const TherapistDashboard = ({ user }) => {
                         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                       >
                         Create Assessment
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Patient Referrals */}
+            <div className="px-4 py-6 sm:px-0">
+              <h2 className="text-lg font-medium text-gray-900">Recent Referrals</h2>
+              <div className="mt-4 bg-white shadow overflow-hidden sm:rounded-md">
+                <ul className="divide-y divide-gray-200">
+                  {loading ? (
+                    <li className="px-6 py-4 flex items-center">
+                      <div className="animate-pulse flex space-x-4 w-full">
+                        <div className="rounded-full bg-gray-200 h-12 w-12"></div>
+                        <div className="flex-1 space-y-4 py-1">
+                          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                          <div className="space-y-2">
+                            <div className="h-4 bg-gray-200 rounded"></div>
+                            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  ) : (
+                    <>
+                      <li>
+                        <div className="block hover:bg-gray-50">
+                          <div className="px-4 py-4 sm:px-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                  <div className="h-10 w-10 rounded-full bg-green-200 flex items-center justify-center text-green-600 font-semibold">
+                                    J
+                                  </div>
+                                </div>
+                                <div className="ml-4">
+                                  <p className="text-sm font-medium text-primary-600 truncate">
+                                    John Smith
+                                  </p>
+                                  <p className="mt-1 flex items-center text-sm text-gray-500">
+                                    <span className="truncate">Lower Back Pain</span>
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="ml-2 flex-shrink-0 flex">
+                                <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                  New
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-2 sm:flex sm:justify-between">
+                              <div className="sm:flex">
+                                <p className="flex items-center text-sm text-gray-500">
+                                  <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                  </svg>
+                                  Referred on: June 15, 2023
+                                </p>
+                              </div>
+                              <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                                <span className="text-gray-500 text-sm">Referred by: Doctor 1</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                      <li>
+                        <div className="block hover:bg-gray-50">
+                          <div className="px-4 py-4 sm:px-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0">
+                                  <div className="h-10 w-10 rounded-full bg-blue-200 flex items-center justify-center text-blue-600 font-semibold">
+                                    E
+                                  </div>
+                                </div>
+                                <div className="ml-4">
+                                  <p className="text-sm font-medium text-primary-600 truncate">
+                                    Emily Davis
+                                  </p>
+                                  <p className="mt-1 flex items-center text-sm text-gray-500">
+                                    <span className="truncate">Shoulder Rehabilitation</span>
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="ml-2 flex-shrink-0 flex">
+                                <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  In Progress
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-2 sm:flex sm:justify-between">
+                              <div className="sm:flex">
+                                <p className="flex items-center text-sm text-gray-500">
+                                  <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                  </svg>
+                                  Referred on: June 10, 2023
+                                </p>
+                              </div>
+                              <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                                <span className="text-gray-500 text-sm">Referred by: Doctor 2</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    </>
+                  )}
+                </ul>
+                <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                  <div className="text-sm">
+                    <Link to="/referrals" className="font-medium text-primary-600 hover:text-primary-500">
+                      View all referrals<span className="sr-only"> referrals</span>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Treatment Progress */}
+            <div className="px-4 py-6 sm:px-0">
+              <h2 className="text-lg font-medium text-gray-900">Treatment Progress</h2>
+              <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">John Smith - Lower Back Pain</h3>
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-500">Progress</div>
+                        <div className="text-sm font-medium text-green-600">75%</div>
+                      </div>
+                      <div className="mt-1 w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="bg-green-600 h-2.5 rounded-full" style={{ width: '75%' }}></div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-500">Sessions Completed</div>
+                        <div className="text-sm font-medium text-gray-900">6 of 8</div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-500">Next Session</div>
+                        <div className="text-sm font-medium text-gray-900">June 22, 2023</div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Link to="/patients/1" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                        View patient details
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Emily Davis - Shoulder Rehabilitation</h3>
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-500">Progress</div>
+                        <div className="text-sm font-medium text-blue-600">40%</div>
+                      </div>
+                      <div className="mt-1 w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '40%' }}></div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-500">Sessions Completed</div>
+                        <div className="text-sm font-medium text-gray-900">4 of 10</div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-500">Next Session</div>
+                        <div className="text-sm font-medium text-gray-900">June 20, 2023</div>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Link to="/patients/2" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                        View patient details
                       </Link>
                     </div>
                   </div>

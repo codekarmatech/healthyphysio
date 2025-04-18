@@ -32,9 +32,10 @@ from users.views import CustomTokenObtainPairView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+     path('api/auth/', include('users.urls')),
+     path('api/users/', include('users.urls')),
     path('api/auth/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/users/', include('users.urls')),
     path('api/scheduling/', include('scheduling.urls')),
     path('api/attendance/', include('attendance.urls')),
     path('api/', include('audit_logs.urls')),

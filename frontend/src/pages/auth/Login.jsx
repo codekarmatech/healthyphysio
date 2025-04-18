@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
@@ -8,7 +9,7 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,15 +25,12 @@ const Login = () => {
     setError('');
     
     try {
-      // This is a placeholder for the actual API call
-      console.log('Logging in with:', credentials);
-      // Simulate API call
-      setTimeout(() => {
-        // For now, just redirect to dashboard
-        navigate('/dashboard');
-      }, 1000);
-    } catch (err) {
-      setError('Failed to login. Please check your credentials.');
+      console.log('Attempting login with:', credentials);
+      // Use the correct endpoint and format for JWT authentication
+      await login(credentials.username, credentials.password);
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.response?.data?.detail || error.response?.data?.error || 'Invalid username or password');
     } finally {
       setLoading(false);
     }
@@ -67,7 +65,7 @@ const Login = () => {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username
+                Username / Email / Mobile
               </label>
               <div className="mt-1">
                 <input
@@ -78,6 +76,7 @@ const Login = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   value={credentials.username}
                   onChange={handleChange}
+                  placeholder="Enter username, email or mobile number"
                 />
               </div>
             </div>
@@ -113,7 +112,6 @@ const Login = () => {
               </div>
 
               <div className="text-sm">
-                {/* Fixed the anchor tag to use Link instead */}
                 <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
                   Forgot your password?
                 </Link>

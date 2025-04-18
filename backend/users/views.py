@@ -2,19 +2,19 @@
 Purpose: API views for user management
 Connected to: User authentication and profile management
 """ 
-from rest_framework import status
+from rest_framework import status, serializers  # Add serializers import here
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import PatientSignupStep1Serializer, PatientSignupStep2Serializer, PatientSignupStep3Serializer
 from .models import User, Patient  # Assuming you have User and Patient models
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from django.db import transaction
+from django.contrib.auth import get_user_model  # Add this import for get_user_model
 from .models import Therapist, Doctor
 from .serializers import UserSerializer, PatientSerializer, TherapistSerializer, DoctorSerializer
 from .permissions import IsAdminUser, IsTherapistUser, IsDoctorUser, IsPatientUser
@@ -78,49 +78,215 @@ class DoctorViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
 
+# Update the CustomTokenObtainPairSerializer to handle multiple identifier types
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username_field = 'username'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields[self.username_field].required = False
+        self.fields['email'] = serializers.EmailField(required=False)
+        self.fields['phone'] = serializers.CharField(required=False)
+
+    def validate(self, attrs):
+        # Check if any identifier is provided
+        username = attrs.get('username')
+        email = attrs.get('email')
+        phone = attrs.get('phone')
+        password = attrs.get('password')
+
+        if not any([username, email, phone]):
+            raise serializers.ValidationError(
+                {'error': 'Must include either username, email or phone number'}
+            )
+
+        # Try to find the user
+        user = None
+        User = get_user_model()
+
+        if username:
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                pass
+
+        if not user and email:
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                pass
+
+        if not user and phone:
+            try:
+                user = User.objects.get(phone=phone)
+            except User.DoesNotExist:
+                pass
+
+        if not user or not user.check_password(password):
+            raise serializers.ValidationError(
+                {'error': 'No active account found with the given credentials'}
+            )
+
+        # Use the found user for token generation
+        attrs[self.username_field] = user.username
+        data = super().validate(attrs)
+
+        # Add user data to response
+        data['user'] = {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'firstName': user.first_name,
+            'lastName': user.last_name,
+            'role': getattr(user, 'role', 'user'),  # Use getattr to safely get role
+        }
+
+        return data
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
 
         # Add custom claims
-        token['role'] = user.role
+        token['role'] = getattr(user, 'role', 'user')  # Use getattr to safely get role
         token['name'] = user.get_full_name() or user.username
         
         return token
 
+# Assuming you have a TokenObtainPairView subclass
 class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        # Call the parent class method to get the token
+        response = super().post(request, *args, **kwargs)
+        
+        # Get the user from the credentials
+        username = request.data.get('username')
+        try:
+            user = User.objects.get(username=username)
+            # Add user data to the response
+            response.data['user'] = UserSerializer(user).data
+        except User.DoesNotExist:
+            pass
+        
+        return response
     serializer_class = CustomTokenObtainPairSerializer
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
     """
-    Register a new user with their role-specific profile
+    Register a new user with role-specific profile
     """
-    serializer = UserSerializer(data=request.data)
-    if serializer.is_valid():
-        with transaction.atomic():
-            user = serializer.save()
+    data = request.data
+    print(f"Received registration data: {data}")
+    
+    # Create a transaction to ensure all operations succeed or fail together
+    with transaction.atomic():
+        try:
+            # Extract user data
+            user_data = {
+                'username': data.get('username'),
+                'email': data.get('email'),
+                'password': data.get('password'),
+                'first_name': data.get('firstName', ''),
+                'last_name': data.get('lastName', ''),
+                'phone': data.get('phone', ''),
+                'role': data.get('role', 'patient'),
+            }
+            
+            # Create the user
+            user_serializer = UserSerializer(data=user_data)
+            if not user_serializer.is_valid():
+                print(f"User serializer errors: {user_serializer.errors}")
+                return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            user = user_serializer.save()
+            user.set_password(data.get('password'))
+            user.save()
             
             # Create role-specific profile
-            if user.role == User.Role.PATIENT:
-                Patient.objects.create(user=user)
-            elif user.role == User.Role.THERAPIST:
-                Therapist.objects.create(
-                    user=user,
-                    license_number=request.data.get('license_number', ''),
-                    specialization=request.data.get('specialization', '')
-                )
-            elif user.role == User.Role.DOCTOR:
-                Doctor.objects.create(
-                    user=user,
-                    license_number=request.data.get('license_number', ''),
-                    specialization=request.data.get('specialization', '')
-                )
+            if user.role == 'patient':
+                patient_data = {
+                    'date_of_birth': data.get('dateOfBirth'),
+                    'gender': data.get('gender', ''),
+                    'age': data.get('age', None),
+                    'address': data.get('address', ''),
+                    'city': data.get('city', ''),
+                    'state': data.get('state', ''),
+                    'zip_code': data.get('zipCode', ''),
+                    'referred_by': data.get('referred_by', ''),
+                    'reference_detail': data.get('referenceDetail', ''),
+                    'treatment_location': data.get('treatmentLocation', ''),
+                    'disease': data.get('disease', ''),
+                    'medical_history': data.get('medicalHistory', ''),
+                }
+                
+                # If the patient is being added by a doctor, set the referred_by field
+                if request.user.is_authenticated and request.user.role == 'doctor':
+                    patient_data['referred_by'] = f"{request.user.first_name} {request.user.last_name}"
+                
+                # Create the patient directly without using the serializer
+                patient = Patient.objects.create(user=user, **patient_data)
+                
+                # Use serializer for the response instead of raw objects
+                return Response({
+                    'message': 'Patient registered successfully',
+                    'user': UserSerializer(user).data
+                }, status=status.HTTP_201_CREATED)
+                
+            elif user.role == 'therapist':
+                # Convert years_of_experience to integer
+                try:
+                    years_exp_str = data.get('yearsOfExperience', '0') # Default to '0' string
+                    years_exp_int = int(years_exp_str) if years_exp_str else 0
+                except (ValueError, TypeError):
+                    # Handle cases where conversion fails (e.g., non-numeric string)
+                    return Response({'error': 'Invalid value provided for years of experience.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                therapist_data = {
+                    'license_number': data.get('licenseNumber', ''),
+                    'specialization': data.get('specialization', ''),
+                    'years_of_experience': years_exp_int, # Use the converted integer
+                    'experience': data.get('experience', ''),
+                    'residential_address': data.get('residentialAddress', ''),
+                    'preferred_areas': data.get('preferredAreas', ''),
+                    # Add photo handling if needed
+                }
+                
+                # Create the therapist directly
+                therapist = Therapist.objects.create(user=user, **therapist_data)
+                
+            elif user.role == 'doctor':
+                 # Convert years_of_experience to integer for Doctor as well
+                try:
+                    years_exp_str = data.get('yearsOfExperience', '0') # Default to '0' string
+                    years_exp_int = int(years_exp_str) if years_exp_str else 0
+                except (ValueError, TypeError):
+                    # Handle cases where conversion fails (e.g., non-numeric string)
+                    return Response({'error': 'Invalid value provided for years of experience.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                doctor_data = {
+                    'license_number': data.get('licenseNumber', '') or data.get('medicalLicenseNumber', ''),
+                    'specialization': data.get('specialization', ''),
+                    'hospital_affiliation': data.get('hospitalAffiliation', ''),
+                    'years_of_experience': years_exp_int, # Use the converted integer
+                    'area': data.get('area', ''),
+                }
+                
+                # Create the doctor directly
+                doctor = Doctor.objects.create(user=user, **doctor_data)
             
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'message': 'User registered successfully',
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            # Improved error handling
+            import traceback
+            print(f"Registration error: {str(e)}")
+            print(traceback.format_exc())
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Create API views for the 3-step patient registration
