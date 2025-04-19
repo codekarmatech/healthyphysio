@@ -1,6 +1,13 @@
 """
 Purpose: URL routing for attendance-related endpoints
-Connected to: Session views
+Connected to: Attendance views, seesions, assessments, and holidays
+Fields:
+  - attendance_date: Date of attendance
+  - user: User who attended
+  - status: Attendance status (e.g., present, absent, late)
+  - notes: Additional notes
+  - created_at: Timestamp when attendance record was created
+  - updated_at: Timestamp when attendance record was last updated
 """
 
 from django.urls import path, include
@@ -8,10 +15,10 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'sessions', views.SessionViewSet)
-router.register(r'assessments', views.AssessmentViewSet)
-
+router.register(r'', views.AttendanceViewSet, basename='attendance')
+router.register(r'holidays', views.HolidayViewSet)
+# router.register(r'sessions', views.SessionViewSet)
+# router.register(r'assessments', views.AssessmentViewSet)
 urlpatterns = [
     path('', include(router.urls)),
-    path('approve-checkin/<str:session_code>/', views.approve_checkin, name='approve_checkin'),
 ]

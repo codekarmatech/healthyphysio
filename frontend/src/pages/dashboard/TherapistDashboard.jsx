@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import AttendanceSummary from '../../components/attendance/AttendanceSummary';
+import attendanceService from '../../services/attendanceService';
 
 const TherapistDashboard = () => {
   const { user } = useAuth(); // Get user from context instead of props
@@ -12,6 +14,13 @@ const TherapistDashboard = () => {
   });
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Add attendance state variables
+  const [attendanceSummary, setAttendanceSummary] = useState(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
+  const [attendanceError, setAttendanceError] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     // Simulate fetching dashboard data
@@ -50,6 +59,38 @@ const TherapistDashboard = () => {
       setLoading(false);
     }, 1000);
   }, []);
+
+  // Add new useEffect for attendance data
+  useEffect(() => {
+    // In the fetchAttendanceSummary function
+    const fetchAttendanceSummary = async () => {
+      setAttendanceLoading(true);
+      setAttendanceError(null);
+      try {
+        // Check if the user is authenticated
+        if (!user || !user.token) {
+          console.warn('User not authenticated or token missing');
+          setAttendanceError('Authentication required. Please log in again.');
+          setAttendanceLoading(false);
+          return;
+        }
+        
+        const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth);
+        setAttendanceSummary(response.data);
+      } catch (error) {
+        console.error('Error fetching attendance summary:', error);
+        // More detailed error message
+        const errorMessage = error.response?.status === 401 
+          ? 'Authentication failed. Please log in again.'
+          : error.response?.data?.message || 'Failed to load attendance data';
+        setAttendanceError(errorMessage);
+      } finally {
+        setAttendanceLoading(false);
+      }
+    };
+
+    fetchAttendanceSummary();
+  }, [currentYear, currentMonth, user]); // Added user to the dependency array
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -234,6 +275,53 @@ const TherapistDashboard = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Attendance Section - Add this new section */}
+            <div className="px-4 py-6 sm:px-0">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Attendance</h2>
+                <div className="flex space-x-2">
+                  <select 
+                    className="border rounded p-2 text-sm"
+                    value={currentMonth}
+                    onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                      </option>
+                    ))}
+                  </select>
+                  <select 
+                    className="border rounded p-2 text-sm"
+                    value={currentYear}
+                    onChange={(e) => setCurrentYear(parseInt(e.target.value))}
+                  >
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const year = new Date().getFullYear() - 2 + i;
+                      return <option key={year} value={year}>{year}</option>;
+                    })}
+                  </select>
+                </div>
+              </div>
+              
+              {attendanceError && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                  <p className="text-red-700">{attendanceError}</p>
+                </div>
+              )}
+              
+              <AttendanceSummary summary={attendanceSummary} loading={attendanceLoading} />
+              
+              <div className="flex justify-end mb-6">
+                <Link
+                  to="/attendance"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  Submit Today's Attendance
+                </Link>
               </div>
             </div>
 
@@ -594,3 +682,4 @@ const TherapistDashboard = () => {
 };
 
 export default TherapistDashboard;
+

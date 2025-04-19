@@ -73,8 +73,7 @@ def pre_save_handler(sender, instance, **kwargs):
         instance._pre_save_state = {}
 
 @receiver(post_save)
-# Instead of trying to JSON dump the entire model instance, create a serializable dict
-def log_model_change(sender, instance, created, **kwargs):
+def log_model_change(sender, instance, created=False, **kwargs):
     """Create an audit log entry after a model is saved"""
     # Skip if running migrations
     if RUNNING_MIGRATIONS:
@@ -110,6 +109,20 @@ def log_model_change(sender, instance, created, **kwargs):
     
     # When creating the AuditLog, ensure any datetime objects are properly serialized
     if previous_state:
+        # Before serializing, convert complex objects to their string representation or ID
+        def prepare_for_json(data):
+            if isinstance(data, dict):
+                return {k: prepare_for_json(v) for k, v in data.items()}
+            elif isinstance(data, (list, tuple)):
+                return [prepare_for_json(item) for item in data]
+            elif hasattr(data, 'pk') and hasattr(data, '__class__'):
+                # For model instances, just store the ID and model name
+                return f"{data.__class__.__name__}:{data.pk}"
+            else:
+                return data
+        
+        # Apply the conversion before JSON serialization
+        previous_state = prepare_for_json(previous_state)
         previous_state = json.loads(json.dumps(previous_state, cls=DjangoJSONEncoder))
     
     # Fix: Use current_state instead of new_state
@@ -143,6 +156,7 @@ def log_model_change(sender, instance, created, **kwargs):
         elif isinstance(field_value, (str, int, float, bool, type(None))):
             # These types are JSON serializable
             serializable_data[field_name] = field_value
+    
     model_name = sender.__name__
     object_repr = str(instance)[:255]
     AuditLog.objects.create(
@@ -181,12 +195,14 @@ def post_delete_handler(sender, instance, **kwargs):
         ip_address = request.META.get('REMOTE_ADDR')
         user_agent = request.META.get('HTTP_USER_AGENT', '')
     
-    # Get the final state before deletion
-    final_state = {
-        field.name: getattr(instance, field.name)
-        for field in sender._meta.fields
-        if not isinstance(field, models.FileField)  # Skip file fields
-    }
+    # Get the final state before deletion - handle foreign keys properly
+    final_state = {}
+    for field in sender._meta.fields:
+        if isinstance(field, models.ForeignKey):
+            # Store the ID instead of the object
+            final_state[f'{field.name}_id'] = getattr(instance, f'{field.name}_id', None)
+        else:
+            final_state[field.name] = str(getattr(instance, field.name, ''))  # Convert to string for non-serializable types
     
     # Create the audit log
     AuditLog.objects.create(

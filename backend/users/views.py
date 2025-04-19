@@ -371,3 +371,42 @@ class PatientSignupStep3View(APIView):
             # For now, we'll just return a success message
             return Response({'message': 'Patient registration complete.'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Add to existing imports at top
+from rest_framework import permissions
+
+# Then modify the permission classes like this:
+class TherapistStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTherapistUser]
+    
+    def get(self, request):
+        return Response({
+            'is_approved': request.user.therapist.is_approved,
+            'approval_date': request.user.therapist.approval_date
+        })
+
+class PendingTherapistsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+class ApproveTherapistView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    
+    def get(self, request):
+        """GET to list pending therapists (if needed)"""
+        therapists = Therapist.objects.filter(is_approved=False)
+        serializer = TherapistSerializer(therapists, many=True)
+        return Response(serializer.data)
+    
+    def post(self, request, pk):
+        """POST to approve a specific therapist"""
+        try:
+            therapist = Therapist.objects.get(pk=pk)
+            therapist.is_approved = True
+            therapist.approval_date = timezone.now()
+            therapist.save()
+            return Response({"status": "Therapist approved"})
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )

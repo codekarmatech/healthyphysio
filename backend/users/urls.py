@@ -29,5 +29,9 @@ urlpatterns = [
 
     # —— USER PROFILES —— everything here will be prefixed with /api/users/…
     path('', include(router.urls)),
-
+    
+    # Therapist approval endpoints
+    path('api/users/therapist-status/', views.TherapistStatusView.as_view(), name='therapist-status'),
+    path('api/users/pending-therapists/', views.PendingTherapistsView.as_view(), name='pending-therapists'),
+    path('api/users/approve-therapist/<int:pk>/', views.ApproveTherapistView.as_view(), name='approve-therapist'),
 ]

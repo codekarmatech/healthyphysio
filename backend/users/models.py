@@ -93,6 +93,8 @@ class Patient(models.Model):
 # Update the Therapist model to include all fields referenced in serializers
 class Therapist(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='therapist_profile')
+    is_approved = models.BooleanField(default=False)
+    approval_date = models.DateTimeField(null=True, blank=True)
     photo = EncryptedFileField(upload_to='therapists/', blank=True, null=True)
     license_number = models.CharField(max_length=50)
     specialization = models.CharField(max_length=100, blank=True)

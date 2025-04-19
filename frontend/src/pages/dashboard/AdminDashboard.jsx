@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import api from '../../services/api';
 
 const AdminDashboard = ({ user }) => {
   const [stats, setStats] = useState({
@@ -10,6 +11,10 @@ const AdminDashboard = ({ user }) => {
   });
   const [recentUsers, setRecentUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Add state for pending therapists
+  const [pendingTherapists, setPendingTherapists] = useState([]);
+  const [loadingTherapists, setLoadingTherapists] = useState(false);
 
   useEffect(() => {
     // Simulate fetching dashboard data
@@ -51,6 +56,34 @@ const AdminDashboard = ({ user }) => {
       setLoading(false);
     }, 1000);
   }, []);
+
+  // Fetch pending therapists
+  useEffect(() => {
+    const fetchPendingTherapists = async () => {
+      setLoadingTherapists(true);
+      try {
+        const response = await api.get('/users/pending-therapists/');
+        setPendingTherapists(response.data);
+      } catch (error) {
+        console.error('Error fetching pending therapists:', error);
+      } finally {
+        setLoadingTherapists(false);
+      }
+    };
+    
+    fetchPendingTherapists();
+  }, []);
+
+  // Approve therapist function
+  const approveTherapist = async (therapistId) => {
+    try {
+      await api.post(`/users/approve-therapist/${therapistId}/`);
+      // Remove from pending list
+      setPendingTherapists(pendingTherapists.filter(t => t.id !== therapistId));
+    } catch (error) {
+      console.error('Error approving therapist:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -233,6 +266,40 @@ const AdminDashboard = ({ user }) => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Therapist Approval Section */}
+            <div className="px-4 py-6 sm:px-0">
+              <h2 className="text-lg font-medium text-gray-900">Pending Therapist Approvals</h2>
+              {loadingTherapists ? (
+                <div className="animate-pulse mt-4">
+                  {Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="bg-white p-4 rounded-md shadow mb-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : pendingTherapists.length === 0 ? (
+                <p className="text-gray-500 mt-4">No pending therapist approvals</p>
+              ) : (
+                <ul className="divide-y divide-gray-200 mt-4 bg-white shadow overflow-hidden sm:rounded-md">
+                  {pendingTherapists.map(therapist => (
+                    <li key={therapist.id} className="px-4 py-4 flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{therapist.first_name} {therapist.last_name}</p>
+                        <p className="text-sm text-gray-500">{therapist.email}</p>
+                      </div>
+                      <button
+                        onClick={() => approveTherapist(therapist.id)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      >
+                        Approve
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Recent Users */}
