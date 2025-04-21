@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import AttendanceSummary from '../../components/attendance/AttendanceSummary';
 import attendanceService from '../../services/attendanceService';
+import MonthSelector from '../../components/attendance/MonthSelector';
+import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
 
 const TherapistDashboard = () => {
   const { user } = useAuth(); // Get user from context instead of props
@@ -21,6 +23,35 @@ const TherapistDashboard = () => {
   const [attendanceError, setAttendanceError] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [attendanceDays, setAttendanceDays] = useState([]);
+  // Memoized fetch function to satisfy hook dependency requirements
+  const fetchAttendanceSummary = useCallback(async () => {
+    setAttendanceLoading(true);
+    setAttendanceError(null);
+    try {
+      // Check if the user is authenticated
+      if (!user || !user.token) {
+        console.warn('User not authenticated or token missing');
+        setAttendanceError('Authentication required. Please log in again.');
+        setAttendanceLoading(false);
+        return;
+      }
+      
+      // Use therapist_id from user object if available
+      const therapistId = user.therapist_id || user.id;
+      const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
+      setAttendanceSummary(response.data);
+      setAttendanceDays(response.data?.days || []);
+    } catch (error) {
+      console.error('Error fetching attendance summary:', error);
+      const errorMessage = error.response?.status === 401 
+        ? 'Authentication failed. Please log in again.'
+        : error.response?.data?.message || 'Failed to load attendance data';
+      setAttendanceError(errorMessage);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  }, [currentYear, currentMonth, user]);
 
   useEffect(() => {
     // Simulate fetching dashboard data
@@ -61,36 +92,32 @@ const TherapistDashboard = () => {
   }, []);
 
   // Add new useEffect for attendance data
+  // In the existing useEffect for attendance or where you fetch attendance data
   useEffect(() => {
-    // In the fetchAttendanceSummary function
-    const fetchAttendanceSummary = async () => {
-      setAttendanceLoading(true);
-      setAttendanceError(null);
-      try {
-        // Check if the user is authenticated
-        if (!user || !user.token) {
-          console.warn('User not authenticated or token missing');
-          setAttendanceError('Authentication required. Please log in again.');
-          setAttendanceLoading(false);
-          return;
-        }
-        
-        const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth);
-        setAttendanceSummary(response.data);
-      } catch (error) {
-        console.error('Error fetching attendance summary:', error);
-        // More detailed error message
-        const errorMessage = error.response?.status === 401 
-          ? 'Authentication failed. Please log in again.'
-          : error.response?.data?.message || 'Failed to load attendance data';
-        setAttendanceError(errorMessage);
-      } finally {
-        setAttendanceLoading(false);
-      }
-    };
-
     fetchAttendanceSummary();
-  }, [currentYear, currentMonth, user]); // Added user to the dependency array
+  }, [fetchAttendanceSummary]);
+
+  // Add handlers for month navigation
+  const handlePrevMonth = () => {
+    if (currentMonth === 1) {
+      setCurrentMonth(12);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 12) {
+      setCurrentMonth(1);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
+
+  // Create a Date object for the current month/year for MonthSelector
+  const currentDate = new Date(currentYear, currentMonth - 1);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -278,50 +305,45 @@ const TherapistDashboard = () => {
               </div>
             </div>
 
-            {/* Attendance Section - Add this new section */}
-            <div className="px-4 py-6 sm:px-0">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">Attendance</h2>
-                <div className="flex space-x-2">
-                  <select 
-                    className="border rounded p-2 text-sm"
-                    value={currentMonth}
-                    onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
-                  >
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        {new Date(0, i).toLocaleString('default', { month: 'long' })}
-                      </option>
-                    ))}
-                  </select>
-                  <select 
-                    className="border rounded p-2 text-sm"
-                    value={currentYear}
-                    onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-                  >
-                    {Array.from({ length: 5 }, (_, i) => {
-                      const year = new Date().getFullYear() - 2 + i;
-                      return <option key={year} value={year}>{year}</option>;
-                    })}
-                  </select>
+            {/* Attendance Section */}
+            <div className="mt-8">
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Attendance</h3>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">Your attendance record for the month.</p>
                 </div>
-              </div>
-              
-              {attendanceError && (
-                <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                  <p className="text-red-700">{attendanceError}</p>
+                
+                <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+                  {attendanceLoading ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+                      <p className="mt-3 text-gray-700">Loading attendance data...</p>
+                    </div>
+                  ) : attendanceError ? (
+                    <div className="text-center py-4 text-red-500">
+                      <p>{attendanceError}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Replace the raw select menus with MonthSelector */}
+                      <MonthSelector 
+                        currentDate={currentDate}
+                        onPrevMonth={handlePrevMonth}
+                        onNextMonth={handleNextMonth}
+                      />
+                      
+                      <AttendanceCalendar
+                        days={attendanceDays}
+                        currentDate={currentDate}
+                        onAttendanceUpdated={() => fetchAttendanceSummary()}
+                      />
+                      
+                      {attendanceSummary && (
+                        <AttendanceSummary summary={attendanceSummary} />
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-              
-              <AttendanceSummary summary={attendanceSummary} loading={attendanceLoading} />
-              
-              <div className="flex justify-end mb-6">
-                <Link
-                  to="/attendance"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  Submit Today's Attendance
-                </Link>
               </div>
             </div>
 

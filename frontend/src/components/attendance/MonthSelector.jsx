@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/solid';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid' // v2 import path
 
 const MonthSelector = ({ currentDate, onPrevMonth, onNextMonth }) => {
   const monthNames = [
@@ -18,7 +18,10 @@ const MonthSelector = ({ currentDate, onPrevMonth, onNextMonth }) => {
       </button>
       
       <h2 className="text-lg font-semibold text-gray-800">
-        {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+        {/* Add check for currentDate before accessing methods */}
+        {currentDate instanceof Date && !isNaN(currentDate)
+          ? `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+          : 'Loading...'} 
       </h2>
       
       <button

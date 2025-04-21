@@ -1,8 +1,8 @@
 import api from './api';
 
-const getMonthlyAttendance = async (year, month) => {
-  // Make sure we're using the authenticated API instance
-  return api.get(`/attendance/monthly-summary/?year=${year}&month=${month}`);
+const getMonthlyAttendance = async (year, month, therapistId) => {
+  // Updated to include therapist_id parameter
+  return api.get(`/attendance/?year=${year}&month=${month}&therapist_id=${therapistId}`);
 };
 
 const submitAttendance = async (data) => {

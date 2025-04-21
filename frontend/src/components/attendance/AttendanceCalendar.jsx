@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isToday, isSameDay } from 'date-fns';
-import attendanceService from '../../services/attendance.service';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+// Use the imported utilities from dateUtils
+import { dayFormat, isSameDay } from '../../utils/dateUtils'; 
+import attendanceService from '../../services/attendanceService';
 
 const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated }) => {
   const [submitting, setSubmitting] = useState(false);
@@ -13,7 +15,6 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated }) => {
   const endDate = monthEnd;
   
   const dateFormat = "d";
-  const dayFormat = "EEEE";
   const days_of_week = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   
   const daysInMonth = eachDayOfInterval({
@@ -51,7 +52,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated }) => {
   // Function to handle day click
   const handleDayClick = (date) => {
     // Only allow submission for today
-    if (isToday(date)) {
+    if (isSameDay(date, new Date())) { // Replace isToday with isSameDay
       // Check if attendance already submitted
       const dayData = getDayData(date);
       if (dayData && dayData.status !== 'upcoming') {
@@ -105,7 +106,8 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated }) => {
           const status = dayData ? dayData.status : 'upcoming';
           const isApproved = dayData ? dayData.is_approved : false;
           const statusColor = getStatusColor(status, isApproved);
-          const isCurrentDay = isToday(day);
+          // Replace isToday with isSameDay
+          const isCurrentDay = isSameDay(day, new Date());
           
           return (
             <div
@@ -114,7 +116,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated }) => {
                 isCurrentDay ? 'ring-2 ring-primary-500' : ''
               }`}
               onClick={() => handleDayClick(day)}
-              title={dayData?.holiday_name || ''}
+              title={`${dayFormat(day)} - ${dayData?.holiday_name || ''}`} // Add tooltip with full day name
             >
               <div className="flex flex-col h-full">
                 <span className={`text-sm font-semibold ${isCurrentDay ? 'text-primary-700' : 'text-gray-700'}`}>
