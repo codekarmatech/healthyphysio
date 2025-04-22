@@ -99,7 +99,13 @@ class AssessmentVersion(models.Model):
     assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE, related_name='versions')
     content = models.TextField()
     changes = models.JSONField(default=dict)  # {field: {old: val, new: val}}
-    edited_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True)
+    edited_by = models.ForeignKey(
+            settings.AUTH_USER_MODEL,
+            null=True,
+            blank=True,
+            on_delete=models.SET_NULL,
+            related_name='attendance_edited_versions'
+        )
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

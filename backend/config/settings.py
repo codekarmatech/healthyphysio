@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'scheduling',
     'attendance',
     'audit_logs',  # Add this line
+    'assessments',
     'websocket',   # Add this if you've created it
 ]
 
