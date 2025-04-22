@@ -3,7 +3,6 @@ from django.conf import settings
 from scheduling.models import Appointment
 
 
-# Forward reference to scheduling.TherapySession
 class Assessment(models.Model):
     appointment = models.ForeignKey('scheduling.Appointment',
                                     on_delete=models.CASCADE,
