@@ -4,7 +4,7 @@ Connected to: Appointment creation and management
 """
 
 from rest_framework import serializers
-from .models import Appointment, RescheduleRequest
+from .models import Appointment, RescheduleRequest, Session
 from users.serializers import PatientSerializer, TherapistSerializer
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -29,3 +29,10 @@ class RescheduleRequestSerializer(serializers.ModelSerializer):
             'reason', 'status', 'admin_notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class SessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Session
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')

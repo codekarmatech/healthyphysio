@@ -410,3 +410,73 @@ class ApproveTherapistView(APIView):
                 {"error": "Therapist not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+class TherapistDashboardSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsTherapistUser]
+    
+    def get(self, request):
+        """
+        Get dashboard summary for therapist including:
+        - Upcoming appointments count
+        - Today's appointments count
+        - Total patients count
+        - Pending assessments count
+        - Recent appointments
+        """
+        try:
+            therapist = request.user.therapist_profile
+            today = timezone.now().date()
+            tomorrow = today + timedelta(days=1)
+            
+            # Get counts
+            upcoming_appointments = Appointment.objects.filter(
+                therapist=therapist,
+                datetime__date__gte=today,
+                status=Appointment.Status.SCHEDULED
+            ).count()
+            
+            today_appointments = Appointment.objects.filter(
+                therapist=therapist,
+                datetime__date=today,
+                status=Appointment.Status.SCHEDULED
+            ).count()
+            
+            # Get unique patients for this therapist
+            total_patients = Appointment.objects.filter(
+                therapist=therapist
+            ).values('patient').distinct().count()
+            
+            # Get pending assessments (sessions that need approval)
+            pending_assessments = Session.objects.filter(
+                appointment__therapist=therapist,
+                status=Session.Status.CHECKIN_INITIATED
+            ).count()
+            
+            # Get recent appointments (last 5)
+            recent_appointments = Appointment.objects.filter(
+                therapist=therapist
+            ).order_by('-datetime')[:5]
+            
+            recent_appointments_data = []
+            for appointment in recent_appointments:
+                recent_appointments_data.append({
+                    'id': appointment.id,
+                    'patient_name': f"{appointment.patient.user.first_name} {appointment.patient.user.last_name}",
+                    'datetime': appointment.datetime,
+                    'status': appointment.status,
+                    'session_code': appointment.session_code
+                })
+            
+            return Response({
+                'upcoming_appointments': upcoming_appointments,
+                'today_appointments': today_appointments,
+                'total_patients': total_patients,
+                'pending_assessments': pending_assessments,
+                'recent_appointments': recent_appointments_data
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

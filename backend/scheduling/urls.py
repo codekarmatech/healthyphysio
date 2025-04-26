@@ -10,6 +10,7 @@ from . import views
 router = DefaultRouter()
 router.register(r'appointments', views.AppointmentViewSet)
 router.register(r'reschedule-requests', views.RescheduleRequestViewSet)
+router.register(r'sessions', views.SessionViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

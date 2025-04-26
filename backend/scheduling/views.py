@@ -8,8 +8,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 # Fix the import to use the correct permission class names
 from users.permissions import IsAdminUser, IsTherapistUser, IsPatientUser
-from .models import Appointment, RescheduleRequest
-from .serializers import AppointmentSerializer, RescheduleRequestSerializer
+from .models import Appointment, RescheduleRequest, Session
+from .serializers import AppointmentSerializer, RescheduleRequestSerializer, SessionSerializer
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -124,6 +124,90 @@ class RescheduleRequestViewSet(viewsets.ModelViewSet):
             {"message": "Reschedule request rejected"},
             status=status.HTTP_200_OK
         )
+
+class SessionViewSet(viewsets.ModelViewSet):
+    queryset = Session.objects.all()
+    serializer_class = SessionSerializer
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [permissions.IsAuthenticated, IsAdminUser | IsTherapistUser]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_admin:
+            return Session.objects.all()
+        elif user.is_therapist:
+            try:
+                therapist = user.therapist_profile
+                return Session.objects.filter(appointment__therapist=therapist)
+            except:
+                return Session.objects.none()
+        elif user.is_patient:
+            try:
+                patient = user.patient_profile
+                return Session.objects.filter(appointment__patient=patient)
+            except:
+                return Session.objects.none()
+        return Session.objects.none()
+    
+    @action(detail=True, methods=['post'])
+    def initiate_check_in(self, request, pk=None):
+        session = self.get_object()
+        success = session.initiate_check_in()
+        
+        if success:
+            return Response({"message": "Check-in initiated successfully"})
+        else:
+            return Response(
+                {"error": "Cannot initiate check-in for this session"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['post'])
+    def approve_check_in(self, request, pk=None):
+        session = self.get_object()
+        success = session.approve_check_in()
+        
+        if success:
+            return Response({"message": "Check-in approved successfully"})
+        else:
+            return Response(
+                {"error": "Cannot approve check-in for this session"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        session = self.get_object()
+        rating = request.data.get('rating')
+        patient_notes = request.data.get('patient_notes', '')
+        
+        success = session.complete_session(rating, patient_notes)
+        
+        if success:
+            return Response({"message": "Session completed successfully"})
+        else:
+            return Response(
+                {"error": "Cannot complete this session"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['post'])
+    def mark_missed(self, request, pk=None):
+        session = self.get_object()
+        success = session.mark_as_missed()
+        
+        if success:
+            return Response({"message": "Session marked as missed"})
+        else:
+            return Response(
+                {"error": "Cannot mark this session as missed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
