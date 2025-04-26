@@ -17,8 +17,7 @@ from . import views
 router = DefaultRouter()
 router.register(r'', views.AttendanceViewSet, basename='attendance')
 router.register(r'holidays', views.HolidayViewSet)
-# router.register(r'sessions', views.SessionViewSet)
-# router.register(r'assessments', views.AssessmentViewSet)
+# Remove the SessionViewSet and AssessmentViewSet registrations
 urlpatterns = [
     path('', include(router.urls)),
 ]

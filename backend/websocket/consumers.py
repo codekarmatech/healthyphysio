@@ -10,7 +10,8 @@ from channels.db import database_sync_to_async
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from scheduling.models import Appointment
-from attendance.models import Session
+from scheduling.models import Session
+
 
 User = get_user_model()
 

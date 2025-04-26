@@ -4,7 +4,8 @@ Connected to: Session management and assessments
 """
 
 from rest_framework import serializers
-from .models import Session, Assessment, AssessmentVersion
+from scheduling.models import Session
+from assessments.models import Assessment, AssessmentVersion
 from scheduling.serializers import AppointmentSerializer
 from .models import Attendance, Holiday
 from django.utils import timezone

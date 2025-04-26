@@ -13,74 +13,13 @@ from django.shortcuts import get_object_or_404
 from users.permissions import IsAdminUser, IsTherapistUser, IsPatientUser
 from scheduling.models import Appointment
 # Import the correct models - Session and Assessment instead of AttendanceRecord
-from .models import Session, Assessment, AssessmentVersion
-from .serializers import SessionSerializer, AssessmentSerializer
+from scheduling.models import Session
+# Remove Assessment imports
+from .serializers import SessionSerializer
 # Add this import for the Therapist model
 from users.models import Therapist
 
-class SessionViewSet(viewsets.ModelViewSet):
-    queryset = Session.objects.all()
-    serializer_class = SessionSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_admin:
-            return Session.objects.all()
-        elif user.is_therapist:
-            # Therapists can only see sessions for their appointments
-            therapist = user.therapist_profile
-            return Session.objects.filter(appointment__therapist=therapist)
-        elif user.is_patient:
-            # Patients can only see their own sessions
-            patient = user.patient_profile
-            return Session.objects.filter(appointment__patient=patient)
-        return Session.objects.none()
-
-class AssessmentViewSet(viewsets.ModelViewSet):
-    queryset = Assessment.objects.all()
-    serializer_class = AssessmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_admin:
-            return Assessment.objects.all()
-        elif user.is_therapist:
-            # Therapists can see assessments for their sessions
-            therapist = user.therapist_profile
-            return Assessment.objects.filter(session__appointment__therapist=therapist)
-        elif user.is_patient:
-            # Patients can only see assessments shared with them
-            patient = user.patient_profile
-            return Assessment.objects.filter(
-                session__appointment__patient=patient,
-                shared_with_patient=True
-            )
-        return Assessment.objects.none()
-    
-    def perform_update(self, serializer):
-        # Create a version history when assessment is updated
-        old_assessment = self.get_object()
-        changes = {}
-        
-        for field in ['content', 'shared_with_patient']:
-            old_value = getattr(old_assessment, field)
-            new_value = serializer.validated_data.get(field, old_value)
-            if old_value != new_value:
-                changes[field] = {'old': old_value, 'new': new_value}
-        
-        # Save the updated assessment
-        assessment = serializer.save()
-        
-        # Create a version record if there are changes
-        if changes:
-            AssessmentVersion.objects.create(
-                assessment=assessment,
-                content=assessment.content,
-                changes=changes,
-                edited_by=self.request.user
-            )
+# Remove SessionViewSet and AssessmentViewSet classes
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated, IsPatientUser])  # Change IsPatient to IsPatientUser

@@ -4,23 +4,19 @@ Connected to: Django admin interface
 """
 
 from django.contrib import admin
-from .models import Session, Assessment, AssessmentVersion
+from .models import Holiday, Attendance
 
-class SessionAdmin(admin.ModelAdmin):
-    list_display = ('appointment', 'status', 'check_in', 'check_out', 'rating')
-    list_filter = ('status', 'check_in', 'check_out')
-    search_fields = ('appointment__session_code', 'appointment__patient__user__username')
+@admin.register(Holiday)
+class HolidayAdmin(admin.ModelAdmin):
+    list_display = ('name', 'date')
+    search_fields = ('name',)
 
-class AssessmentAdmin(admin.ModelAdmin):
-    list_display = ('session', 'shared_with_patient', 'created_at', 'updated_at')
-    list_filter = ('shared_with_patient', 'created_at')
-    search_fields = ('session__appointment__session_code',)
-
-class AssessmentVersionAdmin(admin.ModelAdmin):
-    list_display = ('assessment', 'edited_by', 'created_at')
-    list_filter = ('created_at',)
-    search_fields = ('assessment__session__appointment__session_code',)
-
-admin.site.register(Session, SessionAdmin)
-admin.site.register(Assessment, AssessmentAdmin)
-admin.site.register(AssessmentVersion, AssessmentVersionAdmin)
+@admin.register(Attendance)
+class AttendanceAdmin(admin.ModelAdmin):
+    list_display = ('therapist', 'date', 'status', 'submitted_at', 'approved_by', 'approved_at')
+    list_filter = ('status', 'date', 'approved_by')
+    search_fields = (
+        'therapist__user__username', 
+        'therapist__user__first_name',
+        'therapist__user__last_name',
+    )

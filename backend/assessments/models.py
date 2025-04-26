@@ -4,9 +4,10 @@ from scheduling.models import Appointment
 
 
 class Assessment(models.Model):
-    appointment = models.ForeignKey('scheduling.Appointment',
-                                    on_delete=models.CASCADE,
-                                    related_name='assessments')
+    appointment = models.ForeignKey(
+        'scheduling.Appointment',
+        on_delete=models.CASCADE,
+        related_name='assessments')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -18,7 +19,7 @@ class Assessment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Assessment {self.id} on session {self.session.id}"
+        return f"Assessment {self.id} on appointment {self.appointment.session_code}"
 
 class AssessmentVersion(models.Model):
     assessment = models.ForeignKey(
