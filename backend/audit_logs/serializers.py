@@ -6,6 +6,7 @@ Validation: Data formatting
 
 from rest_framework import serializers
 from .models import AuditLog, AuditLogArchive
+from django.utils import timezone
 
 class AuditLogSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
@@ -22,6 +23,12 @@ class AuditLogSerializer(serializers.ModelSerializer):
         if obj.user:
             return obj.user.get_full_name() or obj.user.username
         return None
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.timestamp:
+            representation['timestamp'] = timezone.localtime(instance.timestamp).strftime('%Y-%m-%dT%H:%M:%S%z')
+        return representation
 
 
 class AuditLogArchiveSerializer(serializers.ModelSerializer):

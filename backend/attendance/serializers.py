@@ -25,16 +25,24 @@ class AttendanceSerializer(serializers.ModelSerializer):
     def get_submitted_at_ist(self, obj):
         if obj.submitted_at:
             # Convert to IST (UTC+5:30)
-            ist_time = obj.submitted_at.astimezone(timezone.get_fixed_timezone(330))
-            return ist_time.strftime("%I:%M %p IST")
+            ist_time = timezone.localtime(obj.submitted_at, timezone=timezone.get_fixed_timezone(330))
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
         return None
     
     def get_approved_at_ist(self, obj):
         if obj.approved_at:
             # Convert to IST (UTC+5:30)
-            ist_time = obj.approved_at.astimezone(timezone.get_fixed_timezone(330))
-            return ist_time.strftime("%I:%M %p IST")
+            ist_time = timezone.localtime(obj.approved_at, timezone=timezone.get_fixed_timezone(330))
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
         return None
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.submitted_at:
+            representation['submitted_at'] = timezone.localtime(instance.submitted_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.approved_at:
+            representation['approved_at'] = timezone.localtime(instance.approved_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        return representation
     
     def validate(self, data):
         today = timezone.now().date()

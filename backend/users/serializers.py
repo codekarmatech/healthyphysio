@@ -6,14 +6,20 @@ Connected to: User authentication and profile management
 
 from rest_framework import serializers
 from .models import User, Patient, Therapist, Doctor
+from django.utils import timezone
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone']
-        # Add any other fields that might be needed by the frontend
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'date_joined']
         read_only_fields = ['date_joined']
         extra_kwargs = {'password': {'write_only': True}}
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.date_joined:
+            representation['date_joined'] = timezone.localtime(instance.date_joined).strftime('%Y-%m-%dT%H:%M:%S%z')
+        return representation
 
 class PatientSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -62,8 +68,15 @@ class TherapistSerializer(serializers.ModelSerializer):
     class Meta:
         model = Therapist
         fields = ['id', 'user', 'license_number', 'specialization', 'years_of_experience', 
-                 'photo', 'experience', 'residential_address', 'preferred_areas']
+                 'photo', 'experience', 'residential_address', 'preferred_areas', 
+                 'is_approved', 'approval_date']
         read_only_fields = ['id']
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.approval_date:
+            representation['approval_date'] = timezone.localtime(instance.approval_date).strftime('%Y-%m-%dT%H:%M:%S%z')
+        return representation
 
 class DoctorSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

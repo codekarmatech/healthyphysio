@@ -24,7 +24,17 @@ class AppointmentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'session_code', 'created_at', 'updated_at']
     
     def get_local_datetime(self, obj):
-        return timezone.localtime(obj.datetime).strftime('%Y-%m-%d %H:%M:%S')
+        return timezone.localtime(obj.datetime).strftime('%Y-%m-%dT%H:%M:%S%z')
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.created_at:
+            representation['created_at'] = timezone.localtime(instance.created_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.updated_at:
+            representation['updated_at'] = timezone.localtime(instance.updated_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.datetime:
+            representation['datetime'] = timezone.localtime(instance.datetime).strftime('%Y-%m-%dT%H:%M:%S%z')
+        return representation
 
 class RescheduleRequestSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,7 +44,16 @@ class RescheduleRequestSerializer(serializers.ModelSerializer):
             'reason', 'status', 'admin_notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
-
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.requested_datetime:
+            representation['requested_datetime'] = timezone.localtime(instance.requested_datetime).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.created_at:
+            representation['created_at'] = timezone.localtime(instance.created_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.updated_at:
+            representation['updated_at'] = timezone.localtime(instance.updated_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        return representation
 
 class SessionSerializer(serializers.ModelSerializer):
     local_datetime = serializers.SerializerMethodField()
@@ -47,5 +66,17 @@ class SessionSerializer(serializers.ModelSerializer):
     
     def get_local_datetime(self, obj):
         if obj.appointment and obj.appointment.datetime:
-            return timezone.localtime(obj.appointment.datetime).strftime('%Y-%m-%d %H:%M:%S')
+            return timezone.localtime(obj.appointment.datetime).strftime('%Y-%m-%dT%H:%M:%S%z')
         return None
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.check_in:
+            representation['check_in'] = timezone.localtime(instance.check_in).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.check_out:
+            representation['check_out'] = timezone.localtime(instance.check_out).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.created_at:
+            representation['created_at'] = timezone.localtime(instance.created_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        if instance.updated_at:
+            representation['updated_at'] = timezone.localtime(instance.updated_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+        return representation
