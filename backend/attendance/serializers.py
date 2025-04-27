@@ -4,42 +4,8 @@ Connected to: Session management and assessments
 """
 
 from rest_framework import serializers
-from scheduling.models import Session
-from assessments.models import Assessment, AssessmentVersion
-from scheduling.serializers import AppointmentSerializer
 from .models import Attendance, Holiday
 from django.utils import timezone
-from datetime import datetime, time
-
-class SessionSerializer(serializers.ModelSerializer):
-    appointment_details = AppointmentSerializer(source='appointment', read_only=True)
-    
-    class Meta:
-        model = Session
-        fields = [
-            'id', 'appointment', 'status', 'check_in', 'check_out', 
-            'rating', 'patient_notes', 'therapist_notes', 'created_at', 
-            'updated_at', 'appointment_details'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-class AssessmentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Assessment
-        fields = [
-            'id', 'session', 'content', 'shared_with_patient', 
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-class AssessmentVersionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AssessmentVersion
-        fields = [
-            'id', 'assessment', 'content', 'changes', 
-            'edited_by', 'created_at'
-        ]
-        read_only_fields = ['id', 'created_at']
 
 class HolidaySerializer(serializers.ModelSerializer):
     class Meta:
@@ -89,7 +55,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
                 except Therapist.DoesNotExist:
                     pass
         
-        return data  # This return was missing in original code
+        return data
     
     def create(self, validated_data):
         request = self.context.get('request')

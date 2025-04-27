@@ -19,6 +19,11 @@ from .models import Therapist, Doctor
 from .serializers import UserSerializer, PatientSerializer, TherapistSerializer, DoctorSerializer
 from .permissions import IsAdminUser, IsTherapistUser, IsDoctorUser, IsPatientUser
 
+# Add these imports for timezone and timedelta
+from django.utils import timezone
+from datetime import timedelta
+from scheduling.models import Appointment
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -411,72 +416,202 @@ class ApproveTherapistView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-class TherapistDashboardSummaryView(APIView):
+# If you already have a TherapistDashboardSummaryView (APIView), convert it to a ViewSet
+class TherapistDashboardSummaryViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsTherapistUser]
     
-    def get(self, request):
-        """
-        Get dashboard summary for therapist including:
-        - Upcoming appointments count
-        - Today's appointments count
-        - Total patients count
-        - Pending assessments count
-        - Recent appointments
-        """
+    def list(self, request):
+        
         try:
             therapist = request.user.therapist_profile
-            today = timezone.now().date()
-            tomorrow = today + timedelta(days=1)
-            
-            # Get counts
-            upcoming_appointments = Appointment.objects.filter(
-                therapist=therapist,
-                datetime__date__gte=today,
-                status=Appointment.Status.SCHEDULED
-            ).count()
-            
-            today_appointments = Appointment.objects.filter(
-                therapist=therapist,
-                datetime__date=today,
-                status=Appointment.Status.SCHEDULED
-            ).count()
-            
-            # Get unique patients for this therapist
-            total_patients = Appointment.objects.filter(
-                therapist=therapist
-            ).values('patient').distinct().count()
-            
-            # Get pending assessments (sessions that need approval)
-            pending_assessments = Session.objects.filter(
-                appointment__therapist=therapist,
-                status=Session.Status.CHECKIN_INITIATED
-            ).count()
-            
-            # Get recent appointments (last 5)
-            recent_appointments = Appointment.objects.filter(
-                therapist=therapist
-            ).order_by('-datetime')[:5]
-            
-            recent_appointments_data = []
-            for appointment in recent_appointments:
-                recent_appointments_data.append({
-                    'id': appointment.id,
-                    'patient_name': f"{appointment.patient.user.first_name} {appointment.patient.user.last_name}",
-                    'datetime': appointment.datetime,
-                    'status': appointment.status,
-                    'session_code': appointment.session_code
-                })
-            
-            return Response({
-                'upcoming_appointments': upcoming_appointments,
-                'today_appointments': today_appointments,
-                'total_patients': total_patients,
-                'pending_assessments': pending_assessments,
-                'recent_appointments': recent_appointments_data
-            })
-            
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        except:
+            return Response({"error": "Therapist profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get current date and time
+        now = timezone.now()
+        today = now.date()
+        
+        # Get upcoming appointments
+        upcoming_appointments = Appointment.objects.filter(
+            therapist=therapist,
+            datetime__gt=now,
+            status='scheduled'
+        ).count()
+        
+        # Get today's appointments
+        today_appointments = Appointment.objects.filter(
+            therapist=therapist,
+            datetime__date=today,
+            status='scheduled'
+        ).count()
+        
+        # Get completed sessions
+        completed_sessions = Appointment.objects.filter(
+            therapist=therapist,
+            status='completed'
+        ).count()
+        
+        # Prepare response data
+        response_data = {
+            "upcoming_appointments": upcoming_appointments,
+            "today_appointments": today_appointments,
+            "completed_sessions": completed_sessions
+        }
+        
+        return Response(response_data)
+
+class PatientDashboardSummaryViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsPatientUser]
+    
+    def list(self, request):
+        # Get the patient profile
+        try:
+            patient = request.user.patient_profile
+        except:
+            return Response({"error": "Patient profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get current date and time
+        now = timezone.now()
+        today = now.date()
+        
+        # Get upcoming appointments
+        upcoming_appointments = Appointment.objects.filter(
+            patient=patient,
+            datetime__gt=now,
+            status='scheduled'
+        ).order_by('datetime')[:5]
+        
+        # Get recent completed sessions
+        completed_sessions = Appointment.objects.filter(
+            patient=patient,
+            status='completed'
+        ).order_by('-datetime')[:5]
+        
+        # Get total completed sessions
+        total_completed = Appointment.objects.filter(
+            patient=patient,
+            status='completed'
+        ).count()
+        
+        # Get missed appointments
+        missed_appointments = Appointment.objects.filter(
+            patient=patient,
+            status='missed'
+        ).count()
+        
+        # Calculate attendance rate
+        total_appointments = total_completed + missed_appointments
+        attendance_rate = (total_completed / total_appointments * 100) if total_appointments > 0 else 0
+        
+        # Prepare response data
+        response_data = {
+            "upcoming_appointments": [
+                {
+                    "id": appointment.id,
+                    "session_code": appointment.session_code,
+                    "datetime": appointment.datetime,
+                    "therapist_name": appointment.therapist.user.get_full_name(),
+                    "issue": appointment.issue
+                } for appointment in upcoming_appointments
+            ],
+            "recent_sessions": [
+                {
+                    "id": appointment.id,
+                    "session_code": appointment.session_code,
+                    "datetime": appointment.datetime,
+                    "therapist_name": appointment.therapist.user.get_full_name(),
+                    "issue": appointment.issue
+                } for appointment in completed_sessions
+            ],
+            "stats": {
+                "total_sessions": total_completed,
+                "missed_appointments": missed_appointments,
+                "attendance_rate": round(attendance_rate, 1)
+            }
+        }
+        
+        return Response(response_data)
+
+class DoctorDashboardSummaryViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
+    
+    def list(self, request):
+        # Get the doctor profile
+        try:
+            doctor = request.user.doctor_profile
+        except:
+            return Response({"error": "Doctor profile not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get current date and time
+        now = timezone.now()
+        today = now.date()
+        
+        # Since we don't have the exact model structure for doctor referrals,
+        # let's create a simplified response with placeholder data
+        # You'll need to adjust this based on your actual model relationships
+        
+        # Prepare response data with placeholder values
+        response_data = {
+            "stats": {
+                "total_referrals": 0,
+                "active_patients": 0,
+                "new_referrals_this_month": 0
+            },
+            "recent_referrals": []
+        }
+        
+        return Response(response_data)
+
+class AdminDashboardSummaryViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    
+    def list(self, request):
+        # Get current date and time
+        now = timezone.now()
+        today = now.date()
+        
+        # Get counts for different user types
+        total_patients = Patient.objects.count()
+        total_therapists = Therapist.objects.count()
+        total_doctors = Doctor.objects.count()
+        
+        # Get appointment statistics
+        total_appointments = Appointment.objects.count()
+        completed_appointments = Appointment.objects.filter(status='completed').count()
+        missed_appointments = Appointment.objects.filter(status='missed').count()
+        
+        # Calculate completion rate
+        completion_rate = (completed_appointments / total_appointments * 100) if total_appointments > 0 else 0
+        
+        # Get new users this month
+        first_day_of_month = today.replace(day=1)
+        new_patients_this_month = Patient.objects.filter(
+            user__date_joined__gte=first_day_of_month
+        ).count()
+        
+        # Get appointments for the next 7 days
+        next_week = today + timedelta(days=7)
+        upcoming_appointments = Appointment.objects.filter(
+            datetime__gte=today,
+            datetime__lt=next_week,
+            status='scheduled'
+        ).count()
+        
+        # Prepare response data
+        response_data = {
+            "user_stats": {
+                "total_patients": total_patients,
+                "total_therapists": total_therapists,
+                "total_doctors": total_doctors,
+                "new_patients_this_month": new_patients_this_month
+            },
+            "appointment_stats": {
+                "total_appointments": total_appointments,
+                "completed_appointments": completed_appointments,
+                "missed_appointments": missed_appointments,
+                "completion_rate": round(completion_rate, 1),
+                "upcoming_appointments": upcoming_appointments
+            }
+        }
+        
+        return Response(response_data)

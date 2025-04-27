@@ -15,7 +15,7 @@ from scheduling.models import Appointment
 # Import the correct models - Session and Assessment instead of AttendanceRecord
 from scheduling.models import Session
 # Remove Assessment imports
-from .serializers import SessionSerializer
+from scheduling.serializers import SessionSerializer
 # Add this import for the Therapist model
 from users.models import Therapist
 

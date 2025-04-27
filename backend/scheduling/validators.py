@@ -6,6 +6,7 @@ Validation: Format, date validity, existence
 
 import re
 from datetime import datetime
+from django.utils import timezone
 
 def is_valid_session_date(date_str):
     """
@@ -21,7 +22,7 @@ def is_valid_session_date(date_str):
         day = int(date_str[6:8])
         
         # Create date object and check if it's valid
-        date = datetime(year, month, day)
+        date = timezone.make_aware(datetime(year, month, day))
         
         # Check if the components match (catches invalid dates like Feb 30)
         return date.year == year and date.month == month and date.day == day

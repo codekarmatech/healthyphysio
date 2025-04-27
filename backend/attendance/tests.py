@@ -3,8 +3,8 @@ from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.utils import timezone
-from datetime import datetime, timedelta
-import calendar  # Add this import
+from datetime import timedelta
+import calendar
 from .models import Attendance, Holiday
 from users.models import User, Therapist
 import json
