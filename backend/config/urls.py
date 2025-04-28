@@ -34,6 +34,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('users.urls')),  
     path('api/users/', include('users.urls')),
+    # Add a direct route for therapists to match the frontend URL pattern
+    path('api/therapists/', include('users.urls')),
     path('api/auth/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/scheduling/', include('scheduling.urls')),

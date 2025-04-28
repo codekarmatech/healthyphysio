@@ -7,6 +7,19 @@ Connected to: User authentication and profile management
 from rest_framework import serializers
 from .models import User, Patient, Therapist, Doctor
 from django.utils import timezone
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        
+        # Add custom claims
+        token['role'] = user.role
+        token['email'] = user.email
+        token['name'] = user.get_full_name() or user.username
+        
+        return token
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

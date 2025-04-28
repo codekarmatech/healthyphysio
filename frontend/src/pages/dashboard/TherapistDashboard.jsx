@@ -5,6 +5,10 @@ import AttendanceSummary from '../../components/attendance/AttendanceSummary';
 import attendanceService from '../../services/attendanceService';
 import MonthSelector from '../../components/attendance/MonthSelector';
 import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
+import axios from 'axios';
+
+// Import your API service
+import api from '../../services/api';
 
 const TherapistDashboard = () => {
   const { user } = useAuth(); // Get user from context instead of props
@@ -24,13 +28,25 @@ const TherapistDashboard = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [attendanceDays, setAttendanceDays] = useState([]);
+  
+  // State to track if therapist is approved
+  const [isApproved, setIsApproved] = useState(false);
+  
+  // Object to store feature access permissions
+  const [featureAccess, setFeatureAccess] = useState({
+    attendance: false,
+    // Add more features here as needed
+    // example: patientManagement: false,
+    // example: reportGeneration: false,
+  });
+  
   // Memoized fetch function to satisfy hook dependency requirements
   const fetchAttendanceSummary = useCallback(async () => {
     setAttendanceLoading(true);
     setAttendanceError(null);
     try {
       // Check if the user is authenticated
-      if (!user || !user.token) {
+      if (!user) {
         console.warn('User not authenticated or token missing');
         setAttendanceError('Authentication required. Please log in again.');
         setAttendanceLoading(false);
@@ -40,6 +56,7 @@ const TherapistDashboard = () => {
       // Use therapist_id from user object if available
       const therapistId = user.therapist_id || user.id;
       const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
+      
       setAttendanceSummary(response.data);
       setAttendanceDays(response.data?.days || []);
     } catch (error) {
@@ -91,11 +108,143 @@ const TherapistDashboard = () => {
     }, 1000);
   }, []);
 
-  // Add new useEffect for attendance data
-  // In the existing useEffect for attendance or where you fetch attendance data
+  // Check therapist approval status and update feature access
   useEffect(() => {
-    fetchAttendanceSummary();
-  }, [fetchAttendanceSummary]);
+    const checkApprovalStatus = async () => {
+      try {
+        if (!user) return;
+        
+        // Get therapist ID from user object
+        const therapistId = user.therapist_id || user.id;
+        
+        // Define all possible endpoints to try
+        const endpoints = [
+          `/users/therapist-status/`,
+          `/users/therapists/${therapistId}/status/`
+        ];
+        
+        let success = false;
+        
+        // Try each endpoint until one succeeds
+        for (const endpoint of endpoints) {
+          try {
+            console.log(`Trying endpoint: ${endpoint}`);
+            const response = await api.get(endpoint);
+            
+            // Update approval status
+            setIsApproved(response.data.is_approved);
+            
+            // Update feature access based on approval status
+            setFeatureAccess(prevAccess => ({
+              ...prevAccess,
+              attendance: response.data.is_approved,
+              // Update other features as needed based on response data
+            }));
+            
+            console.log(`Approval status: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
+            success = true;
+            break; // Exit the loop if successful
+          } catch (endpointError) {
+            console.log(`Endpoint ${endpoint} failed: ${endpointError.message}`);
+            // Continue to the next endpoint
+          }
+        }
+        
+        // If all endpoints failed, set default values
+        if (!success) {
+          console.error('All approval status endpoints failed');
+          setIsApproved(false);
+          setFeatureAccess(prevAccess => ({
+            ...prevAccess,
+            attendance: false,
+            // Reset other features as needed
+          }));
+        }
+        
+      } catch (error) {
+        console.error('Error checking approval status:', error);
+        setIsApproved(false);
+        setFeatureAccess(prevAccess => ({
+          ...prevAccess,
+          attendance: false,
+          // Reset other features as needed
+        }));
+      }
+    };
+    
+    checkApprovalStatus();
+  }, [user]);
+
+  // Add useEffect for attendance data
+  useEffect(() => {
+    // Only fetch attendance data if the feature is accessible
+    if (featureAccess.attendance) {
+      fetchAttendanceSummary();
+    }
+  }, [fetchAttendanceSummary, featureAccess.attendance]);
+  
+  // Add an effect to check approval status periodically
+  // This ensures that if admin revokes approval, the UI updates
+  useEffect(() => {
+    // Check approval status every 30 seconds
+    const intervalId = setInterval(() => {
+      if (user) {
+        const checkApprovalStatus = async () => {
+          try {
+            const therapistId = user.therapist_id || user.id;
+            
+            // Define all possible endpoints to try
+            const endpoints = [
+              `/users/therapist-status/`,
+              `/users/therapists/${therapistId}/status/`
+            ];
+            
+            let success = false;
+            
+            // Try each endpoint until one succeeds
+            for (const endpoint of endpoints) {
+              try {
+                const response = await api.get(endpoint);
+                
+                // Update approval status
+                setIsApproved(response.data.is_approved);
+                
+                // Update feature access based on approval status
+                setFeatureAccess(prevAccess => ({
+                  ...prevAccess,
+                  attendance: response.data.is_approved,
+                }));
+                
+                // Log status change if it changed
+                if (response.data.is_approved !== isApproved) {
+                  console.log(`Approval status changed to: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
+                }
+                
+                success = true;
+                break; // Exit the loop if successful
+              } catch (endpointError) {
+                // Continue to the next endpoint silently in periodic check
+              }
+            }
+            
+            // If all endpoints failed, set default values
+            if (!success) {
+              console.log('Periodic check: All approval status endpoints failed');
+              // Don't reset values here to avoid flickering if it's just a temporary network issue
+            }
+            
+          } catch (error) {
+            console.error('Error in periodic approval status check:', error);
+          }
+        };
+        
+        checkApprovalStatus();
+      }
+    }, 30000); // 30 seconds
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [user, isApproved]);
 
   // Add handlers for month navigation
   const handlePrevMonth = () => {
@@ -118,6 +267,25 @@ const TherapistDashboard = () => {
 
   // Create a Date object for the current month/year for MonthSelector
   const currentDate = new Date(currentYear, currentMonth - 1);
+
+  // Render feature based on access permission
+  const renderFeature = (featureName, component, waitingMessage) => {
+    if (featureAccess[featureName]) {
+      return component;
+    } else {
+      return (
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
+          <div className="flex flex-col items-center justify-center">
+            <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+            <p className="text-gray-600">{waitingMessage || "This feature requires admin approval before you can access it."}</p>
+          </div>
+        </div>
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -167,7 +335,7 @@ const TherapistDashboard = () => {
       <div className="py-10">
         <header>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold text-gray-900">Therapist Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.firstName || 'Therapist'}!</h1>
           </div>
         </header>
         <main>
@@ -308,42 +476,75 @@ const TherapistDashboard = () => {
             {/* Attendance Section */}
             <div className="mt-8">
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-                <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">Attendance</h3>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">Your attendance record for the month.</p>
+                <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Attendance</h3>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                      Your monthly attendance record
+                    </p>
+                  </div>
                 </div>
                 
-                <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-                  {attendanceLoading ? (
-                    <div className="text-center py-4">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-                      <p className="mt-3 text-gray-700">Loading attendance data...</p>
+                {featureAccess.attendance ? (
+                  <div className="border-t border-gray-200">
+                    {attendanceLoading ? (
+                      <div className="px-4 py-5 sm:p-6 text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+                        <p className="mt-3 text-gray-700">Loading attendance data...</p>
+                      </div>
+                    ) : attendanceError ? (
+                      <div className="px-4 py-5 sm:p-6">
+                        <div className="rounded-md bg-red-50 p-4">
+                          <div className="flex">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <h3 className="text-sm font-medium text-red-800">Error loading attendance</h3>
+                              <div className="mt-2 text-sm text-red-700">
+                                <p>{attendanceError}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="px-4 py-3 bg-gray-50">
+                          <MonthSelector 
+                            currentDate={currentDate}
+                            onPrevMonth={handlePrevMonth}
+                            onNextMonth={handleNextMonth}
+                          />
+                        </div>
+                        <div className="px-4 py-5 sm:p-6">
+                          <AttendanceCalendar 
+                            days={attendanceDays}
+                            currentDate={currentDate}
+                            onAttendanceUpdated={fetchAttendanceSummary}
+                          />
+                        </div>
+                        {attendanceSummary && (
+                          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+                            <AttendanceSummary summary={attendanceSummary} />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-6 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+                      <p className="text-gray-600">Your account is pending approval from an administrator. Attendance tracking will be available once your account is approved.</p>
                     </div>
-                  ) : attendanceError ? (
-                    <div className="text-center py-4 text-red-500">
-                      <p>{attendanceError}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      {/* Replace the raw select menus with MonthSelector */}
-                      <MonthSelector 
-                        currentDate={currentDate}
-                        onPrevMonth={handlePrevMonth}
-                        onNextMonth={handleNextMonth}
-                      />
-                      
-                      <AttendanceCalendar
-                        days={attendanceDays}
-                        currentDate={currentDate}
-                        onAttendanceUpdated={() => fetchAttendanceSummary()}
-                      />
-                      
-                      {attendanceSummary && (
-                        <AttendanceSummary summary={attendanceSummary} />
-                      )}
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 

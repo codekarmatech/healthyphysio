@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import PatientSignupStep1Serializer, PatientSignupStep2Serializer, PatientSignupStep3Serializer
 from .models import User, Patient  # Assuming you have User and Patient models
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -23,6 +23,9 @@ from .permissions import IsAdminUser, IsTherapistUser, IsDoctorUser, IsPatientUs
 from django.utils import timezone
 from datetime import timedelta
 from scheduling.models import Appointment
+
+# Import for CustomTokenObtainPairSerializer
+from .serializers import CustomTokenObtainPairSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -75,6 +78,23 @@ class TherapistViewSet(viewsets.ModelViewSet):
             except Patient.DoesNotExist:
                 return Therapist.objects.none()
         return Therapist.objects.none()
+        
+    @action(detail=True, methods=['get'], url_path='status')
+    def status(self, request, pk=None):
+        """
+        Get the approval status of a specific therapist
+        """
+        try:
+            therapist = self.get_object()
+            return Response({
+                'is_approved': therapist.is_approved,
+                'approval_date': therapist.approval_date
+            })
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
@@ -160,6 +180,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 # Assuming you have a TokenObtainPairView subclass
 class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+    
     def post(self, request, *args, **kwargs):
         # Call the parent class method to get the token
         response = super().post(request, *args, **kwargs)
@@ -174,7 +196,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             pass
         
         return response
-    serializer_class = CustomTokenObtainPairSerializer
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -382,13 +403,100 @@ from rest_framework import permissions
 
 # Then modify the permission classes like this:
 class TherapistStatusView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsTherapistUser]
+    permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
-        return Response({
-            'is_approved': request.user.therapist.is_approved,
-            'approval_date': request.user.therapist.approval_date
-        })
+        try:
+            # If the user is a therapist, return their own status
+            if hasattr(request.user, 'therapist_profile'):
+                return Response({
+                    'is_approved': request.user.therapist_profile.is_approved,
+                    'approval_date': request.user.therapist_profile.approval_date
+                })
+            # If the user is an admin and a therapist_id is provided, return that therapist's status
+            elif request.user.is_admin and request.query_params.get('therapist_id'):
+                therapist_id = request.query_params.get('therapist_id')
+                therapist = Therapist.objects.get(id=therapist_id)
+                return Response({
+                    'is_approved': therapist.is_approved,
+                    'approval_date': therapist.approval_date
+                })
+            else:
+                return Response(
+                    {"error": "User is not a therapist or therapist_id not provided"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class TherapistStatusDetailView(APIView):
+    """
+    API view to get the status of a specific therapist by ID
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, pk=None, therapist_id=None):
+        try:
+            # Debug print
+            print(f"TherapistStatusDetailView called with pk={pk}, therapist_id={therapist_id}")
+            
+            # Get the therapist ID from either pk or therapist_id parameter
+            therapist_id = pk or therapist_id
+            
+            if not therapist_id:
+                return Response(
+                    {"error": "Therapist ID is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if the user is authorized to view this therapist's status
+            user = request.user
+            
+            # Admin can view any therapist's status
+            if user.is_admin:
+                pass  # Allow access
+            # Therapists can only view their own status
+            elif hasattr(user, 'therapist_profile'):
+                therapist = user.therapist_profile
+                if str(therapist.id) != str(therapist_id):
+                    return Response(
+                        {"error": "You are not authorized to view this therapist's status"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            # Other users are not allowed
+            else:
+                return Response(
+                    {"error": "You are not authorized to view therapist status"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+                
+            # Get the therapist
+            therapist = Therapist.objects.get(id=therapist_id)
+            
+            # Return the status
+            return Response({
+                'is_approved': therapist.is_approved,
+                'approval_date': therapist.approval_date
+            })
+            
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class PendingTherapistsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
@@ -403,13 +511,28 @@ class ApproveTherapistView(APIView):
         return Response(serializer.data)
     
     def post(self, request, pk):
-        """POST to approve a specific therapist"""
+        """POST to approve or un-approve a specific therapist"""
         try:
-            therapist = Therapist.objects.get(pk=pk)
-            therapist.is_approved = True
-            therapist.approval_date = timezone.now()
+            therapist = Therapist.objects.get(id=pk)
+            
+            # Get the approval status from request data
+            # Default to True if not specified (backward compatibility)
+            is_approved = request.data.get('is_approved', True)
+            
+            # Update therapist approval status
+            therapist.is_approved = is_approved
+            
+            # Only update approval date if approving
+            if is_approved:
+                therapist.approval_date = timezone.now()
+            else:
+                # If un-approving, set approval_date to None
+                therapist.approval_date = None
+                
             therapist.save()
-            return Response({"status": "Therapist approved"})
+            
+            status_message = "Therapist approved" if is_approved else "Therapist approval revoked"
+            return Response({"status": status_message})
         except Therapist.DoesNotExist:
             return Response(
                 {"error": "Therapist not found"},

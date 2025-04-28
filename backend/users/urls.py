@@ -37,9 +37,11 @@ urlpatterns = [
     path('', include(router.urls)),
     
     # Therapist approval endpoints
-    path('api/users/therapist-status/', views.TherapistStatusView.as_view(), name='therapist-status'),
-    path('api/users/pending-therapists/', views.PendingTherapistsView.as_view(), name='pending-therapists'),
-    path('api/users/approve-therapist/<int:pk>/', views.ApproveTherapistView.as_view(), name='approve-therapist'),
+    path('therapist-status/', views.TherapistStatusView.as_view(), name='therapist-status'),
+    path('therapists/<int:pk>/status/', views.TherapistStatusDetailView.as_view(), name='therapist-status-detail'),
+    path('therapists/<int:therapist_id>/status/', views.TherapistStatusDetailView.as_view(), name='therapist-status-detail-alt'),
+    path('pending-therapists/', views.PendingTherapistsView.as_view(), name='pending-therapists'),
+    path('approve-therapist/<int:pk>/', views.ApproveTherapistView.as_view(), name='approve-therapist'),
     
     # Dashboard summary endpoints
     path('therapist/dashboard/summary/', TherapistDashboardSummaryViewSet.as_view({'get': 'list'}), name='therapist-dashboard-summary'),

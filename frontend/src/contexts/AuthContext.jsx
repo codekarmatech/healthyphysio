@@ -23,20 +23,31 @@ export function AuthProvider({ children }) {
     const checkAuthStatus = async () => {
       try {
         const token = localStorage.getItem('token');
+        const storedUser = localStorage.getItem('user');
         
-        if (token) {
+        if (token && storedUser) {
           // Set default auth header for all requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
-          // Fetch user data
-          const response = await axios.get('/api/auth/me');
-          setCurrentUser(response.data);
+          // Use the stored user data instead of making an API call
+          setCurrentUser(JSON.parse(storedUser));
+          setLoading(false);
+          return;
         }
+        
+        // If no token or user data, clear authentication
+        setCurrentUser(null);
       } catch (error) {
         console.error('Error checking auth status:', error);
-        // Clear token if invalid
-        localStorage.removeItem('token');
-        axios.defaults.headers.common['Authorization'] = '';
+        // Only clear token on actual auth errors, not on parsing errors
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          axios.defaults.headers.common['Authorization'] = '';
+          api.defaults.headers.common['Authorization'] = '';
+          setCurrentUser(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -101,6 +112,7 @@ export function AuthProvider({ children }) {
     } finally {
       // Clear user data regardless of API response
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       axios.defaults.headers.common['Authorization'] = '';
       setCurrentUser(null);
       navigate('/login');
@@ -134,6 +146,7 @@ export function AuthProvider({ children }) {
 
   const value = {
     user: currentUser,
+    setUser: setCurrentUser, // Add this line to expose setUser function
     loading,
     error,
     login,
