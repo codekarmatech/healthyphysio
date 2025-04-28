@@ -12,14 +12,16 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patient_details = PatientSerializer(source='patient', read_only=True)
     therapist_details = TherapistSerializer(source='therapist', read_only=True)
     local_datetime = serializers.SerializerMethodField()
+    reason_for_visit = serializers.CharField(source='issue', required=False, allow_blank=True)
     
     class Meta:
         model = Appointment
         fields = [
             'id', 'patient', 'therapist', 'session_code', 'datetime', 'local_datetime', 
-            'duration_minutes', 'status', 'reschedule_count', 'issue', 
-            'notes', 'created_at', 'updated_at', 'patient_details', 
-            'therapist_details'
+            'duration_minutes', 'status', 'reschedule_count', 'type', 'issue', 
+            'reason_for_visit', 'notes', 'previous_treatments', 'pain_level', 
+            'mobility_issues', 'changes_log', 'created_at', 'updated_at', 
+            'patient_details', 'therapist_details'
         ]
         read_only_fields = ['id', 'session_code', 'created_at', 'updated_at']
     

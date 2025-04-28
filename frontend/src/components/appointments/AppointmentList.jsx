@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useUser } from '../../contexts/UserContext';
-import { appointmentService } from '../../services/appointmentService';
+import { useAuth } from '../../contexts/AuthContext.jsx';
+import appointmentService from '../../services/appointmentService';
 import AppointmentStatusBadge from './AppointmentStatusBadge';
 
 const AppointmentList = () => {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('upcoming');
@@ -18,46 +18,64 @@ const AppointmentList = () => {
   const fetchAppointments = async () => {
     try {
       setLoading(true);
-      let data;
+      let response;
       
       if (user.role === 'patient') {
-        data = await appointmentService.getByPatient(user.id);
+        response = await appointmentService.getByPatient(user.id);
       } else if (user.role === 'therapist') {
-        data = await appointmentService.getByTherapist(user.id);
+        response = await appointmentService.getByTherapist(user.id);
       } else {
-        data = await appointmentService.getAll();
+        response = await appointmentService.getAll();
       }
       
+      // Extract the data array from the response
+      const data = response.data.results || response.data || [];
+      
       // Filter appointments based on selected filter
-      let filteredData = data;
+      let filteredData = [...data];
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
       if (filter === 'upcoming') {
-        filteredData = data.filter(appointment => {
-          const appointmentDate = new Date(appointment.date);
-          return appointmentDate >= today && appointment.status !== 'cancelled';
+        filteredData = filteredData.filter(appointment => {
+          const appointmentDate = new Date(appointment.datetime || appointment.date);
+          return appointmentDate >= today && appointment.status.toLowerCase() !== 'cancelled';
         });
       } else if (filter === 'past') {
-        filteredData = data.filter(appointment => {
-          const appointmentDate = new Date(appointment.date);
-          return appointmentDate < today || appointment.status === 'completed';
+        filteredData = filteredData.filter(appointment => {
+          const appointmentDate = new Date(appointment.datetime || appointment.date);
+          return appointmentDate < today || appointment.status.toLowerCase() === 'completed';
         });
       } else if (filter === 'cancelled') {
-        filteredData = data.filter(appointment => appointment.status === 'cancelled');
+        filteredData = filteredData.filter(appointment => 
+          appointment.status.toLowerCase() === 'cancelled');
       }
       
       // Sort appointments by date (newest first for upcoming, oldest first for past)
       filteredData.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
+        const dateA = new Date(a.datetime || a.date);
+        const dateB = new Date(b.datetime || b.date);
         return filter === 'past' ? dateA - dateB : dateB - dateA;
       });
       
-      setAppointments(filteredData);
+      // Format the appointments for display
+      const formattedAppointments = filteredData.map(appointment => ({
+        id: appointment.id,
+        patientFirstName: appointment.patient_details?.user?.first_name || 'Unknown',
+        patientLastName: appointment.patient_details?.user?.last_name || 'Patient',
+        therapistFirstName: appointment.therapist_details?.user?.first_name || 'Unknown',
+        therapistLastName: appointment.therapist_details?.user?.last_name || 'Therapist',
+        date: appointment.datetime || appointment.date,
+        time: new Date(appointment.datetime || appointment.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        status: appointment.status.toLowerCase(),
+        type: appointment.issue || appointment.type || 'Consultation'
+      }));
+      
+      setAppointments(formattedAppointments);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching appointments:', error);
+      setAppointments([]);
       setLoading(false);
     }
   };

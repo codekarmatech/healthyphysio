@@ -81,7 +81,7 @@ export function AuthProvider({ children }) {
       } else if (user.role === 'doctor') {
         navigate('/dashboard');
       } else if (user.role === 'therapist') {
-        navigate('/dashboard');
+        navigate('/therapist/dashboard');
       }
       
       return user;

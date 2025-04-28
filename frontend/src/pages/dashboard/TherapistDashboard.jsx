@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import AttendanceSummary from '../../components/attendance/AttendanceSummary';
 import attendanceService from '../../services/attendanceService';
 import MonthSelector from '../../components/attendance/MonthSelector';
@@ -70,43 +70,73 @@ const TherapistDashboard = () => {
     }
   }, [currentYear, currentMonth, user]);
 
+  // Fetch dashboard data from backend
   useEffect(() => {
-    // Simulate fetching dashboard data
-    setTimeout(() => {
-      setStats({
-        upcomingAppointments: 12,
-        todayAppointments: 3,
-        totalPatients: 28,
-        pendingAssessments: 5,
-      });
-      
-      setRecentAppointments([
-        {
-          id: 1,
-          patientName: 'Alice Johnson',
-          date: '2023-06-15T10:00:00',
-          status: 'confirmed',
-          type: 'Initial Assessment',
-        },
-        {
-          id: 2,
-          patientName: 'Bob Smith',
-          date: '2023-06-15T14:30:00',
-          status: 'confirmed',
-          type: 'Follow-up',
-        },
-        {
-          id: 3,
-          patientName: 'Carol Williams',
-          date: '2023-06-16T09:15:00',
-          status: 'pending',
-          type: 'Treatment Session',
-        },
-      ]);
-      
-      setLoading(false);
-    }, 1000);
-  }, []);
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        // Get therapist ID from user object
+        const therapistId = user.therapist_id || user.id;
+        
+        // Fetch upcoming appointments
+        const upcomingResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&status=SCHEDULED,RESCHEDULED`);
+        
+        // Fetch today's appointments
+        const today = new Date().toISOString().split('T')[0];
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const todayResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&datetime__gte=${today}&datetime__lt=${tomorrowStr}`);
+        
+        // Fetch total patients
+        const patientsResponse = await api.get(`/users/patients/?therapist=${therapistId}`);
+        
+        // Fetch pending assessments
+        const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
+        
+        // Fetch recent appointments (limit to 5)
+        const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
+        
+        // Update stats
+        setStats({
+          upcomingAppointments: upcomingResponse.data.count || upcomingResponse.data.length || 0,
+          todayAppointments: todayResponse.data.count || todayResponse.data.length || 0,
+          totalPatients: patientsResponse.data.count || patientsResponse.data.length || 0,
+          pendingAssessments: assessmentsResponse.data.count || assessmentsResponse.data.length || 0,
+        });
+        
+        // Format recent appointments
+        const formattedAppointments = (recentResponse.data.results || recentResponse.data).map(appointment => ({
+          id: appointment.id,
+          patientName: appointment.patient_details ? 
+            `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` : 
+            'Unknown Patient',
+          date: appointment.datetime,
+          status: appointment.status.toLowerCase(),
+          type: appointment.issue || 'Consultation',
+        }));
+        
+        setRecentAppointments(formattedAppointments);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        // Set some default data in case of error
+        setStats({
+          upcomingAppointments: 0,
+          todayAppointments: 0,
+          totalPatients: 0,
+          pendingAssessments: 0,
+        });
+        setRecentAppointments([]);
+        setLoading(false);
+      }
+    };
+    
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   // Check therapist approval status and update feature access
   useEffect(() => {
@@ -298,7 +328,7 @@ const TherapistDashboard = () => {
                 <h1 className="text-2xl font-bold text-primary-600">PhysioWay</h1>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <Link to="/dashboard" className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to="/therapist/dashboard" className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Dashboard
                 </Link>
                 <Link to="/appointments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">

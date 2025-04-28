@@ -45,6 +45,68 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 return Appointment.objects.none()
         return Appointment.objects.none()
     
+    def update(self, request, *args, **kwargs):
+        # Get the original appointment
+        instance = self.get_object()
+        
+        # Store the original state for comparison
+        original_data = {
+            'therapist_id': instance.therapist.id if instance.therapist else None,
+            'patient_id': instance.patient.id if instance.patient else None,
+            'datetime': instance.datetime.isoformat() if instance.datetime else None,
+            'duration_minutes': instance.duration_minutes,
+            'status': instance.status,
+            'type': instance.type,
+            'issue': instance.issue,
+            'notes': instance.notes,
+            'previous_treatments': instance.previous_treatments,
+            'pain_level': instance.pain_level,
+            'mobility_issues': instance.mobility_issues
+        }
+        
+        # Process the update
+        response = super().update(request, *args, **kwargs)
+        
+        # If the update was successful, track changes
+        if response.status_code == 200:
+            instance.refresh_from_db()
+            
+            # Get the new state
+            new_data = {
+                'therapist_id': instance.therapist.id if instance.therapist else None,
+                'patient_id': instance.patient.id if instance.patient else None,
+                'datetime': instance.datetime.isoformat() if instance.datetime else None,
+                'duration_minutes': instance.duration_minutes,
+                'status': instance.status,
+                'type': instance.type,
+                'issue': instance.issue,
+                'notes': instance.notes,
+                'previous_treatments': instance.previous_treatments,
+                'pain_level': instance.pain_level,
+                'mobility_issues': instance.mobility_issues
+            }
+            
+            # Find changes
+            changes = []
+            for field, old_value in original_data.items():
+                new_value = new_data.get(field)
+                if old_value != new_value:
+                    changes.append({
+                        'field': field,
+                        'old_value': old_value,
+                        'new_value': new_value,
+                        'changed_at': timezone.now().isoformat(),
+                        'changed_by': request.user.id
+                    })
+            
+            # If there are changes, update the changes_log
+            if changes:
+                current_log = instance.changes_log or []
+                instance.changes_log = current_log + changes
+                instance.save(update_fields=['changes_log'])
+        
+        return response
+    
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         appointment = self.get_object()

@@ -16,21 +16,34 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Appointment(models.Model):
     class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
         SCHEDULED = 'scheduled', 'Scheduled'
         RESCHEDULED = 'rescheduled', 'Rescheduled'
         COMPLETED = 'completed', 'Completed'
         CANCELLED = 'cancelled', 'Cancelled'
         MISSED = 'missed', 'Missed'
     
+    class Type(models.TextChoices):
+        INITIAL_ASSESSMENT = 'initial-assessment', 'Initial Assessment'
+        FOLLOW_UP = 'follow-up', 'Follow-up Session'
+        TREATMENT = 'treatment', 'Treatment Session'
+        CONSULTATION = 'consultation', 'Consultation'
+        EMERGENCY = 'emergency', 'Emergency Session'
+    
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='appointments')
     therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='appointments')
     session_code = models.CharField(max_length=10, unique=True, blank=True)
     datetime = models.DateTimeField()
     duration_minutes = models.IntegerField(default=60)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     reschedule_count = models.IntegerField(default=0)
-    issue = models.TextField(blank=True)
+    type = models.CharField(max_length=30, choices=Type.choices, default=Type.INITIAL_ASSESSMENT)
+    issue = models.TextField(blank=True)  # Reason for visit
     notes = models.TextField(blank=True)
+    previous_treatments = models.TextField(blank=True)
+    pain_level = models.CharField(max_length=2, blank=True, default='0')
+    mobility_issues = models.TextField(blank=True)
+    changes_log = models.JSONField(blank=True, null=True)  # Track changes to the appointment
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

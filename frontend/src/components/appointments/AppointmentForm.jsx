@@ -1,24 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '../../contexts/UserContext';
-import { appointmentService } from '../../services/appointmentService';
-import { therapistService } from '../../services/therapistService';
+import { useAuth } from '../../contexts/AuthContext.jsx';
+import appointmentService from '../../services/appointmentService';
+import therapistService from '../../services/therapistService';
+import patientService from '../../services/patientService';
 
 const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [therapists, setTherapists] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [formData, setFormData] = useState({
-    therapistId: '',
+    therapistId: user.role === 'therapist' ? user.id : '',
+    patientId: user.role === 'patient' ? user.id : '',
     date: '',
     time: '',
     type: 'initial-assessment',
     notes: '',
     reasonForVisit: '',
-    preferredContactMethod: 'email',
-    insuranceDetails: '',
     previousTreatments: '',
     painLevel: '0',
     mobilityIssues: ''
@@ -28,14 +29,36 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
   useEffect(() => {
     const fetchTherapists = async () => {
       try {
-        const data = await therapistService.getAll();
+        const response = await therapistService.getAll();
+        // Extract the data array from the response
+        const data = response.data.results || response.data || [];
         setTherapists(data);
       } catch (error) {
         console.error('Error fetching therapists:', error);
+        setTherapists([]);
+      }
+    };
+
+    const fetchPatients = async () => {
+      try {
+        // If user is a therapist, get only their patients
+        let response;
+        if (user.role === 'therapist') {
+          response = await patientService.getByTherapist(user.id);
+        } else {
+          response = await patientService.getAll();
+        }
+        // Extract the data array from the response
+        const data = response.data.results || response.data || [];
+        setPatients(data);
+      } catch (error) {
+        console.error('Error fetching patients:', error);
+        setPatients([]);
       }
     };
 
     fetchTherapists();
+    fetchPatients();
 
     if (editMode && appointmentId) {
       fetchAppointment(appointmentId);
@@ -45,20 +68,32 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
   const fetchAppointment = async (id) => {
     try {
       setLoading(true);
-      const data = await appointmentService.getById(id);
+      const response = await appointmentService.getById(id);
+      const data = response.data || response;
+      
+      // Extract date from datetime if available
+      let appointmentDate = '';
+      let appointmentTime = '';
+      
+      if (data.datetime) {
+        const dateObj = new Date(data.datetime);
+        appointmentDate = dateObj.toISOString().split('T')[0];
+        appointmentTime = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      }
+      
       setFormData({
-        therapistId: data.therapistId,
-        date: data.date.split('T')[0],
-        time: data.time || '',
-        type: data.type,
+        therapistId: data.therapist || (user.role === 'therapist' ? user.id : ''),
+        patientId: data.patient || (user.role === 'patient' ? user.id : ''),
+        date: appointmentDate,
+        time: appointmentTime,
+        type: data.type || 'initial-assessment',
         notes: data.notes || '',
-        reasonForVisit: data.reasonForVisit || '',
-        preferredContactMethod: data.preferredContactMethod || 'email',
-        insuranceDetails: data.insuranceDetails || '',
-        previousTreatments: data.previousTreatments || '',
-        painLevel: data.painLevel || '0',
-        mobilityIssues: data.mobilityIssues || ''
+        reasonForVisit: data.issue || '',  // Backend uses 'issue' for reason for visit
+        previousTreatments: data.previous_treatments || '',
+        painLevel: data.pain_level || '0',
+        mobilityIssues: data.mobility_issues || ''
       });
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching appointment:', error);
@@ -91,11 +126,20 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.therapistId) newErrors.therapistId = 'Please select a therapist';
+    
+    // If user is not a therapist, they need to select a therapist
+    if (user.role !== 'therapist' && !formData.therapistId) {
+      newErrors.therapistId = 'Please select a therapist';
+    }
+    
     if (!formData.date) newErrors.date = 'Please select a date';
     if (!formData.time) newErrors.time = 'Please select a time slot';
     if (!formData.type) newErrors.type = 'Please select appointment type';
-    if (!formData.reasonForVisit) newErrors.reasonForVisit = 'Please provide a reason for visit';
+    
+    // Reason for visit is optional for admin but required for others
+    if (user.role !== 'admin' && !formData.reasonForVisit) {
+      newErrors.reasonForVisit = 'Please provide a reason for visit';
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -109,11 +153,41 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
     try {
       setLoading(true);
       
+      // Map frontend field names to backend field names
       const appointmentData = {
-        ...formData,
-        patientId: user.id,
-        status: 'pending'
+        patient: formData.patientId,
+        therapist: formData.therapistId,
+        datetime: `${formData.date}T${formData.time}`,
+        duration_minutes: 60,
+        status: 'pending',
+        type: formData.type,
+        issue: formData.reasonForVisit,  // Backend uses 'issue' for reason for visit
+        notes: formData.notes,
+        previous_treatments: formData.previousTreatments,
+        pain_level: formData.painLevel,
+        mobility_issues: formData.mobilityIssues
       };
+      
+      // If user is a therapist, set the therapist ID to the user's ID
+      if (user.role === 'therapist') {
+        appointmentData.therapist = user.id;
+        // For therapist-created appointments, we need a patient ID
+        if (!appointmentData.patient) {
+          setErrors({ patientId: 'Please select a patient' });
+          setLoading(false);
+          return;
+        }
+      } else if (user.role === 'patient') {
+        // If user is a patient, set the patient ID to the user's ID
+        appointmentData.patient = user.id;
+      } else if (user.role === 'admin') {
+        // Admin needs to specify both patient and therapist
+        if (!appointmentData.patient) {
+          setErrors({ patientId: 'Please select a patient' });
+          setLoading(false);
+          return;
+        }
+      }
       
       if (editMode && appointmentId) {
         await appointmentService.update(appointmentId, appointmentData);
@@ -150,33 +224,66 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
         <div className="border-t border-gray-200">
           <form onSubmit={handleSubmit} className="px-4 py-5 sm:p-6">
             <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-              {/* Therapist Selection */}
-              <div className="sm:col-span-3">
-                <label htmlFor="therapistId" className="block text-sm font-medium text-gray-700">
-                  Select Therapist
-                </label>
-                <div className="mt-1">
-                  <select
-                    id="therapistId"
-                    name="therapistId"
-                    value={formData.therapistId}
-                    onChange={handleChange}
-                    className={`shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md ${
-                      errors.therapistId ? 'border-red-300' : ''
-                    }`}
-                  >
-                    <option value="">Select a therapist</option>
-                    {therapists.map((therapist) => (
-                      <option key={therapist.id} value={therapist.id}>
-                        {therapist.firstName} {therapist.lastName} - {therapist.specialization}
-                      </option>
-                    ))}
-                  </select>
+              {/* Therapist Selection - Only shown for patients and admins */}
+              {user.role !== 'therapist' && (
+                <div className="sm:col-span-3">
+                  <label htmlFor="therapistId" className="block text-sm font-medium text-gray-700">
+                    Select Therapist
+                  </label>
+                  <div className="mt-1">
+                    <select
+                      id="therapistId"
+                      name="therapistId"
+                      value={formData.therapistId}
+                      onChange={handleChange}
+                      className={`shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md ${
+                        errors.therapistId ? 'border-red-300' : ''
+                      }`}
+                    >
+                      <option value="">Select a therapist</option>
+                      {Array.isArray(therapists) && therapists.map((therapist) => (
+                        <option key={therapist.id} value={therapist.id}>
+                          {therapist.user?.first_name || therapist.firstName || ''} {therapist.user?.last_name || therapist.lastName || ''} 
+                          {therapist.specialization ? ` - ${therapist.specialization}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {errors.therapistId && (
+                    <p className="mt-2 text-sm text-red-600">{errors.therapistId}</p>
+                  )}
                 </div>
-                {errors.therapistId && (
-                  <p className="mt-2 text-sm text-red-600">{errors.therapistId}</p>
-                )}
-              </div>
+              )}
+              
+              {/* Patient Selection - Only shown for therapists and admins */}
+              {user.role !== 'patient' && (
+                <div className="sm:col-span-3">
+                  <label htmlFor="patientId" className="block text-sm font-medium text-gray-700">
+                    Select Patient
+                  </label>
+                  <div className="mt-1">
+                    <select
+                      id="patientId"
+                      name="patientId"
+                      value={formData.patientId}
+                      onChange={handleChange}
+                      className={`shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md ${
+                        errors.patientId ? 'border-red-300' : ''
+                      }`}
+                    >
+                      <option value="">Select a patient</option>
+                      {Array.isArray(patients) && patients.map((patient) => (
+                        <option key={patient.id} value={patient.id}>
+                          {patient.user?.first_name || patient.firstName || ''} {patient.user?.last_name || patient.lastName || ''} 
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {errors.patientId && (
+                    <p className="mt-2 text-sm text-red-600">{errors.patientId}</p>
+                  )}
+                </div>
+              )}
 
               {/* Appointment Type */}
               <div className="sm:col-span-3">
@@ -263,7 +370,7 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
               {/* Reason for Visit */}
               <div className="sm:col-span-6">
                 <label htmlFor="reasonForVisit" className="block text-sm font-medium text-gray-700">
-                  Reason for Visit
+                  Reason for Visit {user.role === 'admin' ? '(optional)' : ''}
                 </label>
                 <div className="mt-1">
                   <textarea
@@ -275,7 +382,7 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
                     className={`shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md ${
                       errors.reasonForVisit ? 'border-red-300' : ''
                     }`}
-                    placeholder="Please describe your symptoms and reason for seeking physiotherapy"
+                    placeholder="Please describe symptoms and reason for seeking physiotherapy"
                   />
                 </div>
                 {errors.reasonForVisit && (
@@ -346,44 +453,7 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
                 </div>
               </div>
 
-              {/* Insurance Details */}
-              <div className="sm:col-span-3">
-                <label htmlFor="insuranceDetails" className="block text-sm font-medium text-gray-700">
-                  Insurance Details (optional)
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="insuranceDetails"
-                    id="insuranceDetails"
-                    value={formData.insuranceDetails}
-                    onChange={handleChange}
-                    className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                    placeholder="Insurance provider and policy number"
-                  />
-                </div>
-              </div>
 
-              {/* Preferred Contact Method */}
-              <div className="sm:col-span-3">
-                <label htmlFor="preferredContactMethod" className="block text-sm font-medium text-gray-700">
-                  Preferred Contact Method
-                </label>
-                <div className="mt-1">
-                  <select
-                    id="preferredContactMethod"
-                    name="preferredContactMethod"
-                    value={formData.preferredContactMethod}
-                    onChange={handleChange}
-                    className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  >
-                    <option value="email">Email</option>
-                    <option value="phone">Phone</option>
-                    <option value="sms">SMS</option>
-                    <option value="whatsapp">WhatsApp</option>
-                  </select>
-                </div>
-              </div>
 
               {/* Additional Notes */}
               <div className="sm:col-span-6">
