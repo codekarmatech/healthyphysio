@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import rescheduleRequestService from '../../services/rescheduleRequestService';
 
 const AdminDashboard = ({ user }) => {
   const [stats, setStats] = useState({
@@ -12,9 +13,11 @@ const AdminDashboard = ({ user }) => {
   const [recentUsers, setRecentUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Add state for pending therapists
+  // Add state for pending therapists and reschedule requests
   const [pendingTherapists, setPendingTherapists] = useState([]);
+  const [pendingReschedules, setPendingReschedules] = useState([]);
   const [loadingTherapists, setLoadingTherapists] = useState(false);
+  const [loadingReschedules, setLoadingReschedules] = useState(false);
 
   useEffect(() => {
     // Simulate fetching dashboard data
@@ -73,6 +76,23 @@ const AdminDashboard = ({ user }) => {
     
     fetchPendingTherapists();
   }, []);
+  
+  // Fetch pending reschedule requests
+  useEffect(() => {
+    const fetchPendingReschedules = async () => {
+      setLoadingReschedules(true);
+      try {
+        const response = await rescheduleRequestService.getPending();
+        setPendingReschedules(response.data || []);
+      } catch (error) {
+        console.error('Error fetching pending reschedule requests:', error);
+      } finally {
+        setLoadingReschedules(false);
+      }
+    };
+    
+    fetchPendingReschedules();
+  }, []);
 
   // Approve therapist function
   const approveTherapist = async (therapistId) => {
@@ -82,6 +102,31 @@ const AdminDashboard = ({ user }) => {
       setPendingTherapists(pendingTherapists.filter(t => t.id !== therapistId));
     } catch (error) {
       console.error('Error approving therapist:', error);
+    }
+  };
+  
+  // Approve reschedule request function
+  const approveReschedule = async (requestId) => {
+    try {
+      await rescheduleRequestService.approve(requestId);
+      // Remove from pending list
+      setPendingReschedules(pendingReschedules.filter(r => r.id !== requestId));
+    } catch (error) {
+      console.error('Error approving reschedule request:', error);
+    }
+  };
+  
+  // Reject reschedule request function
+  const rejectReschedule = async (requestId) => {
+    const reason = prompt('Please provide a reason for rejecting this reschedule request:');
+    if (reason) {
+      try {
+        await rescheduleRequestService.reject(requestId, reason);
+        // Remove from pending list
+        setPendingReschedules(pendingReschedules.filter(r => r.id !== requestId));
+      } catch (error) {
+        console.error('Error rejecting reschedule request:', error);
+      }
     }
   };
 
@@ -266,6 +311,100 @@ const AdminDashboard = ({ user }) => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="px-4 py-6 sm:px-0">
+              <h2 className="text-lg font-medium text-gray-900">Quick Actions</h2>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  to="/appointments/new"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  New Appointment
+                </Link>
+                <Link
+                  to="/patients/new"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  New Patient
+                </Link>
+                <Link
+                  to="/therapists/new"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  New Therapist
+                </Link>
+              </div>
+            </div>
+
+            {/* Pending Reschedule Requests Section */}
+            <div className="px-4 py-6 sm:px-0">
+              <h2 className="text-lg font-medium text-gray-900">Pending Reschedule Requests</h2>
+              {loadingReschedules ? (
+                <div className="animate-pulse mt-4">
+                  {Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="bg-white p-4 rounded-md shadow mb-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : pendingReschedules.length === 0 ? (
+                <p className="text-gray-500 mt-4">No pending reschedule requests</p>
+              ) : (
+                <ul className="divide-y divide-gray-200 mt-4 bg-white shadow overflow-hidden sm:rounded-md">
+                  {pendingReschedules.map(request => (
+                    <li key={request.id} className="px-4 py-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">
+                            Appointment on {new Date(request.appointment_details?.datetime).toLocaleDateString()}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Patient: {request.appointment_details?.patient_details?.user?.first_name} {request.appointment_details?.patient_details?.user?.last_name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Therapist: {request.appointment_details?.therapist_details?.user?.first_name} {request.appointment_details?.therapist_details?.user?.last_name}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            <span className="font-medium">Requested by:</span> {request.requested_by_details?.first_name} {request.requested_by_details?.last_name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            <span className="font-medium">New date/time:</span> {new Date(request.requested_datetime).toLocaleString()}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            <span className="font-medium">Reason:</span> {request.reason}
+                          </p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => approveReschedule(request.id)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => rejectReschedule(request.id)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* Therapist Approval Section */}

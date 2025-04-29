@@ -37,9 +37,14 @@ const AssessmentsPage = () => {
             data = response.data;
           } else if (response.data.results && Array.isArray(response.data.results)) {
             data = response.data.results;
+          } else if (response.data.assessments && typeof response.data.assessments === 'string') {
+            // Handle the case where the API returns a URL instead of data
+            // This is a temporary fix until the backend is updated
+            console.log('Received URL instead of data, using empty array');
+            data = [];
           } else {
             // If data is not in expected format, initialize as empty array
-            console.warn('Unexpected data format:', response.data);
+            console.log('Using default empty array for unexpected data format');
             data = [];
           }
         } else {

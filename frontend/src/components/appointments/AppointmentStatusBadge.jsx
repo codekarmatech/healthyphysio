@@ -5,8 +5,9 @@ const AppointmentStatusBadge = ({ status }) => {
   let textColor = 'text-gray-800';
   let statusText = status;
 
-  switch (status) {
+  switch (status.toLowerCase()) {
     case 'confirmed':
+    case 'scheduled':
       bgColor = 'bg-green-100';
       textColor = 'text-green-800';
       statusText = 'Confirmed';
@@ -15,6 +16,11 @@ const AppointmentStatusBadge = ({ status }) => {
       bgColor = 'bg-yellow-100';
       textColor = 'text-yellow-800';
       statusText = 'Pending';
+      break;
+    case 'pending_reschedule':
+      bgColor = 'bg-amber-100';
+      textColor = 'text-amber-800';
+      statusText = 'Awaiting Approval';
       break;
     case 'cancelled':
       bgColor = 'bg-red-100';
@@ -31,8 +37,13 @@ const AppointmentStatusBadge = ({ status }) => {
       textColor = 'text-indigo-800';
       statusText = 'Rescheduled';
       break;
+    case 'missed':
+      bgColor = 'bg-gray-100';
+      textColor = 'text-gray-800';
+      statusText = 'Missed';
+      break;
     default:
-      statusText = status.charAt(0).toUpperCase() + status.slice(1);
+      statusText = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
   }
 
   return (

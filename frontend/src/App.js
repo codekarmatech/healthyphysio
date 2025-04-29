@@ -16,11 +16,17 @@ import TherapistDashboard from './pages/dashboard/TherapistDashboard';
 import DoctorDashboard from './pages/dashboard/DoctorDashboard';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 
+// Earnings Pages
+import EarningsPage from './pages/earnings/EarningsPage';
+
 // Appointment Pages
 import AppointmentsPage from './pages/appointments/AppointmentsPage';
 import AppointmentDetailPage from './pages/appointments/AppointmentDetailPage';
 import TodayAppointmentsPage from './pages/appointments/TodayAppointmentsPage';
 import NewAppointmentPage from './pages/appointments/NewAppointmentPage';
+import EditAppointmentPage from './pages/appointments/EditAppointmentPage';
+import RescheduleRequestPage from './pages/appointments/RescheduleRequestPage';
+import PatientRescheduleRequestPage from './pages/appointments/PatientRescheduleRequestPage';
 
 // Patient Pages
 import PatientsPage from './pages/patients/PatientsPage';
@@ -50,23 +56,29 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
             
-            {/* Appointment Routes */}
+            {/* Common Appointment Routes */}
             <Route path="/appointments" element={<AppointmentsPage />} />
             <Route path="/appointments/today" element={<TodayAppointmentsPage />} />
-            <Route path="/appointments/new" element={<NewAppointmentPage />} />
             <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
-            
-            {/* Patient Routes */}
-            <Route path="/patients" element={<PatientsPage />} />
-            <Route path="/patients/:id" element={<PatientDetailPage />} />
+            <Route path="/appointments/:id/reschedule-request" element={<PatientRescheduleRequestPage />} />
             
             {/* Assessment Routes */}
             <Route path="/assessments" element={<AssessmentsPage />} />
           </Route>
           
+          {/* Admin-only Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/appointments/new" element={<NewAppointmentPage />} />
+            <Route path="/appointments/:id/edit" element={<EditAppointmentPage />} />
+            <Route path="/patients" element={<PatientsPage />} />
+            <Route path="/patients/:id" element={<PatientDetailPage />} />
+          </Route>
+          
           {/* Therapist Routes */}
           <Route element={<ProtectedRoute allowedRoles={['therapist']} />}>
             <Route path="/therapist/dashboard" element={<TherapistDashboard />} />
+            <Route path="/earnings" element={<EarningsPage />} />
+            <Route path="/appointments/:id/reschedule" element={<RescheduleRequestPage />} />
           </Route>
           
           {/* Patient Routes */}

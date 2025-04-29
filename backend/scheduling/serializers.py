@@ -39,13 +39,28 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return representation
 
 class RescheduleRequestSerializer(serializers.ModelSerializer):
+    appointment_details = AppointmentSerializer(source='appointment', read_only=True)
+    requested_by_details = serializers.SerializerMethodField()
+    
     class Meta:
         model = RescheduleRequest
         fields = [
             'id', 'appointment', 'requested_by', 'requested_datetime', 
-            'reason', 'status', 'admin_notes', 'created_at', 'updated_at'
+            'reason', 'status', 'admin_notes', 'created_at', 'updated_at',
+            'appointment_details', 'requested_by_details'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_requested_by_details(self, obj):
+        if obj.requested_by:
+            return {
+                'id': obj.requested_by.id,
+                'first_name': obj.requested_by.first_name,
+                'last_name': obj.requested_by.last_name,
+                'email': obj.requested_by.email,
+                'role': obj.requested_by.role
+            }
+        return None
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)

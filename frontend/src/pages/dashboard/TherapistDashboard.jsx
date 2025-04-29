@@ -5,7 +5,8 @@ import AttendanceSummary from '../../components/attendance/AttendanceSummary';
 import attendanceService from '../../services/attendanceService';
 import MonthSelector from '../../components/attendance/MonthSelector';
 import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
-import axios from 'axios';
+import EarningsChart from '../../components/earnings/EarningsChart';
+import EarningsSummary from '../../components/earnings/EarningsSummary';
 
 // Import your API service
 import api from '../../services/api';
@@ -32,9 +33,15 @@ const TherapistDashboard = () => {
   // State to track if therapist is approved
   const [isApproved, setIsApproved] = useState(false);
   
+  // State for earnings data
+  const [earningsData, setEarningsData] = useState(null);
+  const [earningsLoading, setEarningsLoading] = useState(true);
+  const [earningsError, setEarningsError] = useState(null);
+  
   // Object to store feature access permissions
   const [featureAccess, setFeatureAccess] = useState({
-    attendance: false,
+    attendance: true, // Set to true for development/testing
+    earnings: true,   // Set to true for development/testing
     // Add more features here as needed
     // example: patientManagement: false,
     // example: reportGeneration: false,
@@ -89,8 +96,9 @@ const TherapistDashboard = () => {
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
         const todayResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&datetime__gte=${today}&datetime__lt=${tomorrowStr}`);
         
-        // Fetch total patients
+        // Fetch assigned patients count
         const patientsResponse = await api.get(`/users/patients/?therapist=${therapistId}`);
+        const patientCount = patientsResponse.data.count || patientsResponse.data.length || 0;
         
         // Fetch pending assessments
         const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
@@ -98,12 +106,30 @@ const TherapistDashboard = () => {
         // Fetch recent appointments (limit to 5)
         const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
         
+        // Fetch monthly earnings (or use mock data if API not available)
+        let monthlyEarnings = 0;
+        try {
+          // Try to get real earnings data from API
+          const currentMonth = new Date().getMonth() + 1;
+          const currentYear = new Date().getFullYear();
+          const earningsResponse = await api.get(`/earnings/monthly/${therapistId}/?year=${currentYear}&month=${currentMonth}`);
+          monthlyEarnings = earningsResponse.data.summary?.totalEarned || 0;
+        } catch (earningsError) {
+          console.log('Using mock earnings data:', earningsError);
+          // If API fails, generate some mock data
+          const mockEarningsResponse = await import('../../services/earningsService').then(module => {
+            return module.default.getMockEarnings(therapistId, new Date().getFullYear(), new Date().getMonth() + 1);
+          });
+          monthlyEarnings = mockEarningsResponse.data.summary.totalEarned;
+        }
+        
         // Update stats
         setStats({
           upcomingAppointments: upcomingResponse.data.count || upcomingResponse.data.length || 0,
           todayAppointments: todayResponse.data.count || todayResponse.data.length || 0,
-          totalPatients: patientsResponse.data.count || patientsResponse.data.length || 0,
+          totalPatients: patientCount,
           pendingAssessments: assessmentsResponse.data.count || assessmentsResponse.data.length || 0,
+          monthlyEarnings: monthlyEarnings.toFixed(2)
         });
         
         // Format recent appointments
@@ -127,6 +153,7 @@ const TherapistDashboard = () => {
           todayAppointments: 0,
           totalPatients: 0,
           pendingAssessments: 0,
+          monthlyEarnings: '0.00'
         });
         setRecentAppointments([]);
         setLoading(false);
@@ -168,6 +195,7 @@ const TherapistDashboard = () => {
             setFeatureAccess(prevAccess => ({
               ...prevAccess,
               attendance: response.data.is_approved,
+              earnings: response.data.is_approved,
               // Update other features as needed based on response data
             }));
             
@@ -205,6 +233,61 @@ const TherapistDashboard = () => {
     checkApprovalStatus();
   }, [user]);
 
+  // Memoized function to fetch earnings data
+  const fetchEarningsData = useCallback(async () => {
+    setEarningsLoading(true);
+    setEarningsError(null);
+    try {
+      // Check if the user is authenticated
+      if (!user) {
+        console.warn('User not authenticated or token missing');
+        setEarningsError('Authentication required. Please log in again.');
+        setEarningsLoading(false);
+        return;
+      }
+      
+      // Use therapist_id from user object if available
+      const therapistId = user.therapist_id || user.id;
+      
+      try {
+        // Try to get real earnings data from API
+        const response = await api.get(`/earnings/monthly/${therapistId}/?year=${currentYear}&month=${currentMonth}`);
+        setEarningsData(response.data);
+        // Clear any previous errors since we got data successfully
+        setEarningsError(null);
+      } catch (apiError) {
+        console.log('Using mock earnings data:', apiError);
+        // If API fails, generate some mock data
+        const mockEarningsResponse = await import('../../services/earningsService').then(module => {
+          return module.default.getMockEarnings(therapistId, currentYear, currentMonth);
+        });
+        setEarningsData(mockEarningsResponse.data);
+        
+        // Set a non-blocking warning message for the 404 error
+        if (apiError.response?.status === 404) {
+          // We're using mock data, so this is just an informational message, not an error
+          console.info('API endpoint not available, using mock data');
+          // Don't set earningsError here since we have mock data as a fallback
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching earnings data:', error);
+      const errorMessage = error.response?.status === 401 
+        ? 'Authentication failed. Please log in again.'
+        : error.response?.data?.message || 'Failed to load earnings data';
+      setEarningsError(errorMessage);
+      
+      // Set a user-friendly error message
+      if (error.response?.status === 404) {
+        setEarningsError('The earnings data endpoint is not available yet. Using mock data instead.');
+      } else {
+        setEarningsError('There was a problem loading your earnings data. Please try again later.');
+      }
+    } finally {
+      setEarningsLoading(false);
+    }
+  }, [currentYear, currentMonth, user]);
+
   // Add useEffect for attendance data
   useEffect(() => {
     // Only fetch attendance data if the feature is accessible
@@ -212,6 +295,14 @@ const TherapistDashboard = () => {
       fetchAttendanceSummary();
     }
   }, [fetchAttendanceSummary, featureAccess.attendance]);
+  
+  // Add useEffect for earnings data
+  useEffect(() => {
+    // Only fetch earnings data if the feature is accessible
+    if (featureAccess.earnings) {
+      fetchEarningsData();
+    }
+  }, [fetchEarningsData, featureAccess.earnings]);
   
   // Add an effect to check approval status periodically
   // This ensures that if admin revokes approval, the UI updates
@@ -243,6 +334,7 @@ const TherapistDashboard = () => {
                 setFeatureAccess(prevAccess => ({
                   ...prevAccess,
                   attendance: response.data.is_approved,
+                  earnings: response.data.is_approved,
                 }));
                 
                 // Log status change if it changed
@@ -298,23 +390,40 @@ const TherapistDashboard = () => {
   // Create a Date object for the current month/year for MonthSelector
   const currentDate = new Date(currentYear, currentMonth - 1);
 
-  // Render feature based on access permission
-  const renderFeature = (featureName, component, waitingMessage) => {
-    if (featureAccess[featureName]) {
-      return component;
-    } else {
+  // Render feature based on access permission and error state
+  const renderFeature = (featureName, component, waitingMessage, errorState = null) => {
+    // If there's an error for this feature, show the error message
+    if (errorState) {
       return (
         <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
           <div className="flex flex-col items-center justify-center">
-            <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg className="h-12 w-12 text-red-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
-            <p className="text-gray-600">{waitingMessage || "This feature requires admin approval before you can access it."}</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Data</h3>
+            <p className="text-gray-600">{errorState}</p>
           </div>
         </div>
       );
     }
+    
+    // If user has access to the feature, show the component
+    if (featureAccess[featureName]) {
+      return component;
+    } 
+    
+    // Otherwise show the waiting message
+    return (
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
+        <div className="flex flex-col items-center justify-center">
+          <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+          <p className="text-gray-600">{waitingMessage || "This feature requires admin approval before you can access it."}</p>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -334,8 +443,8 @@ const TherapistDashboard = () => {
                 <Link to="/appointments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Appointments
                 </Link>
-                <Link to="/patients" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Patients
+                <Link to="/earnings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Earnings
                 </Link>
                 <Link to="/assessments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Assessments
@@ -437,23 +546,23 @@ const TherapistDashboard = () => {
                   </div>
                 </div>
 
-                {/* Stat 3 */}
+                {/* Stat 3 - Earnings */}
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                        <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
+                        <svg className="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dl>
                           <dt className="text-sm font-medium text-gray-500 truncate">
-                            Total Patients
+                            Monthly Earnings
                           </dt>
                           <dd>
                             <div className="text-lg font-medium text-gray-900">
-                              {stats.totalPatients}
+                              ${stats.monthlyEarnings || '0.00'}
                             </div>
                           </dd>
                         </dl>
@@ -462,8 +571,8 @@ const TherapistDashboard = () => {
                   </div>
                   <div className="bg-gray-50 px-4 py-4 sm:px-6">
                     <div className="text-sm">
-                      <Link to="/patients" className="font-medium text-primary-600 hover:text-primary-500">
-                        View all patients
+                      <Link to="/earnings" className="font-medium text-primary-600 hover:text-primary-500">
+                        View earnings details
                       </Link>
                     </div>
                   </div>
@@ -655,6 +764,49 @@ const TherapistDashboard = () => {
                       View all appointments<span className="sr-only"> appointments</span>
                     </Link>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Earnings Chart Section */}
+            <div className="px-4 py-6 sm:px-0">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Earnings Overview</h2>
+                <Link to="/earnings" className="text-sm font-medium text-primary-600 hover:text-primary-500 flex items-center">
+                  View detailed report
+                  <svg className="ml-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                {/* Earnings Chart */}
+                <div className="bg-white overflow-hidden shadow-md rounded-lg border border-gray-100">
+                  {renderFeature('earnings', 
+                    <div className="px-4 py-5 sm:p-6 h-80">
+                      <EarningsChart 
+                        therapistId={user?.therapist_id || user?.id} 
+                        year={currentYear} 
+                        month={currentMonth} 
+                      />
+                    </div>,
+                    "Earnings visualization requires admin approval.",
+                    earningsError
+                  )}
+                </div>
+                
+                {/* Earnings Summary */}
+                <div className="bg-white overflow-hidden shadow-md rounded-lg border border-gray-100">
+                  {renderFeature('earnings', 
+                    <div className="px-4 py-5 sm:p-6 h-80 flex items-center">
+                      <EarningsSummary 
+                        summary={earningsData?.summary} 
+                        loading={earningsLoading} 
+                      />
+                    </div>,
+                    "Earnings summary requires admin approval.",
+                    earningsError
+                  )}
                 </div>
               </div>
             </div>

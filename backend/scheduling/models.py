@@ -19,6 +19,7 @@ class Appointment(models.Model):
         PENDING = 'pending', 'Pending'
         SCHEDULED = 'scheduled', 'Scheduled'
         RESCHEDULED = 'rescheduled', 'Rescheduled'
+        PENDING_RESCHEDULE = 'pending_reschedule', 'Pending Reschedule'
         COMPLETED = 'completed', 'Completed'
         CANCELLED = 'cancelled', 'Cancelled'
         MISSED = 'missed', 'Missed'

@@ -21,9 +21,17 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     serializer_class = AppointmentSerializer
     
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action == 'create':
+            # Only admin can create new appointments
+            permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+        elif self.action in ['update', 'partial_update']:
+            # Admin and therapists can update appointments
             permission_classes = [permissions.IsAuthenticated, IsAdminUser | IsTherapistUser]
+        elif self.action == 'destroy':
+            # Only admin can delete appointments
+            permission_classes = [permissions.IsAuthenticated, IsAdminUser]
         else:
+            # Everyone can view appointments
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
     
@@ -108,6 +116,93 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return response
     
     @action(detail=True, methods=['post'])
+    def reschedule(self, request, pk=None):
+        appointment = self.get_object()
+        
+        # Check if appointment is in the future
+        if appointment.datetime < timezone.now():
+            return Response(
+                {"error": "Cannot reschedule past appointments"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get the new datetime from request
+        new_datetime = request.data.get('requested_datetime')
+        if not new_datetime:
+            return Response(
+                {"error": "New datetime is required (requested_datetime)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get the reason from request
+        reason = request.data.get('reason')
+        if not reason:
+            return Response(
+                {"error": "Reason for rescheduling is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user is admin (direct reschedule) or therapist (request reschedule)
+        if request.user.is_admin:
+            # Admin can directly reschedule
+            old_datetime = appointment.datetime
+            appointment.datetime = new_datetime
+            appointment.status = Appointment.Status.RESCHEDULED
+            appointment.reschedule_count += 1
+            appointment.save()
+            
+            # Track the change
+            if appointment.changes_log is None:
+                appointment.changes_log = []
+                
+            appointment.changes_log.append({
+                'field': 'datetime',
+                'old_value': old_datetime.isoformat() if old_datetime else None,
+                'new_value': new_datetime,
+                'changed_at': timezone.now().isoformat(),
+                'changed_by': request.user.id,
+                'reason': reason
+            })
+            appointment.save(update_fields=['changes_log'])
+            
+            return Response(
+                {"message": "Appointment rescheduled successfully"},
+                status=status.HTTP_200_OK
+            )
+        else:
+            # Create a reschedule request
+            reschedule_request = RescheduleRequest.objects.create(
+                appointment=appointment,
+                requested_by=request.user,
+                requested_datetime=new_datetime,
+                reason=reason,
+                status=RescheduleRequest.Status.PENDING
+            )
+            
+            # Update appointment status to pending_reschedule
+            appointment.status = 'pending_reschedule'
+            appointment.save()
+            
+            # Track the change
+            if appointment.changes_log is None:
+                appointment.changes_log = []
+                
+            appointment.changes_log.append({
+                'field': 'status',
+                'old_value': appointment.status,
+                'new_value': 'pending_reschedule',
+                'changed_at': timezone.now().isoformat(),
+                'changed_by': request.user.id,
+                'reschedule_request_id': reschedule_request.id
+            })
+            appointment.save(update_fields=['changes_log'])
+            
+            return Response(
+                {"message": "Reschedule request submitted successfully"},
+                status=status.HTTP_200_OK
+            )
+    
+    @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         appointment = self.get_object()
         
@@ -161,13 +256,41 @@ class RescheduleRequestViewSet(viewsets.ModelViewSet):
         appointment = reschedule_request.appointment
         
         # Update appointment with new datetime
-        appointment.datetime = reschedule_request.proposed_datetime
-        appointment.status = 'CONFIRMED'
+        old_datetime = appointment.datetime
+        appointment.datetime = reschedule_request.requested_datetime
+        appointment.status = 'rescheduled'
+        appointment.reschedule_count += 1
         appointment.save()
         
         # Update reschedule request
-        reschedule_request.status = 'APPROVED'
+        reschedule_request.status = 'approved'
+        reschedule_request.admin_notes = request.data.get('admin_notes', '')
         reschedule_request.save()
+        
+        # Track the change
+        if appointment.changes_log is None:
+            appointment.changes_log = []
+            
+        appointment.changes_log.append({
+            'field': 'datetime',
+            'old_value': old_datetime.isoformat() if old_datetime else None,
+            'new_value': reschedule_request.requested_datetime.isoformat() if reschedule_request.requested_datetime else None,
+            'changed_at': timezone.now().isoformat(),
+            'changed_by': request.user.id,
+            'reschedule_request_id': reschedule_request.id,
+            'admin_notes': request.data.get('admin_notes', '')
+        })
+        
+        appointment.changes_log.append({
+            'field': 'status',
+            'old_value': 'pending_reschedule',
+            'new_value': 'rescheduled',
+            'changed_at': timezone.now().isoformat(),
+            'changed_by': request.user.id,
+            'reschedule_request_id': reschedule_request.id,
+            'admin_notes': request.data.get('admin_notes', '')
+        })
+        appointment.save(update_fields=['changes_log'])
         
         return Response(
             {"message": "Reschedule request approved"},
@@ -177,10 +300,31 @@ class RescheduleRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         reschedule_request = self.get_object()
+        appointment = reschedule_request.appointment
         
         # Update reschedule request
-        reschedule_request.status = 'REJECTED'
+        reschedule_request.status = 'rejected'
+        reschedule_request.admin_notes = request.data.get('admin_notes', '')
         reschedule_request.save()
+        
+        # Revert appointment status to scheduled
+        appointment.status = 'scheduled'
+        appointment.save()
+        
+        # Track the change
+        if appointment.changes_log is None:
+            appointment.changes_log = []
+            
+        appointment.changes_log.append({
+            'field': 'status',
+            'old_value': 'pending_reschedule',
+            'new_value': 'scheduled',
+            'changed_at': timezone.now().isoformat(),
+            'changed_by': request.user.id,
+            'reschedule_request_id': reschedule_request.id,
+            'admin_notes': request.data.get('admin_notes', '')
+        })
+        appointment.save(update_fields=['changes_log'])
         
         return Response(
             {"message": "Reschedule request rejected"},
