@@ -36,6 +36,9 @@ import TherapistPatientDetailPage from './pages/patients/TherapistPatientDetailP
 
 // Assessment Pages
 import AssessmentsPage from './pages/assessments/AssessmentsPage';
+import NewAssessmentPage from './pages/assessments/NewAssessmentPage';
+import AssessmentDetailPage from './pages/assessments/AssessmentDetailPage';
+import EditAssessmentPage from './pages/assessments/EditAssessmentPage';
 
 // Other Pages
 import Landing from './pages/Landing';
@@ -66,6 +69,10 @@ function App() {
             
             {/* Assessment Routes */}
             <Route path="/assessments" element={<AssessmentsPage />} />
+            <Route path="/assessments/new" element={<NewAssessmentPage />} />
+            <Route path="/assessments/new/:templateId" element={<NewAssessmentPage />} />
+            <Route path="/assessments/:id" element={<AssessmentDetailPage />} />
+            <Route path="/assessments/:id/edit" element={<EditAssessmentPage />} />
           </Route>
           
           {/* Admin-only Routes */}

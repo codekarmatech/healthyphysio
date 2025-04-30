@@ -1,46 +1,67 @@
+import BaseService from './baseService';
 import api from './api';
 
-// Create a service object for therapist management
-const therapistService = {
-  // Get all therapists
-  getAll: async () => {
-    return api.get('/users/therapists/');
-  },
-  
-  // Get therapist by ID
-  getById: async (id) => {
-    return api.get(`/users/therapists/${id}/`);
-  },
-  
-  // Get current therapist profile
-  getCurrentProfile: async () => {
-    return api.get('/users/therapists/me/');
-  },
-  
-  // Update therapist profile
-  updateProfile: async (profileData) => {
-    return api.put('/users/therapists/me/', profileData);
-  },
-  
-  // Get therapist availability
-  getAvailability: async (therapistId) => {
-    return api.get(`/users/therapists/${therapistId}/availability/`);
-  },
-  
-  // Update therapist availability
-  updateAvailability: async (therapistId, availabilityData) => {
-    return api.put(`/users/therapists/${therapistId}/availability/`, availabilityData);
-  },
-  
-  // Get therapist specializations
-  getSpecializations: async () => {
+/**
+ * Service for managing therapists
+ * Extends BaseService to inherit common CRUD operations
+ */
+class TherapistService extends BaseService {
+  constructor() {
+    super('/users/therapists/');
+  }
+
+  /**
+   * Get current therapist profile
+   * @returns {Promise} API response
+   */
+  getCurrentProfile() {
+    return api.get(`${this.basePath}me/`);
+  }
+
+  /**
+   * Update therapist profile
+   * @param {Object} profileData - Profile data
+   * @returns {Promise} API response
+   */
+  updateProfile(profileData) {
+    return api.put(`${this.basePath}me/`, profileData);
+  }
+
+  /**
+   * Get therapist availability
+   * @param {string|number} therapistId - Therapist ID
+   * @returns {Promise} API response
+   */
+  getAvailability(therapistId) {
+    return api.get(`${this.basePath}${therapistId}/availability/`);
+  }
+
+  /**
+   * Update therapist availability
+   * @param {string|number} therapistId - Therapist ID
+   * @param {Object} availabilityData - Availability data
+   * @returns {Promise} API response
+   */
+  updateAvailability(therapistId, availabilityData) {
+    return api.put(`${this.basePath}${therapistId}/availability/`, availabilityData);
+  }
+
+  /**
+   * Get therapist specializations
+   * @returns {Promise} API response
+   */
+  getSpecializations() {
     return api.get('/users/specializations/');
-  },
-  
-  // Get therapist approval status
-  getApprovalStatus: async (therapistId) => {
+  }
+
+  /**
+   * Get therapist approval status
+   * @param {string|number} therapistId - Therapist ID
+   * @returns {Promise} API response data
+   */
+  async getApprovalStatus(therapistId) {
     try {
-      const response = await api.get(`/users/therapists/${therapistId}/status/`);
+      const response = await api.get(`${this.basePath}${therapistId}/status/`);
       return response.data;
     } catch (error) {
       // Try alternative endpoint if first one fails
@@ -52,12 +73,18 @@ const therapistService = {
         throw secondError;
       }
     }
-  },
-  
-  // Get therapist statistics
-  getStatistics: async (therapistId) => {
-    return api.get(`/users/therapists/${therapistId}/statistics/`);
   }
-};
 
+  /**
+   * Get therapist statistics
+   * @param {string|number} therapistId - Therapist ID
+   * @returns {Promise} API response
+   */
+  getStatistics(therapistId) {
+    return api.get(`${this.basePath}${therapistId}/statistics/`);
+  }
+}
+
+// Create and export a singleton instance
+const therapistService = new TherapistService();
 export default therapistService;

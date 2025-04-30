@@ -1,61 +1,70 @@
+import BaseService from './baseService';
 import api from './api';
 
-// Create a service object for assessment management
-const assessmentService = {
-  // Get all assessments
-  getAll: async () => {
-    return api.get('/assessments/');
-  },
-  
-  // Get assessment by ID
-  getById: async (id) => {
-    return api.get(`/assessments/${id}/`);
-  },
-  
-  // Get assessments by patient
-  getByPatient: async (patientId) => {
-    return api.get(`/assessments/?patient=${patientId}`);
-  },
-  
-  // Get assessments by therapist
-  getByTherapist: async (therapistId) => {
-    return api.get(`/assessments/?therapist=${therapistId}`);
-  },
-  
-  // Get pending assessments for therapist
-  getPendingByTherapist: async (therapistId) => {
-    return api.get(`/assessments/?therapist=${therapistId}&status=pending`);
-  },
-  
-  // Create new assessment
-  create: async (assessmentData) => {
-    return api.post('/assessments/', assessmentData);
-  },
-  
-  // Update assessment
-  update: async (id, assessmentData) => {
-    return api.put(`/assessments/${id}/`, assessmentData);
-  },
-  
-  // Delete assessment
-  delete: async (id) => {
-    return api.delete(`/assessments/${id}/`);
-  },
-  
-  // Complete assessment
-  complete: async (id, completionData) => {
-    return api.post(`/assessments/${id}/complete/`, completionData);
-  },
-  
-  // Get assessment templates
-  getTemplates: async () => {
-    return api.get('/assessments/templates/');
-  },
-  
-  // Get assessment template by ID
-  getTemplateById: async (id) => {
-    return api.get(`/assessments/templates/${id}/`);
+/**
+ * Service for managing assessments
+ * Extends BaseService to inherit common CRUD operations
+ */
+class AssessmentService extends BaseService {
+  constructor() {
+    super('/assessments/');
   }
-};
 
+  /**
+   * Get assessments by patient
+   * @param {string|number} patientId - Patient ID
+   * @returns {Promise} API response
+   */
+  getByPatient(patientId) {
+    return this.getByField('patient', patientId);
+  }
+
+  /**
+   * Get assessments by therapist
+   * @param {string|number} therapistId - Therapist ID
+   * @returns {Promise} API response
+   */
+  getByTherapist(therapistId) {
+    return this.getByField('therapist', therapistId);
+  }
+
+  /**
+   * Get pending assessments for therapist
+   * @param {string|number} therapistId - Therapist ID
+   * @returns {Promise} API response
+   */
+  getPendingByTherapist(therapistId) {
+    return api.get(`${this.basePath}?therapist=${therapistId}&status=pending`);
+  }
+
+  /**
+   * Complete assessment
+   * @param {string|number} id - Assessment ID
+   * @param {Object} completionData - Completion data
+   * @returns {Promise} API response
+   */
+  complete(id, completionData) {
+    return this.performAction(id, 'complete', completionData);
+  }
+
+  /**
+   * Get assessment templates
+   * @returns {Promise} API response
+   */
+  getTemplates() {
+    return api.get(`${this.basePath}templates/`);
+  }
+
+  /**
+   * Get assessment template by ID
+   * @param {string|number} id - Template ID
+   * @returns {Promise} API response
+   */
+  getTemplateById(id) {
+    return api.get(`${this.basePath}templates/${id}/`);
+  }
+}
+
+// Create and export a singleton instance
+const assessmentService = new AssessmentService();
 export default assessmentService;
