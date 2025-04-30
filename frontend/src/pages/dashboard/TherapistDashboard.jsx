@@ -440,13 +440,16 @@ const TherapistDashboard = () => {
                 <Link to="/therapist/dashboard" className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Dashboard
                 </Link>
-                <Link to="/appointments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to="/therapist/appointments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Appointments
                 </Link>
-                <Link to="/earnings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to="/therapist/patients" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Patients
+                </Link>
+                <Link to="/therapist/earnings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Earnings
                 </Link>
-                <Link to="/assessments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to="/therapist/assessments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Assessments
                 </Link>
               </div>
@@ -507,7 +510,7 @@ const TherapistDashboard = () => {
                   </div>
                   <div className="bg-gray-50 px-4 py-4 sm:px-6">
                     <div className="text-sm">
-                      <Link to="/appointments" className="font-medium text-primary-600 hover:text-primary-500">
+                      <Link to="/therapist/appointments" className="font-medium text-primary-600 hover:text-primary-500">
                         View all<span className="sr-only"> appointments</span>
                       </Link>
                     </div>
@@ -539,7 +542,7 @@ const TherapistDashboard = () => {
                   </div>
                   <div className="bg-gray-50 px-4 py-4 sm:px-6">
                     <div className="text-sm">
-                      <Link to="/appointments/today" className="font-medium text-primary-600 hover:text-primary-500">
+                      <Link to="/therapist/appointments/today" className="font-medium text-primary-600 hover:text-primary-500">
                         View today's schedule<span className="sr-only"> for today</span>
                       </Link>
                     </div>
@@ -571,7 +574,7 @@ const TherapistDashboard = () => {
                   </div>
                   <div className="bg-gray-50 px-4 py-4 sm:px-6">
                     <div className="text-sm">
-                      <Link to="/earnings" className="font-medium text-primary-600 hover:text-primary-500">
+                      <Link to="/therapist/earnings" className="font-medium text-primary-600 hover:text-primary-500">
                         View earnings details
                       </Link>
                     </div>
@@ -603,7 +606,7 @@ const TherapistDashboard = () => {
                   </div>
                   <div className="bg-gray-50 px-4 py-4 sm:px-6">
                     <div className="text-sm">
-                      <Link to="/assessments" className="font-medium text-primary-600 hover:text-primary-500">
+                      <Link to="/therapist/assessments" className="font-medium text-primary-600 hover:text-primary-500">
                         Complete assessments
                       </Link>
                     </div>
@@ -612,14 +615,14 @@ const TherapistDashboard = () => {
               </div>
             </div>
 
-            {/* Attendance Section */}
+            {/* Weekly Patient Attendance Section */}
             <div className="mt-8">
               <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
                   <div>
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Attendance</h3>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Weekly Patient Schedule</h3>
                     <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                      Your monthly attendance record
+                      Your patient attendance and payment status
                     </p>
                   </div>
                 </div>
@@ -629,7 +632,7 @@ const TherapistDashboard = () => {
                     {attendanceLoading ? (
                       <div className="px-4 py-5 sm:p-6 text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-                        <p className="mt-3 text-gray-700">Loading attendance data...</p>
+                        <p className="mt-3 text-gray-700">Loading patient schedule data...</p>
                       </div>
                     ) : attendanceError ? (
                       <div className="px-4 py-5 sm:p-6">
@@ -641,7 +644,7 @@ const TherapistDashboard = () => {
                               </svg>
                             </div>
                             <div className="ml-3">
-                              <h3 className="text-sm font-medium text-red-800">Error loading attendance</h3>
+                              <h3 className="text-sm font-medium text-red-800">Error loading patient schedule</h3>
                               <div className="mt-2 text-sm text-red-700">
                                 <p>{attendanceError}</p>
                               </div>
@@ -659,17 +662,137 @@ const TherapistDashboard = () => {
                           />
                         </div>
                         <div className="px-4 py-5 sm:p-6">
-                          <AttendanceCalendar 
-                            days={attendanceDays}
-                            currentDate={currentDate}
-                            onAttendanceUpdated={fetchAttendanceSummary}
-                          />
-                        </div>
-                        {attendanceSummary && (
-                          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-                            <AttendanceSummary summary={attendanceSummary} />
+                          {/* Weekly Schedule Table */}
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Patient
+                                  </th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Monday
+                                  </th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Tuesday
+                                  </th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Wednesday
+                                  </th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Thursday
+                                  </th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Friday
+                                  </th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Saturday
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {/* Mock data for patient schedules */}
+                                {[1, 2, 3, 4, 5].map((patientId) => {
+                                  // Generate weekly schedule based on patient ID
+                                  const weeklySchedule = [];
+                                  
+                                  // Assign days based on patient ID (to make it consistent)
+                                  if (patientId % 5 === 0) {
+                                    weeklySchedule.push(1, 3, 5); // Mon, Wed, Fri
+                                  } else if (patientId % 5 === 1) {
+                                    weeklySchedule.push(2, 4, 6); // Tue, Thu, Sat
+                                  } else if (patientId % 5 === 2) {
+                                    weeklySchedule.push(1, 4, 6); // Mon, Thu, Sat
+                                  } else if (patientId % 5 === 3) {
+                                    weeklySchedule.push(2, 3, 5); // Tue, Wed, Fri
+                                  } else {
+                                    weeklySchedule.push(1, 3, 6); // Mon, Wed, Sat
+                                  }
+                                  
+                                  // Generate random status for each day
+                                  const attendanceRate = 65 + (patientId % 30);
+                                  const getRandomStatus = () => {
+                                    const rand = Math.random() * 100;
+                                    if (rand < attendanceRate) {
+                                      return { status: 'attended', paid: true };
+                                    } else if (rand < attendanceRate + ((100 - attendanceRate) / 2)) {
+                                      return { status: 'cancelled', paid: false };
+                                    } else {
+                                      return { status: 'missed', paid: false };
+                                    }
+                                  };
+                                  
+                                  // Create status for each day of the week
+                                  const dayStatus = {
+                                    1: weeklySchedule.includes(1) ? getRandomStatus() : null,
+                                    2: weeklySchedule.includes(2) ? getRandomStatus() : null,
+                                    3: weeklySchedule.includes(3) ? getRandomStatus() : null,
+                                    4: weeklySchedule.includes(4) ? getRandomStatus() : null,
+                                    5: weeklySchedule.includes(5) ? getRandomStatus() : null,
+                                    6: weeklySchedule.includes(6) ? getRandomStatus() : null,
+                                  };
+                                  
+                                  return (
+                                    <tr key={patientId}>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="flex items-center">
+                                          <div className="flex-shrink-0 h-10 w-10">
+                                            <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                                              {['J', 'S', 'M', 'E', 'R'][patientId % 5]}
+                                            </div>
+                                          </div>
+                                          <div className="ml-4">
+                                            <div className="text-sm font-medium text-gray-900">
+                                              {['John Doe', 'Sarah Johnson', 'Michael Chen', 'Emily Wilson', 'Robert Garcia'][patientId % 5]}
+                                            </div>
+                                            <div className="text-sm text-gray-500">
+                                              {['Lower back pain', 'Shoulder injury', 'Knee arthritis', 'Ankle sprain', 'Chronic back pain'][patientId % 5]}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      {[1, 2, 3, 4, 5, 6].map(day => (
+                                        <td key={`${patientId}-${day}`} className="px-6 py-4 whitespace-nowrap">
+                                          {dayStatus[day] ? (
+                                            <div className="flex flex-col items-center">
+                                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                ${dayStatus[day].status === 'attended' ? 'bg-green-100 text-green-800' : 
+                                                  dayStatus[day].status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                                                  'bg-yellow-100 text-yellow-800'}`}>
+                                                {dayStatus[day].status.charAt(0).toUpperCase() + dayStatus[day].status.slice(1)}
+                                              </span>
+                                              <span className={`mt-1 text-xs ${dayStatus[day].paid ? 'text-green-600' : 'text-red-600'}`}>
+                                                {dayStatus[day].paid ? 'Paid' : 'Not Paid'}
+                                              </span>
+                                            </div>
+                                          ) : (
+                                            <span className="text-gray-400">-</span>
+                                          )}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
-                        )}
+                        </div>
+                        <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+                          <div className="flex flex-wrap gap-4 justify-center">
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
+                              <span className="text-xs text-gray-600">Attended (Paid)</span>
+                            </div>
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
+                              <span className="text-xs text-gray-600">Cancelled (Not Paid)</span>
+                            </div>
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full bg-yellow-500 mr-1"></div>
+                              <span className="text-xs text-gray-600">Missed (Not Paid)</span>
+                            </div>
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
@@ -680,7 +803,7 @@ const TherapistDashboard = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
-                      <p className="text-gray-600">Your account is pending approval from an administrator. Attendance tracking will be available once your account is approved.</p>
+                      <p className="text-gray-600">Your account is pending approval from an administrator. Patient scheduling will be available once your account is approved.</p>
                     </div>
                   </div>
                 )}
@@ -708,7 +831,7 @@ const TherapistDashboard = () => {
                   ) : recentAppointments.length > 0 ? (
                     recentAppointments.map((appointment) => (
                       <li key={appointment.id}>
-                        <Link to={`/appointments/${appointment.id}`} className="block hover:bg-gray-50">
+                        <Link to={`/therapist/appointments/${appointment.id}`} className="block hover:bg-gray-50">
                           <div className="px-4 py-4 sm:px-6">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
@@ -760,7 +883,7 @@ const TherapistDashboard = () => {
                 </ul>
                 <div className="bg-gray-50 px-4 py-4 sm:px-6">
                   <div className="text-sm">
-                    <Link to="/appointments" className="font-medium text-primary-600 hover:text-primary-500">
+                    <Link to="/therapist/appointments" className="font-medium text-primary-600 hover:text-primary-500">
                       View all appointments<span className="sr-only"> appointments</span>
                     </Link>
                   </div>
@@ -772,7 +895,7 @@ const TherapistDashboard = () => {
             <div className="px-4 py-6 sm:px-0">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">Earnings Overview</h2>
-                <Link to="/earnings" className="text-sm font-medium text-primary-600 hover:text-primary-500 flex items-center">
+                <Link to="/therapist/earnings" className="text-sm font-medium text-primary-600 hover:text-primary-500 flex items-center">
                   View detailed report
                   <svg className="ml-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -824,18 +947,21 @@ const TherapistDashboard = () => {
                         </svg>
                       </div>
                       <div className="ml-5 w-0 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">Schedule Appointment</h3>
+                        <h3 className="text-lg font-medium text-gray-900">Appointment Scheduling</h3>
                         <p className="mt-1 text-sm text-gray-500">
-                          Create a new appointment for a patient.
+                          View your upcoming appointments.
                         </p>
                       </div>
                     </div>
                     <div className="mt-4">
+                      <p className="text-sm text-gray-500 mb-2">
+                        Appointments are scheduled by administrators.
+                      </p>
                       <Link
-                        to="/appointments/new"
+                        to="/therapist/appointments"
                         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                       >
-                        Schedule Now
+                        View Appointments
                       </Link>
                     </div>
                   </div>
@@ -1002,7 +1128,7 @@ const TherapistDashboard = () => {
                 </ul>
                 <div className="bg-gray-50 px-4 py-4 sm:px-6">
                   <div className="text-sm">
-                    <Link to="/referrals" className="font-medium text-primary-600 hover:text-primary-500">
+                    <Link to="/therapist/referrals" className="font-medium text-primary-600 hover:text-primary-500">
                       View all referrals<span className="sr-only"> referrals</span>
                     </Link>
                   </div>
@@ -1039,8 +1165,8 @@ const TherapistDashboard = () => {
                       </div>
                     </div>
                     <div className="mt-4">
-                      <Link to="/patients/1" className="text-sm font-medium text-primary-600 hover:text-primary-500">
-                        View patient details
+                      <Link to="/therapist/patients" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                        View all patients
                       </Link>
                     </div>
                   </div>
@@ -1071,8 +1197,8 @@ const TherapistDashboard = () => {
                       </div>
                     </div>
                     <div className="mt-4">
-                      <Link to="/patients/2" className="text-sm font-medium text-primary-600 hover:text-primary-500">
-                        View patient details
+                      <Link to="/therapist/patients" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                        View all patients
                       </Link>
                     </div>
                   </div>

@@ -31,6 +31,8 @@ import PatientRescheduleRequestPage from './pages/appointments/PatientReschedule
 // Patient Pages
 import PatientsPage from './pages/patients/PatientsPage';
 import PatientDetailPage from './pages/patients/PatientDetailPage';
+import TherapistPatientsPage from './pages/patients/TherapistPatientsPage';
+import TherapistPatientDetailPage from './pages/patients/TherapistPatientDetailPage';
 
 // Assessment Pages
 import AssessmentsPage from './pages/assessments/AssessmentsPage';
@@ -52,11 +54,11 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           
-          {/* Protected Routes */}
+          {/* Protected Routes - Common for all roles */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
             
-            {/* Common Appointment Routes */}
+            {/* Common Appointment Routes - These will redirect to role-specific routes */}
             <Route path="/appointments" element={<AppointmentsPage />} />
             <Route path="/appointments/today" element={<TodayAppointmentsPage />} />
             <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
@@ -77,8 +79,15 @@ function App() {
           {/* Therapist Routes */}
           <Route element={<ProtectedRoute allowedRoles={['therapist']} />}>
             <Route path="/therapist/dashboard" element={<TherapistDashboard />} />
-            <Route path="/earnings" element={<EarningsPage />} />
-            <Route path="/appointments/:id/reschedule" element={<RescheduleRequestPage />} />
+            <Route path="/therapist/appointments" element={<AppointmentsPage />} />
+            <Route path="/therapist/appointments/today" element={<TodayAppointmentsPage />} />
+            <Route path="/therapist/appointments/:id" element={<AppointmentDetailPage />} />
+            <Route path="/therapist/appointments/:id/reschedule" element={<RescheduleRequestPage />} />
+            <Route path="/therapist/patients" element={<TherapistPatientsPage />} />
+            <Route path="/therapist/patients/:id" element={<TherapistPatientDetailPage />} />
+            <Route path="/therapist/earnings" element={<EarningsPage />} />
+            <Route path="/therapist/assessments" element={<AssessmentsPage />} />
+            <Route path="/therapist/referrals" element={<NotFound />} />
           </Route>
           
           {/* Patient Routes */}

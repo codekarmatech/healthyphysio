@@ -10,13 +10,13 @@ const Dashboard = () => {
     if (!loading && user) {
       // Redirect to role-specific dashboard
       if (user.role === 'admin') {
-        navigate('/admin');
+        navigate('/admin/dashboard');
       } else if (user.role === 'doctor') {
-        navigate('/doctor');
+        navigate('/doctor/dashboard');
       } else if (user.role === 'therapist') {
-        navigate('/therapist');
+        navigate('/therapist/dashboard');
       } else if (user.role === 'patient') {
-        navigate('/patient');
+        navigate('/patient/dashboard');
       }
     }
   }, [user, loading, navigate]);

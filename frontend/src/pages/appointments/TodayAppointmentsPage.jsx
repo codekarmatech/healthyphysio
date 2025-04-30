@@ -75,7 +75,7 @@ const TodayAppointmentsPage = () => {
   const handleStartSession = async (appointmentId) => {
     try {
       // Navigate to the appointment detail page to start the session
-      window.location.href = `/appointments/${appointmentId}`;
+      window.location.href = `/therapist/appointments/${appointmentId}`;
     } catch (error) {
       console.error('Error starting session:', error);
       alert('Failed to start session. Please try again.');
@@ -96,13 +96,16 @@ const TodayAppointmentsPage = () => {
                 <Link to="/therapist/dashboard" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Dashboard
                 </Link>
-                <Link to="/appointments" className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to="/therapist/appointments" className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Appointments
                 </Link>
-                <Link to="/patients" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to="/therapist/patients" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Patients
                 </Link>
-                <Link to="/assessments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to="/therapist/earnings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Earnings
+                </Link>
+                <Link to="/therapist/assessments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Assessments
                 </Link>
               </div>

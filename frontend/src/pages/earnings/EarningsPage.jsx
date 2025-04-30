@@ -119,31 +119,31 @@ const EarningsPage = () => {
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 <Link
-                  to="/dashboard"
+                  to="/therapist/dashboard"
                   className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
                 >
                   Dashboard
                 </Link>
                 <Link
-                  to="/appointments"
+                  to="/therapist/appointments"
                   className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
                 >
                   Appointments
                 </Link>
                 <Link
-                  to="/patients"
+                  to="/therapist/patients"
                   className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
                 >
                   Patients
                 </Link>
                 <Link
-                  to="/earnings"
+                  to="/therapist/earnings"
                   className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
                 >
                   Earnings
                 </Link>
                 <Link
-                  to="/assessments"
+                  to="/therapist/assessments"
                   className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
                 >
                   Assessments
