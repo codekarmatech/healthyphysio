@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'audit_logs',  # Add this line
     'assessments',
     'websocket',   # Add this if you've created it
+    'equipment',   # Equipment management app
 ]
 
 # Add our custom middleware

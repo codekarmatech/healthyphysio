@@ -28,6 +28,16 @@ import EditAppointmentPage from './pages/appointments/EditAppointmentPage';
 import RescheduleRequestPage from './pages/appointments/RescheduleRequestPage';
 import PatientRescheduleRequestPage from './pages/appointments/PatientRescheduleRequestPage';
 
+// Equipment Pages
+import { 
+  EquipmentListPage, 
+  EquipmentDetailPage, 
+  EquipmentFormPage,
+  AllocationRequestPage,
+  AllocationRequestsPage,
+  AllocationsPage
+} from './pages/equipment';
+
 // Patient Pages
 import PatientsPage from './pages/patients/PatientsPage';
 import PatientDetailPage from './pages/patients/PatientDetailPage';
@@ -75,6 +85,11 @@ function App() {
             <Route path="/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/assessments/:id" element={<AssessmentDetailPage />} />
             <Route path="/assessments/:id/edit" element={<EditAssessmentPage />} />
+            
+            {/* Equipment Routes - Common for all roles */}
+            <Route path="/equipment" element={<EquipmentListPage />} />
+            <Route path="/equipment/allocations" element={<AllocationsPage />} />
+            <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
           </Route>
           
           {/* Admin-only Routes */}
@@ -83,6 +98,9 @@ function App() {
             <Route path="/appointments/:id/edit" element={<EditAppointmentPage />} />
             <Route path="/patients" element={<PatientsPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
+            <Route path="/equipment/new" element={<EquipmentFormPage />} />
+            <Route path="/equipment/requests" element={<AllocationRequestsPage />} />
+            <Route path="/equipment/:id/edit" element={<EquipmentFormPage />} />
           </Route>
           
           {/* Therapist Routes */}
@@ -98,6 +116,9 @@ function App() {
             <Route path="/therapist/assessments" element={<AssessmentsPage />} />
             <Route path="/therapist/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/therapist/referrals" element={<NotFound />} />
+            <Route path="/therapist/equipment" element={<EquipmentListPage />} />
+            <Route path="/therapist/equipment/requests" element={<AllocationRequestsPage />} />
+            <Route path="/therapist/equipment/requests/new" element={<AllocationRequestPage />} />
           </Route>
           
           {/* Patient Routes */}

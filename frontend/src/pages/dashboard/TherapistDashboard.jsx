@@ -7,6 +7,7 @@ import MonthSelector from '../../components/attendance/MonthSelector';
 import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
 import EarningsChart from '../../components/earnings/EarningsChart';
 import EarningsSummary from '../../components/earnings/EarningsSummary';
+import EquipmentRequestsSummary from '../../components/equipment/EquipmentRequestsSummary';
 
 // Import your API service
 import api from '../../services/api';
@@ -18,6 +19,8 @@ const TherapistDashboard = () => {
     todayAppointments: 0,
     totalPatients: 0,
     pendingAssessments: 0,
+    equipmentAllocations: 0,
+    equipmentRequests: 0,
   });
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +45,7 @@ const TherapistDashboard = () => {
   const [featureAccess, setFeatureAccess] = useState({
     attendance: true, // Set to true for development/testing
     earnings: true,   // Set to true for development/testing
+    equipment: true,  // Set to true for development/testing
     // Add more features here as needed
     // example: patientManagement: false,
     // example: reportGeneration: false,
@@ -103,6 +107,19 @@ const TherapistDashboard = () => {
         // Fetch pending assessments
         const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
         
+        // Fetch equipment allocations
+        let equipmentAllocations = 0;
+        let equipmentRequests = 0;
+        try {
+          const allocationsResponse = await api.get(`/equipment/allocations/`);
+          equipmentAllocations = allocationsResponse.data.count || allocationsResponse.data.length || 0;
+          
+          const requestsResponse = await api.get(`/equipment/requests/`);
+          equipmentRequests = requestsResponse.data.count || requestsResponse.data.length || 0;
+        } catch (equipmentError) {
+          console.error('Error fetching equipment data:', equipmentError);
+        }
+        
         // Fetch recent appointments (limit to 5)
         const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
         
@@ -129,7 +146,9 @@ const TherapistDashboard = () => {
           todayAppointments: todayResponse.data.count || todayResponse.data.length || 0,
           totalPatients: patientCount,
           pendingAssessments: assessmentsResponse.data.count || assessmentsResponse.data.length || 0,
-          monthlyEarnings: monthlyEarnings.toFixed(2)
+          monthlyEarnings: monthlyEarnings.toFixed(2),
+          equipmentAllocations: equipmentAllocations,
+          equipmentRequests: equipmentRequests
         });
         
         // Format recent appointments
@@ -153,7 +172,9 @@ const TherapistDashboard = () => {
           todayAppointments: 0,
           totalPatients: 0,
           pendingAssessments: 0,
-          monthlyEarnings: '0.00'
+          monthlyEarnings: '0.00',
+          equipmentAllocations: 0,
+          equipmentRequests: 0
         });
         setRecentAppointments([]);
         setLoading(false);
@@ -196,6 +217,7 @@ const TherapistDashboard = () => {
               ...prevAccess,
               attendance: response.data.is_approved,
               earnings: response.data.is_approved,
+              equipment: response.data.is_approved,
               // Update other features as needed based on response data
             }));
             
@@ -215,6 +237,8 @@ const TherapistDashboard = () => {
           setFeatureAccess(prevAccess => ({
             ...prevAccess,
             attendance: false,
+            earnings: false,
+            equipment: false,
             // Reset other features as needed
           }));
         }
@@ -225,6 +249,8 @@ const TherapistDashboard = () => {
         setFeatureAccess(prevAccess => ({
           ...prevAccess,
           attendance: false,
+          earnings: false,
+          equipment: false,
           // Reset other features as needed
         }));
       }
@@ -484,7 +510,7 @@ const TherapistDashboard = () => {
           <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
             {/* Stats */}
             <div className="px-4 py-6 sm:px-0">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {/* Stat 1 */}
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
@@ -581,7 +607,7 @@ const TherapistDashboard = () => {
                   </div>
                 </div>
 
-                {/* Stat 4 */}
+                {/* Stat 4 - Assessments */}
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex items-center">
@@ -608,6 +634,38 @@ const TherapistDashboard = () => {
                     <div className="text-sm">
                       <Link to="/therapist/assessments" className="font-medium text-primary-600 hover:text-primary-500">
                         Complete assessments
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stat 5 - Equipment */}
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
+                        <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">
+                            Equipment Requests
+                          </dt>
+                          <dd>
+                            <div className="text-lg font-medium text-gray-900">
+                              {stats.equipmentRequests}
+                            </div>
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/therapist/equipment/requests" className="font-medium text-primary-600 hover:text-primary-500">
+                        Manage equipment
                       </Link>
                     </div>
                   </div>
@@ -662,6 +720,23 @@ const TherapistDashboard = () => {
                           />
                         </div>
                         <div className="px-4 py-5 sm:p-6">
+                          {/* Attendance Summary Component */}
+                          <div className="mb-6">
+                            <AttendanceSummary 
+                              summary={attendanceSummary} 
+                              loading={attendanceLoading} 
+                            />
+                          </div>
+                          
+                          {/* Attendance Calendar Component */}
+                          <div className="mb-6">
+                            <AttendanceCalendar 
+                              attendanceDays={attendanceDays} 
+                              currentYear={currentYear}
+                              currentMonth={currentMonth}
+                            />
+                          </div>
+                          
                           {/* Weekly Schedule Table */}
                           <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
@@ -888,6 +963,27 @@ const TherapistDashboard = () => {
                     </Link>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Equipment Requests Section */}
+            <div className="px-4 py-6 sm:px-0">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Equipment Requests</h2>
+                <Link to="/therapist/equipment/requests/new" className="text-sm font-medium text-primary-600 hover:text-primary-500 flex items-center">
+                  New request
+                  <svg className="ml-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+              </div>
+              <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                {renderFeature('equipment', 
+                  <div className="px-4 py-5 sm:p-6">
+                    <EquipmentRequestsSummary />
+                  </div>,
+                  "Equipment management requires admin approval."
+                )}
               </div>
             </div>
 
