@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import appointmentService from '../../services/appointmentService';
 import sessionService from '../../services/sessionService';
 
 const AppointmentDetailPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [appointment, setAppointment] = useState(null);
   const [session, setSession] = useState(null);
@@ -92,19 +91,28 @@ const AppointmentDetailPage = () => {
   const handleStartSession = async () => {
     try {
       setProcessingAction(true);
-      let sessionId;
+      
+      // Check if user is admin
+      if (!user.is_admin) {
+        alert('Only administrators can start new sessions.');
+        setProcessingAction(false);
+        return;
+      }
       
       // Create a session if it doesn't exist
       if (!session) {
         const response = await sessionService.create({ appointment: id });
         setSession(response.data);
-        sessionId = response.data.id;
+        
+        // Inform the admin that the session was created
+        alert('Session created successfully.');
       } else {
-        sessionId = session.id;
+        // Session already exists
+        alert('Session already exists for this appointment.');
       }
       
-      // Navigate to the session page
-      navigate(`/sessions/${sessionId}`);
+      // Refresh the page to show updated session information
+      window.location.reload();
       
       setProcessingAction(false);
     } catch (err) {
@@ -369,7 +377,7 @@ const AppointmentDetailPage = () => {
                       </Link>
                     )}
                     
-                    {appointment.status === 'CONFIRMED' && (
+                    {appointment.status === 'CONFIRMED' && user.is_admin && (
                       <button
                         type="button"
                         onClick={handleStartSession}
@@ -378,6 +386,12 @@ const AppointmentDetailPage = () => {
                       >
                         Start Session
                       </button>
+                    )}
+                    
+                    {appointment.status === 'CONFIRMED' && !user.is_admin && (
+                      <div className="text-sm text-gray-500 italic">
+                        Session will be started by an administrator
+                      </div>
                     )}
                   </div>
                 </div>

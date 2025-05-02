@@ -35,7 +35,8 @@ import {
   EquipmentFormPage,
   AllocationRequestPage,
   AllocationRequestsPage,
-  AllocationsPage
+  AllocationsPage,
+  CategoryManagementPage
 } from './pages/equipment';
 
 // Patient Pages
@@ -99,6 +100,7 @@ function App() {
             <Route path="/patients" element={<PatientsPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/equipment/new" element={<EquipmentFormPage />} />
+            <Route path="/equipment/categories" element={<CategoryManagementPage />} />
             <Route path="/equipment/requests" element={<AllocationRequestsPage />} />
             <Route path="/equipment/:id/edit" element={<EquipmentFormPage />} />
           </Route>

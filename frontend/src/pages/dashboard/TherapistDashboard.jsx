@@ -1066,24 +1066,24 @@ const TherapistDashboard = () => {
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-                        <svg className="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
+                        <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="ml-5 w-0 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">Start Session</h3>
+                        <h3 className="text-lg font-medium text-gray-900">Sessions</h3>
                         <p className="mt-1 text-sm text-gray-500">
-                          Begin a therapy session with a patient.
+                          View your upcoming therapy sessions. Only administrators can start new sessions.
                         </p>
                       </div>
                     </div>
                     <div className="mt-4">
                       <Link
-                        to="/sessions/new"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        to="/therapist/appointments"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
-                        Start Session
+                        View Sessions
                       </Link>
                     </div>
                   </div>

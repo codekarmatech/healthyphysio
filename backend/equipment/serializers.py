@@ -4,13 +4,35 @@ Connected to: Equipment API endpoints
 """
 
 from rest_framework import serializers
-from .models import Equipment, EquipmentAllocation, AllocationRequest
+from .models import Category, Equipment, EquipmentAllocation, AllocationRequest
 from users.serializers import UserSerializer, TherapistSerializer, PatientSerializer
 
+class CategorySerializer(serializers.ModelSerializer):
+    equipment_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'description', 'equipment_count', 'created_at', 'updated_at']
+    
+    def get_equipment_count(self, obj):
+        return obj.equipment.count()
+
 class EquipmentSerializer(serializers.ModelSerializer):
+    category_name = serializers.ReadOnlyField(source='category.name')
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True)
+    
     class Meta:
         model = Equipment
         fields = '__all__'
+        
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.category:
+            representation['category'] = {
+                'id': instance.category.id,
+                'name': instance.category.name
+            }
+        return representation
 
 class EquipmentAllocationSerializer(serializers.ModelSerializer):
     equipment_details = EquipmentSerializer(source='equipment', read_only=True)

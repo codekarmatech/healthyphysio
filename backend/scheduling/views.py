@@ -336,9 +336,14 @@ class SessionViewSet(viewsets.ModelViewSet):
     serializer_class = SessionSerializer
     
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action in ['create', 'destroy']:
+            # Only admin can create or delete sessions
+            permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+        elif self.action in ['update', 'partial_update']:
+            # Admin and therapists can update sessions
             permission_classes = [permissions.IsAuthenticated, IsAdminUser | IsTherapistUser]
         else:
+            # Everyone can view sessions
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
     

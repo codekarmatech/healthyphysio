@@ -8,6 +8,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
+router.register(r'categories', views.CategoryViewSet)
 router.register(r'equipment', views.EquipmentViewSet)
 router.register(r'allocations', views.EquipmentAllocationViewSet)
 router.register(r'requests', views.AllocationRequestViewSet)

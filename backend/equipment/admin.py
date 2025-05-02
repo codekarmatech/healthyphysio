@@ -5,12 +5,16 @@ Connected to: Django admin interface
 
 from django.contrib import admin
 from django.utils import timezone
-from .models import Equipment, EquipmentAllocation, AllocationRequest
+from .models import Category, Equipment, EquipmentAllocation, AllocationRequest
+
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description', 'created_at')
+    search_fields = ('name', 'description')
 
 class EquipmentAdmin(admin.ModelAdmin):
-    list_display = ('name', 'serial_number', 'price', 'is_available', 'purchase_date')
-    list_filter = ('is_available', 'purchase_date')
-    search_fields = ('name', 'serial_number', 'description')
+    list_display = ('name', 'category', 'serial_number', 'tracking_id', 'price', 'is_available', 'condition', 'purchase_date')
+    list_filter = ('is_available', 'category', 'condition', 'purchase_date', 'has_serial_number')
+    search_fields = ('name', 'serial_number', 'tracking_id', 'description')
 
 class EquipmentAllocationAdmin(admin.ModelAdmin):
     list_display = ('equipment', 'therapist', 'patient', 'allocation_date', 'expected_return_date', 'status', 'location')
@@ -69,6 +73,7 @@ class AllocationRequestAdmin(admin.ModelAdmin):
         )
     reject_requests.short_description = "Reject selected allocation requests"
 
+admin.site.register(Category, CategoryAdmin)
 admin.site.register(Equipment, EquipmentAdmin)
 admin.site.register(EquipmentAllocation, EquipmentAllocationAdmin)
 admin.site.register(AllocationRequest, AllocationRequestAdmin)

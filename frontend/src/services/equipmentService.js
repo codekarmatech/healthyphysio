@@ -1,17 +1,52 @@
 import api from './api';
 
 const equipmentService = {
+  // Equipment Categories
+  getAllCategories: () => {
+    return api.get('/equipment/categories/');
+  },
+  
+  getCategoryById: (id) => {
+    return api.get(`/equipment/categories/${id}/`);
+  },
+  
+  createCategory: (categoryData) => {
+    return api.post('/equipment/categories/', categoryData);
+  },
+  
+  updateCategory: (id, categoryData) => {
+    return api.patch(`/equipment/categories/${id}/`, categoryData);
+  },
+  
+  deleteCategory: (id) => {
+    return api.delete(`/equipment/categories/${id}/`);
+  },
+  
   // Equipment CRUD operations
-  getAllEquipment: () => {
-    return api.get('/equipment/equipment/');
+  getAllEquipment: (categoryId = null) => {
+    const url = categoryId 
+      ? `/equipment/equipment/?category=${categoryId}` 
+      : '/equipment/equipment/';
+    return api.get(url);
   },
   
   getEquipmentById: (id) => {
     return api.get(`/equipment/equipment/${id}/`);
   },
   
-  getAvailableEquipment: () => {
-    return api.get('/equipment/equipment/available/');
+  getAvailableEquipment: (categoryId = null) => {
+    const url = categoryId 
+      ? `/equipment/equipment/available/?category=${categoryId}` 
+      : '/equipment/equipment/available/';
+    return api.get(url);
+  },
+  
+  checkSerialNumberExists: (serialNumber, excludeId = null) => {
+    let url = `/equipment/equipment/check_serial_number_exists/?serial_number=${encodeURIComponent(serialNumber)}`;
+    if (excludeId) {
+      url += `&exclude_id=${excludeId}`;
+    }
+    return api.get(url);
   },
   
   createEquipment: (equipmentData) => {

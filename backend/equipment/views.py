@@ -9,10 +9,31 @@ from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Q
 from django.shortcuts import render
-from .models import Equipment, EquipmentAllocation, AllocationRequest
-from .serializers import EquipmentSerializer, EquipmentAllocationSerializer, AllocationRequestSerializer
+from .models import Category, Equipment, EquipmentAllocation, AllocationRequest
+from .serializers import CategorySerializer, EquipmentSerializer, EquipmentAllocationSerializer, AllocationRequestSerializer
 from users.models import User, Therapist, Patient
 from users.permissions import IsAdminUser as IsAdmin, IsTherapistUser as IsTherapist, IsPatientUser as IsPatient
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing equipment categories
+    """
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at']
+    
+    def get_permissions(self):
+        """
+        Only admin can create, update or delete categories
+        Therapists and patients can view categories
+        """
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsAdmin]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
 class EquipmentViewSet(viewsets.ModelViewSet):
     """
@@ -21,8 +42,8 @@ class EquipmentViewSet(viewsets.ModelViewSet):
     queryset = Equipment.objects.all()
     serializer_class = EquipmentSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['name', 'description', 'serial_number']
-    ordering_fields = ['name', 'price', 'purchase_date', 'is_available']
+    search_fields = ['name', 'description', 'serial_number', 'tracking_id']
+    ordering_fields = ['name', 'price', 'purchase_date', 'is_available', 'category__name']
     
     def get_permissions(self):
         """
@@ -35,12 +56,39 @@ class EquipmentViewSet(viewsets.ModelViewSet):
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
     
+    def get_queryset(self):
+        """Filter equipment by category if provided"""
+        queryset = super().get_queryset()
+        category_id = self.request.query_params.get('category', None)
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+        return queryset
+    
     @action(detail=False, methods=['get'])
     def available(self, request):
         """Get only available equipment"""
-        available_equipment = Equipment.objects.filter(is_available=True)
-        serializer = self.get_serializer(available_equipment, many=True)
+        queryset = self.get_queryset().filter(is_available=True)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def check_serial_number_exists(self, request):
+        """Check if a serial number already exists"""
+        serial_number = request.query_params.get('serial_number', None)
+        exclude_id = request.query_params.get('exclude_id', None)
+        
+        if not serial_number:
+            return Response(
+                {"detail": "Serial number parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        query = Q(serial_number=serial_number, has_serial_number=True)
+        if exclude_id:
+            query &= ~Q(id=exclude_id)
+            
+        exists = Equipment.objects.filter(query).exists()
+        return Response({"exists": exists})
 
 class EquipmentAllocationViewSet(viewsets.ModelViewSet):
     """

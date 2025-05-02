@@ -10,6 +10,20 @@ from django.db import models
 from django.utils import timezone
 from users.models import User, Therapist, Patient
 from django.db import models
+
+class Category(models.Model):
+    """Model for equipment categories"""
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        verbose_name_plural = "Categories"
+
 class Equipment(models.Model):
     """Model for physical therapy equipment owned by admin"""
     name = models.CharField(max_length=255)
@@ -19,11 +33,21 @@ class Equipment(models.Model):
     serial_number = models.CharField(max_length=100, blank=True)
     purchase_date = models.DateField(default=timezone.now)
     is_available = models.BooleanField(default=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='equipment')
+    has_serial_number = models.BooleanField(default=True)
+    tracking_id = models.CharField(max_length=100, blank=True)
+    condition = models.CharField(max_length=20, default='new')
+    quantity = models.PositiveIntegerField(default=1)
+    related_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='related_items')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"{self.name} ({self.serial_number})"
+        if self.has_serial_number and self.serial_number:
+            return f"{self.name} ({self.serial_number})"
+        elif self.tracking_id:
+            return f"{self.name} ({self.tracking_id})"
+        return self.name
 
 
 class EquipmentAllocation(models.Model):

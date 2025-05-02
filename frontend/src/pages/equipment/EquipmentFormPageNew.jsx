@@ -96,7 +96,7 @@ const EquipmentFormPage = () => {
   }, [id, isEditMode]);
   
   // Check if serial number already exists
-  const checkSerialNumber = async (serialNumber) => {
+  const checkSerialNumber = useCallback(async (serialNumber) => {
     if (!serialNumber.trim()) {
       setSerialNumberError(null);
       return;
@@ -120,7 +120,7 @@ const EquipmentFormPage = () => {
     } finally {
       setSerialNumberChecking(false);
     }
-  };
+  }, [isEditMode, id]);
 
   // Debounce function for serial number check
   const debounce = (func, delay) => {
@@ -136,15 +136,12 @@ const EquipmentFormPage = () => {
   };
 
   // Debounced serial number check
-  const debouncedCheckSerialNumber = useCallback(
-    (serialNumber) => {
-      const debouncedFn = debounce((value) => {
-        checkSerialNumber(value);
-      }, 500);
-      debouncedFn(serialNumber);
-    },
-    [isEditMode, id] // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  const debouncedCheckSerialNumber = useCallback((serialNumber) => {
+    const debouncedFn = debounce((value) => {
+      checkSerialNumber(value);
+    }, 500);
+    debouncedFn(serialNumber);
+  }, [checkSerialNumber]);
 
   const handleChange = (e) => {
     const { name, value, type, checked, files } = e.target;
@@ -203,6 +200,11 @@ const EquipmentFormPage = () => {
     e.preventDefault();
     
     // Validate form
+    if (!formData.category) {
+      setError('Please select a category for the equipment.');
+      return;
+    }
+    
     if (formData.has_serial_number && !formData.serial_number.trim()) {
       setError('Serial number is required when "Has Serial Number" is checked.');
       return;
@@ -233,9 +235,9 @@ const EquipmentFormPage = () => {
         // For multiple items, we'll create them one by one
         const baseData = { ...formData, quantity: 1 };
         
-        // Create the first item and get its ID for reference
-        const firstResponse = await equipmentService.createEquipment(baseData);
-        console.log('First item created with ID:', firstResponse.data.id);
+        // Create the first item and store its ID for reference
+        const firstItemResponse = await equipmentService.createEquipment(baseData);
+        const firstItemId = firstItemResponse.data.id;
         
         // Create the rest of the items
         const promises = [];
@@ -250,6 +252,9 @@ const EquipmentFormPage = () => {
             // If using tracking IDs, generate a new one
             itemData.tracking_id = `EQ-${Date.now()}-${i+1}`;
           }
+          
+          // Add a reference to the first item
+          itemData.related_to = firstItemId;
           
           promises.push(equipmentService.createEquipment(itemData));
         }
@@ -328,7 +333,7 @@ const EquipmentFormPage = () => {
               </div>
               <div className="ml-3">
                 <p className="text-sm text-green-700">
-                  Equipment {isEditMode ? 'updated' : 'created'} successfully! Redirecting...
+                  Equipment saved successfully! Redirecting...
                 </p>
               </div>
             </div>
@@ -372,7 +377,7 @@ const EquipmentFormPage = () => {
               {/* Equipment Name */}
               <div className="sm:col-span-3">
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Name *
+                  Equipment Name *
                 </label>
                 <div className="mt-1">
                   <input
@@ -411,6 +416,29 @@ const EquipmentFormPage = () => {
                 </div>
               )}
               
+              {/* Price */}
+              <div className="sm:col-span-3">
+                <label htmlFor="price" className="block text-sm font-medium text-gray-700">
+                  Price *
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 sm:text-sm">$</span>
+                  </div>
+                  <input
+                    type="number"
+                    name="price"
+                    id="price"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={handleChange}
+                    className="focus:ring-primary-500 focus:border-primary-500 block w-full pl-7 sm:text-sm border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+              
               {/* Has Serial Number Toggle */}
               <div className="sm:col-span-6">
                 <div className="flex items-start">
@@ -435,7 +463,8 @@ const EquipmentFormPage = () => {
                 </div>
               </div>
               
-              {formData.has_serial_number ? (
+              {/* Serial Number (only if has_serial_number is true) */}
+              {formData.has_serial_number && (
                 <div className="sm:col-span-3">
                   <label htmlFor="serial_number" className="block text-sm font-medium text-gray-700">
                     Serial Number *
@@ -463,13 +492,16 @@ const EquipmentFormPage = () => {
                       {serialNumberError}
                     </p>
                   )}
-                  {!isEditMode && formData.quantity > 1 && (
+                  {formData.quantity > 1 && formData.has_serial_number && (
                     <p className="mt-1 text-sm text-gray-500">
-                      For multiple items, suffixes will be added to make serial numbers unique
+                      For multiple items, suffixes will be added to the serial number (e.g., SN-001, SN-002)
                     </p>
                   )}
                 </div>
-              ) : (
+              )}
+              
+              {/* Tracking ID (only if has_serial_number is false) */}
+              {!formData.has_serial_number && (
                 <div className="sm:col-span-3">
                   <label htmlFor="tracking_id" className="block text-sm font-medium text-gray-700">
                     Tracking ID
@@ -490,45 +522,6 @@ const EquipmentFormPage = () => {
                   </p>
                 </div>
               )}
-              
-              <div className="sm:col-span-3">
-                <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-                  Price *
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">$</span>
-                  </div>
-                  <input
-                    type="number"
-                    name="price"
-                    id="price"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={handleChange}
-                    className="focus:ring-primary-500 focus:border-primary-500 block w-full pl-7 sm:text-sm border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
-              
-              <div className="sm:col-span-3">
-                <label htmlFor="purchase_date" className="block text-sm font-medium text-gray-700">
-                  Purchase Date *
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="date"
-                    name="purchase_date"
-                    id="purchase_date"
-                    required
-                    value={formData.purchase_date}
-                    onChange={handleChange}
-                    className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
               
               {/* Condition */}
               <div className="sm:col-span-3">
@@ -552,6 +545,25 @@ const EquipmentFormPage = () => {
                 </div>
               </div>
               
+              {/* Purchase Date */}
+              <div className="sm:col-span-3">
+                <label htmlFor="purchase_date" className="block text-sm font-medium text-gray-700">
+                  Purchase Date *
+                </label>
+                <div className="mt-1">
+                  <input
+                    type="date"
+                    name="purchase_date"
+                    id="purchase_date"
+                    required
+                    value={formData.purchase_date}
+                    onChange={handleChange}
+                    className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+              
+              {/* Description */}
               <div className="sm:col-span-6">
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700">
                   Description
@@ -566,13 +578,11 @@ const EquipmentFormPage = () => {
                     className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
                   />
                 </div>
-                <p className="mt-2 text-sm text-gray-500">
-                  Brief description of the equipment.
-                </p>
               </div>
               
+              {/* Photo */}
               <div className="sm:col-span-6">
-                <label htmlFor="photo" className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700">
                   Photo
                 </label>
                 <div className="mt-1 flex items-center">
@@ -592,42 +602,31 @@ const EquipmentFormPage = () => {
                             photo: null
                           });
                         }}
-                        className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-100 rounded-full p-1"
+                        className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                       >
-                        <svg className="h-4 w-4 text-red-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
                       </button>
                     </div>
                   ) : (
-                    <div className="h-32 w-32 border-2 border-gray-300 border-dashed rounded-md flex items-center justify-center">
-                      <svg className="h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="h-32 w-32 border-2 border-gray-300 border-dashed rounded-md flex items-center justify-center text-gray-400 relative">
+                      <svg className="h-12 w-12" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                    </div>
-                  )}
-                  <div className="ml-5">
-                    <div className="relative bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm flex items-center cursor-pointer hover:bg-gray-50 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
-                      <label
-                        htmlFor="photo-upload"
-                        className="relative text-sm font-medium text-gray-700 pointer-events-none"
-                      >
-                        <span>Upload a file</span>
-                        <span className="sr-only"> photo</span>
-                      </label>
                       <input
-                        id="photo-upload"
-                        name="photo"
                         type="file"
+                        name="photo"
                         accept="image/*"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={handleChange}
                       />
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
               
+              {/* Availability */}
               <div className="sm:col-span-6">
                 <div className="flex items-start">
                   <div className="flex items-center h-5">
@@ -645,7 +644,7 @@ const EquipmentFormPage = () => {
                       Available for allocation
                     </label>
                     <p className="text-gray-500">
-                      Uncheck if this equipment is not available for allocation.
+                      Uncheck this if the equipment is not available for allocation (e.g., under maintenance, reserved, etc.)
                     </p>
                   </div>
                 </div>
@@ -654,7 +653,7 @@ const EquipmentFormPage = () => {
             
             <div className="mt-6 flex justify-end space-x-3">
               <Link
-                to={isEditMode ? `/equipment/${id}` : '/equipment'}
+                to="/equipment"
                 className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 Cancel
@@ -675,7 +674,7 @@ const EquipmentFormPage = () => {
                     Saving...
                   </>
                 ) : (
-                  'Save'
+                  'Save Equipment'
                 )}
               </button>
             </div>

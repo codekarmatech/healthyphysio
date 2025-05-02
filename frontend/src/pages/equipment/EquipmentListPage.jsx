@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import equipmentService from '../../services/equipmentService';
 import { useAuth } from '../../contexts/AuthContext';
 
 const EquipmentListPage = () => {
   const [equipment, setEquipment] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const categoryFilter = searchParams.get('category') || '';
   
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await equipmentService.getAllCategories();
+        setCategories(response.data);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
+  
+  // Fetch equipment
   useEffect(() => {
     const fetchEquipment = async () => {
       try {
         setLoading(true);
-        const response = await equipmentService.getAllEquipment();
+        const response = await equipmentService.getAllEquipment(categoryFilter || null);
         setEquipment(response.data);
         setError(null);
       } catch (err) {
@@ -25,24 +43,90 @@ const EquipmentListPage = () => {
     };
     
     fetchEquipment();
-  }, []);
+  }, [categoryFilter]);
   
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Equipment Management</h1>
         {user?.role === 'admin' && (
-          <Link
-            to="/equipment/new"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Add New Equipment
-          </Link>
+          <div className="flex space-x-4">
+            <Link
+              to="/equipment/categories"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v10H5V5z" clipRule="evenodd" />
+                <path d="M7 7h6v2H7V7zm0 4h6v2H7v-2z" />
+              </svg>
+              Manage Categories
+            </Link>
+            <Link
+              to="/equipment/new"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              Add New Equipment
+            </Link>
+          </div>
         )}
       </div>
+      
+      {/* Category Filter */}
+      {categories.length > 0 && (
+        <div className="mb-6 bg-white shadow overflow-hidden sm:rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center">
+            <div className="flex-grow">
+              <label htmlFor="category-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Filter by Category
+              </label>
+              <div className="flex">
+                <select
+                  id="category-filter"
+                  value={categoryFilter}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value) {
+                      setSearchParams({ category: value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+                {categoryFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchParams({})}
+                    className="ml-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+            {categoryFilter && (
+              <div className="mt-4 sm:mt-0 sm:ml-4">
+                <div className="text-sm font-medium text-gray-700">
+                  Showing equipment in category: 
+                  <span className="ml-1 text-primary-600">
+                    {categories.find(c => c.id.toString() === categoryFilter)?.name || 'Unknown'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {loading ? (
         <div className="flex justify-center">
@@ -99,9 +183,18 @@ const EquipmentListPage = () => {
                           <p className="text-sm font-medium text-primary-600 truncate">
                             {item.name}
                           </p>
-                          <p className="mt-1 flex items-center text-sm text-gray-500">
-                            <span className="truncate">Serial: {item.serial_number || 'N/A'}</span>
-                          </p>
+                          <div className="mt-1 flex items-center text-sm text-gray-500">
+                            <span className="truncate mr-2">
+                              {item.has_serial_number 
+                                ? `Serial: ${item.serial_number || 'N/A'}` 
+                                : `Tracking ID: ${item.tracking_id || 'N/A'}`}
+                            </span>
+                            {item.category && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {item.category.name}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="ml-2 flex-shrink-0 flex">

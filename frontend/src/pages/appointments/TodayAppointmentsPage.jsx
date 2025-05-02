@@ -72,15 +72,7 @@ const TodayAppointmentsPage = () => {
     }
   }, [user]);
 
-  const handleStartSession = async (appointmentId) => {
-    try {
-      // Navigate to the appointment detail page to start the session
-      window.location.href = `/therapist/appointments/${appointmentId}`;
-    } catch (error) {
-      console.error('Error starting session:', error);
-      alert('Failed to start session. Please try again.');
-    }
-  };
+  // Removed handleStartSession as therapists are no longer allowed to start sessions
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -177,13 +169,19 @@ const TodayAppointmentsPage = () => {
                                 View details
                               </Link>
                               
-                              {appointment.status === 'scheduled' && (
-                                <button
-                                  onClick={() => handleStartSession(appointment.id)}
+                              {appointment.status === 'scheduled' && user.is_admin && (
+                                <Link
+                                  to={`/therapist/appointments/${appointment.id}`}
                                   className="text-green-600 hover:text-green-900"
                                 >
                                   Start Session
-                                </button>
+                                </Link>
+                              )}
+                              
+                              {appointment.status === 'scheduled' && !user.is_admin && (
+                                <span className="text-sm text-gray-500 italic">
+                                  Waiting for admin to start session
+                                </span>
                               )}
                             </div>
                           </div>
