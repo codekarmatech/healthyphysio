@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import assessmentService from '../../services/assessmentService';
+import { mockAssessments } from '../../data/mockAssessments';
 
 const AssessmentsPage = () => {
   const { user } = useAuth();
@@ -10,12 +11,31 @@ const AssessmentsPage = () => {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
+  // eslint-disable-next-line no-unused-vars
+  const [useMockData, setUseMockData] = useState(true); // Flag to use mock data
 
   useEffect(() => {
     const fetchAssessments = async () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // Use mock data if flag is set
+        if (useMockData) {
+          console.log('Using mock assessment data');
+          let filteredData = [...mockAssessments];
+          
+          // Filter based on status
+          if (filter === 'pending') {
+            filteredData = filteredData.filter(assessment => assessment.status === 'pending');
+          } else if (filter === 'completed') {
+            filteredData = filteredData.filter(assessment => assessment.status === 'completed');
+          }
+          
+          setAssessments(filteredData);
+          setLoading(false);
+          return;
+        }
         
         // Get therapist ID from user object
         const therapistId = user.therapist_id || user.id;
@@ -69,7 +89,7 @@ const AssessmentsPage = () => {
     if (user && user.id) {
       fetchAssessments();
     }
-  }, [user, filter]);
+  }, [user, filter, useMockData]);
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -382,7 +402,12 @@ const AssessmentsPage = () => {
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">
-                                  {assessment.patient_name || 'Unknown Patient'}
+                                  <Link 
+                                    to={`/assessments/patient/${assessment.patient_id}`}
+                                    className="text-indigo-600 hover:text-indigo-900 hover:underline"
+                                  >
+                                    {assessment.patient_name || 'Unknown Patient'}
+                                  </Link>
                                 </div>
                               </div>
                             </div>

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import AssessmentForm from '../../components/assessments/AssessmentForm';
 import assessmentService from '../../services/assessmentService';
+import { mockAssessments } from '../../data/mockAssessments';
 
 const EditAssessmentPage = () => {
   const { user } = useAuth();
@@ -11,11 +12,33 @@ const EditAssessmentPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [assessment, setAssessment] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [useMockData, setUseMockData] = useState(true); // Flag to use mock data
   
   useEffect(() => {
     const fetchAssessment = async () => {
       try {
         setLoading(true);
+        
+        // Use mock data if flag is set
+        if (useMockData) {
+          console.log('Using mock assessment data for edit view');
+          // Find the assessment in mock data
+          const mockAssessment = mockAssessments.find(a => a.id.toString() === id);
+          
+          if (mockAssessment) {
+            setAssessment(mockAssessment);
+            setLoading(false);
+            return;
+          } else {
+            console.error('Assessment not found in mock data with ID:', id);
+            setError('Assessment not found');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // If not using mock data, fetch from API
         const response = await assessmentService.getById(id);
         
         if (response.data) {
@@ -33,7 +56,7 @@ const EditAssessmentPage = () => {
     if (id) {
       fetchAssessment();
     }
-  }, [id]);
+  }, [id, useMockData]);
   
   if (loading) {
     return (

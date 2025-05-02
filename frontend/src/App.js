@@ -39,6 +39,7 @@ import AssessmentsPage from './pages/assessments/AssessmentsPage';
 import NewAssessmentPage from './pages/assessments/NewAssessmentPage';
 import AssessmentDetailPage from './pages/assessments/AssessmentDetailPage';
 import EditAssessmentPage from './pages/assessments/EditAssessmentPage';
+import PatientAssessmentPage from './pages/assessments/PatientAssessmentPage';
 
 // Other Pages
 import Landing from './pages/Landing';
@@ -71,6 +72,7 @@ function App() {
             <Route path="/assessments" element={<AssessmentsPage />} />
             <Route path="/assessments/new" element={<NewAssessmentPage />} />
             <Route path="/assessments/new/:templateId" element={<NewAssessmentPage />} />
+            <Route path="/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/assessments/:id" element={<AssessmentDetailPage />} />
             <Route path="/assessments/:id/edit" element={<EditAssessmentPage />} />
           </Route>
@@ -94,6 +96,7 @@ function App() {
             <Route path="/therapist/patients/:id" element={<TherapistPatientDetailPage />} />
             <Route path="/therapist/earnings" element={<EarningsPage />} />
             <Route path="/therapist/assessments" element={<AssessmentsPage />} />
+            <Route path="/therapist/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/therapist/referrals" element={<NotFound />} />
           </Route>
           

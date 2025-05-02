@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import assessmentService from '../../services/assessmentService';
 import { assessmentTemplates } from '../../data/assessmentTemplates';
+import { mockAssessments } from '../../data/mockAssessments';
 
 const AssessmentDetail = () => {
   const { user } = useAuth();
@@ -12,11 +13,42 @@ const AssessmentDetail = () => {
   const [error, setError] = useState(null);
   const [assessment, setAssessment] = useState(null);
   const [template, setTemplate] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [useMockData, setUseMockData] = useState(true); // Flag to use mock data
   
   useEffect(() => {
     const fetchAssessment = async () => {
       try {
         setLoading(true);
+        
+        // Use mock data if flag is set
+        if (useMockData) {
+          console.log('Using mock assessment data for detail view');
+          // Find the assessment in mock data
+          const mockAssessment = mockAssessments.find(a => a.id.toString() === id);
+          
+          if (mockAssessment) {
+            setAssessment(mockAssessment);
+            
+            // Find the template from the standard templates
+            const foundTemplate = assessmentTemplates.find(t => t.id === mockAssessment.template_id);
+            if (foundTemplate) {
+              setTemplate(foundTemplate);
+            } else {
+              console.error('Template not found for ID:', mockAssessment.template_id);
+            }
+            
+            setLoading(false);
+            return;
+          } else {
+            console.error('Assessment not found in mock data with ID:', id);
+            setError('Assessment not found');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // If not using mock data, fetch from API
         const response = await assessmentService.getById(id);
         
         if (response.data) {
@@ -59,7 +91,7 @@ const AssessmentDetail = () => {
     if (id) {
       fetchAssessment();
     }
-  }, [id]);
+  }, [id, useMockData]);
   
   const renderFieldValue = (field, value) => {
     if (value === undefined || value === null || value === '') {
@@ -260,7 +292,15 @@ const AssessmentDetail = () => {
               <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-gray-500">Patient Name</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                  {assessment.patient_name}
+                  <span className="text-gray-900">{assessment.patient_name}</span>
+                  {assessment.patient_id && (
+                    <Link 
+                      to={`/assessments/patient/${assessment.patient_id}`}
+                      className="ml-2 text-xs text-indigo-600 hover:text-indigo-900"
+                    >
+                      (View Patient Profile)
+                    </Link>
+                  )}
                 </dd>
               </div>
               <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
