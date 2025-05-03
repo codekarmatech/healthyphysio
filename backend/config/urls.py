@@ -43,6 +43,8 @@ urlpatterns = [
     path('api/audit-logs/', include('audit_logs.urls')),
     path('api/assessments/', include('assessments.urls')),
     path('api/equipment/', include('equipment.urls')),
+    # Earnings API endpoints
+    path('api/earnings/', include('earnings.urls')),
 ]
 
 # Serve media files in development

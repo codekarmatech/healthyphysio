@@ -30,13 +30,7 @@ class EarningsService extends BaseService {
    * @returns {Promise} API response
    */
   async getMonthlyEarnings(therapistId, year, month) {
-    try {
-      return await api.get(`${this.basePath}monthly/${therapistId}/?year=${year}&month=${month}`);
-    } catch (error) {
-      console.error('Error fetching monthly earnings:', error);
-      // If API endpoint doesn't exist yet, return mock data
-      return this.getMockEarnings(therapistId, year, month);
-    }
+    return api.get(`${this.basePath}therapist/${therapistId}/monthly/?year=${year}&month=${month}`);
   }
 
   /**
@@ -68,13 +62,7 @@ class EarningsService extends BaseService {
    * @returns {Promise} API response or mock data
    */
   async getPatientEarnings(patientId, year, month) {
-    try {
-      return await api.get(`${this.basePath}from-patient/${patientId}/?year=${year}&month=${month}`);
-    } catch (error) {
-      console.error('Error fetching patient earnings:', error);
-      // If API endpoint doesn't exist yet, return mock data
-      return this.getMockPatientEarnings(patientId, year, month);
-    }
+    return api.get(`${this.basePath}from-patient/${patientId}/?year=${year}&month=${month}`);
   }
 
   /**
@@ -88,6 +76,7 @@ class EarningsService extends BaseService {
   }
 
   /**
+   * @deprecated - This method is kept for reference only. The backend now provides sample data for new therapists.
    * Mock function to get earnings data (for frontend development before backend is ready)
    * @param {string|number} therapistId - Therapist ID
    * @param {number} year - Year
@@ -136,6 +125,7 @@ class EarningsService extends BaseService {
   }
 
   /**
+   * @deprecated - This method is kept for reference only. The backend now provides sample data for new patients.
    * Mock function to get patient-specific earnings data
    * @param {string|number} patientId - Patient ID
    * @param {number} year - Year

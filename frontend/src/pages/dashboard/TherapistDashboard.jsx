@@ -9,8 +9,9 @@ import EarningsChart from '../../components/earnings/EarningsChart';
 import EarningsSummary from '../../components/earnings/EarningsSummary';
 import EquipmentRequestsSummary from '../../components/equipment/EquipmentRequestsSummary';
 
-// Import your API service
+// Import your API services
 import api from '../../services/api';
+import earningsService from '../../services/earningsService';
 
 const TherapistDashboard = () => {
   const { user } = useAuth(); // Get user from context instead of props
@@ -123,21 +124,41 @@ const TherapistDashboard = () => {
         // Fetch recent appointments (limit to 5)
         const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
         
-        // Fetch monthly earnings (or use mock data if API not available)
+        // Fetch monthly earnings
         let monthlyEarnings = 0;
         try {
-          // Try to get real earnings data from API
+          // Get real earnings data from API
           const currentMonth = new Date().getMonth() + 1;
           const currentYear = new Date().getFullYear();
-          const earningsResponse = await api.get(`/earnings/monthly/${therapistId}/?year=${currentYear}&month=${currentMonth}`);
-          monthlyEarnings = earningsResponse.data.summary?.totalEarned || 0;
+          
+          console.log(`Fetching earnings data for therapist ${therapistId}, ${currentYear}-${currentMonth}`);
+          
+          // Use the earnings service instead of direct API call
+          // Use the earnings service to get monthly earnings
+          const earningsService = (await import('../../services/earningsService')).default;
+          const earningsResponse = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
+          
+          // Check if we have a valid response
+          if (earningsResponse && earningsResponse.data) {
+            // The API will return either real data or sample data for new therapists
+            if (earningsResponse.data.summary) {
+              monthlyEarnings = earningsResponse.data.summary.totalEarned || 0;
+              
+              // If this is sample data, log it (but still use it)
+              if (earningsResponse.data.isMockData) {
+                console.info('Using sample earnings data for new therapist');
+              }
+            } else {
+              console.log('Response received but no summary data:', earningsResponse.data);
+              // Set a default value
+              monthlyEarnings = 0;
+            }
+          } else {
+            console.warn('Invalid earnings response format:', earningsResponse);
+          }
         } catch (earningsError) {
-          console.log('Using mock earnings data:', earningsError);
-          // If API fails, generate some mock data
-          const mockEarningsResponse = await import('../../services/earningsService').then(module => {
-            return module.default.getMockEarnings(therapistId, new Date().getFullYear(), new Date().getMonth() + 1);
-          });
-          monthlyEarnings = mockEarningsResponse.data.summary.totalEarned;
+          console.error('Error fetching earnings data:', earningsError);
+          monthlyEarnings = 0;
         }
         
         // Update stats
@@ -276,24 +297,38 @@ const TherapistDashboard = () => {
       const therapistId = user.therapist_id || user.id;
       
       try {
-        // Try to get real earnings data from API
-        const response = await api.get(`/earnings/monthly/${therapistId}/?year=${currentYear}&month=${currentMonth}`);
-        setEarningsData(response.data);
-        // Clear any previous errors since we got data successfully
-        setEarningsError(null);
-      } catch (apiError) {
-        console.log('Using mock earnings data:', apiError);
-        // If API fails, generate some mock data
-        const mockEarningsResponse = await import('../../services/earningsService').then(module => {
-          return module.default.getMockEarnings(therapistId, currentYear, currentMonth);
-        });
-        setEarningsData(mockEarningsResponse.data);
+        // Use earningsService instead of direct API call
+        const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
         
-        // Set a non-blocking warning message for the 404 error
+        // Check if we have a valid response
+        if (response && response.data) {
+          setEarningsData(response.data);
+          
+          // If this is sample data, log it (but still use it)
+          if (response.data.isMockData) {
+            console.info('Using sample earnings data for new therapist');
+          }
+          
+          // Clear any previous errors since we got data successfully
+          setEarningsError(null);
+          
+          // Log success for debugging
+          console.log('Successfully loaded earnings data:', response.data);
+        } else {
+          console.warn('Invalid response format:', response);
+          setEarningsError('Received an invalid response format from the server.');
+        }
+      } catch (apiError) {
+        console.error('Error fetching earnings data:', apiError);
+        setEarningsData(null);
+        
+        // Set an appropriate error message
         if (apiError.response?.status === 404) {
-          // We're using mock data, so this is just an informational message, not an error
-          console.info('API endpoint not available, using mock data');
-          // Don't set earningsError here since we have mock data as a fallback
+          setEarningsError('Earnings data not found for this period.');
+        } else if (apiError.response?.status === 403) {
+          setEarningsError('You don\'t have permission to view these earnings.');
+        } else {
+          setEarningsError('Failed to load earnings data. Please try again later.');
         }
       }
     } catch (error) {

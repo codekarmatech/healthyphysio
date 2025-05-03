@@ -1,6 +1,8 @@
 import React from 'react';
 
 const EarningsSummary = ({ summary, loading }) => {
+  // Add console log for debugging
+  console.log('EarningsSummary received summary:', summary);
   if (loading) {
     return (
       <div className="bg-white shadow-sm rounded-lg w-full">
@@ -62,7 +64,14 @@ const EarningsSummary = ({ summary, loading }) => {
     );
   }
 
-  const { totalEarned, totalPotential, attendedSessions, missedSessions, attendanceRate } = summary;
+  // Use default values if summary properties are missing
+  const { 
+    totalEarned = 0, 
+    totalPotential = 0, 
+    attendedSessions = 0, 
+    missedSessions = 0, 
+    attendanceRate = 0 
+  } = summary || {};
 
   return (
     <div className="bg-white shadow-sm rounded-lg w-full">

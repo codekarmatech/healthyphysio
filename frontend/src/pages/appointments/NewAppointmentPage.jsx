@@ -5,6 +5,19 @@ import AppointmentForm from '../../components/appointments/AppointmentForm';
 
 const NewAppointmentPage = () => {
   const { user } = useAuth();
+  
+  // Conditionally render different navigation links based on user role
+  const getDashboardLink = () => {
+    if (user?.role === 'therapist') {
+      return '/therapist/dashboard';
+    } else if (user?.role === 'patient') {
+      return '/patient/dashboard';
+    } else if (user?.role === 'admin') {
+      return '/admin/dashboard';
+    } else {
+      return '/dashboard';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -17,7 +30,7 @@ const NewAppointmentPage = () => {
                 <h1 className="text-2xl font-bold text-primary-600">PhysioWay</h1>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <Link to="/therapist/dashboard" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                <Link to={getDashboardLink()} className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Dashboard
                 </Link>
                 <Link to="/appointments" className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">

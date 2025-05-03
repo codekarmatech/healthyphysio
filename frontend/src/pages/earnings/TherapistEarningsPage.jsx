@@ -26,8 +26,8 @@ const TherapistEarningsPage = () => {
       // Get therapist ID from user object
       const therapistId = user.therapist_id || user.id;
       
-      // Use the mock service for now, replace with real API call when backend is ready
-      const response = await earningsService.getMockEarnings(therapistId, currentYear, currentMonth);
+      // Get earnings data from API
+      const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
       setEarningsData(response.data);
     } catch (err) {
       console.error('Error fetching earnings data:', err);

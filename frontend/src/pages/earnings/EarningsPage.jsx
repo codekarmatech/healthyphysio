@@ -24,25 +24,30 @@ const EarningsPage = () => {
         const therapistId = user.therapist_id || user.id;
         
         try {
-          // Try to get real earnings data from API
+          // Get earnings data from API
           const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
           setEarningsData(response.data);
-        } catch (error) {
-          // Only log as error if it's not a 404 (which is expected during development)
-          if (error.response?.status === 404) {
-            console.info('API endpoint not available, using mock data');
-          } else {
-            console.warn('Using mock earnings data due to API error:', error);
-          }
           
-          // If API fails, generate some mock data
-          const mockEarningsResponse = await earningsService.getMockEarnings(therapistId, currentYear, currentMonth);
-          setEarningsData(mockEarningsResponse.data);
+          // If this is sample data, log it (but still use it)
+          if (response.data.isMockData) {
+            console.info('Using sample earnings data for new therapist');
+          }
+        } catch (error) {
+          console.error('Error fetching earnings data:', error);
+          
+          // Set appropriate error message based on response
+          if (error.response?.status === 404) {
+            setError('No earnings data found for this period.');
+          } else if (error.response?.status === 403) {
+            setError('You don\'t have permission to view these earnings.');
+          } else {
+            setError('Failed to load earnings data. Please try again later.');
+          }
         }
         
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching earnings data:', err);
+        console.error('Error in earnings data fetch process:', err);
         setError('Failed to load earnings data. Please try again later.');
         setLoading(false);
       }

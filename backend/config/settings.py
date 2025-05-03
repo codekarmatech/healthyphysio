@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'assessments',
     'websocket',   # Add this if you've created it
     'equipment',   # Equipment management app
+    'earnings',    # Earnings tracking app
 ]
 
 # Add our custom middleware

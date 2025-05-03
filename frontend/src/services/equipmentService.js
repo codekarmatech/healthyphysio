@@ -120,12 +120,32 @@ const equipmentService = {
   },
   
   // Allocation Request operations
-  getAllRequests: () => {
-    return api.get('/equipment/requests/');
+  getAllRequests: (params = {}) => {
+    // Convert params object to URL query string
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, value);
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return api.get(`/equipment/requests/${queryString ? `?${queryString}` : ''}`);
   },
   
-  getRequestsForTherapist: (therapistId) => {
-    return api.get(`/equipment/requests/?therapist=${therapistId}`);
+  getRequestsForTherapist: (therapistId, params = {}) => {
+    // Convert params object to URL query string
+    const queryParams = new URLSearchParams();
+    queryParams.append('therapist', therapistId);
+    
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && key !== 'therapist') {
+        queryParams.append(key, value);
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return api.get(`/equipment/requests/?${queryString}`);
   },
   
   getRequestById: (id) => {

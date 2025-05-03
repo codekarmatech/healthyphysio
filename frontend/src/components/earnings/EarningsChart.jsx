@@ -32,36 +32,69 @@ const EarningsChart = ({ therapistId, year, month }) => {
 
   useEffect(() => {
     const fetchEarningsData = async () => {
+      if (!therapistId) {
+        console.error('No therapist ID provided to EarningsChart');
+        setError('Missing therapist ID');
+        setLoading(false);
+        return;
+      }
+      
       try {
         setLoading(true);
         setError(null);
         
+        console.log(`Fetching earnings data for therapist ${therapistId}, ${year}-${month}`);
+        
         let response;
         try {
-          // Try to get real data from API
+          // Get earnings data from API
           response = await earningsService.getMonthlyEarnings(therapistId, year, month);
-        } catch (err) {
-          // Only log as error if it's not a 404 (which is expected during development)
-          if (err.response?.status === 404) {
-            console.info('API endpoint not available, using mock data');
+          
+          // Check if we have a valid response
+          if (response && response.data) {
+            // If this is sample data, log it (but still use it)
+            if (response.data.isMockData) {
+              console.info('Using sample earnings data for new therapist');
+            }
+            console.log('Successfully fetched earnings data:', response.data);
           } else {
-            console.warn('Using mock earnings data due to API error:', err);
+            throw new Error('Invalid response format');
           }
-          // Fallback to mock data if API fails
-          response = await earningsService.getMockEarnings(therapistId, year, month);
+        } catch (err) {
+          console.error('Error fetching earnings data:', err);
+          setError('Failed to load earnings data. Please try again later.');
+          setLoading(false);
+          return;
         }
         
         // Process the data for the chart
+        if (!response || !response.data) {
+          console.error('Invalid response format from earnings API');
+          setError('Invalid data format received');
+          setLoading(false);
+          return;
+        }
+        
+        // Log the response for debugging
+        console.log('Earnings API response:', response.data);
+        
         const earningsData = response.data.earnings || [];
         
         // Group by date and sum earnings
         const dailyEarnings = {};
         earningsData.forEach(item => {
+          if (!item || !item.date || !item.amount) return;
+          
           const date = item.date;
           if (!dailyEarnings[date]) {
             dailyEarnings[date] = 0;
           }
-          dailyEarnings[date] += parseFloat(item.amount);
+          
+          // Handle non-numeric amounts
+          const amount = parseFloat(item.amount);
+          if (!isNaN(amount)) {
+            dailyEarnings[date] += amount;
+          }
         });
         
         // Sort dates and prepare chart data
