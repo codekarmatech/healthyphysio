@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { neuroAssessmentTemplate, orthoAssessmentTemplate } from '../../data/assessmentTemplates';
 
 const CustomAssessmentBuilder = ({ patientId, appointmentId }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   
   const [selectedSections, setSelectedSections] = useState({});
   const [customTemplate, setCustomTemplate] = useState({

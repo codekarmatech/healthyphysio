@@ -159,7 +159,6 @@ export function generateMockEarnings(therapistId, year, month) {
     const monthNum = parseInt(month) || new Date().getMonth() + 1;
     
     const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
-    const baseAmount = 1500 + (therapistIdNum % 10) * 100;
     
     // Patient names for more realistic data
     const patientNames = [
@@ -194,18 +193,23 @@ export function generateMockEarnings(therapistId, year, month) {
       const dateStr = formatDate(date);
       
       // Skip weekends (0 = Sunday, 6 = Saturday) with some exceptions
-      if ((dayOfWeek === 0 || dayOfWeek === 6) && Math.random() > 0.2) {
+      // Use therapistIdNum to create variation in weekend availability
+      const weekendChance = 0.2 + (therapistIdNum % 5) * 0.05; // 0.2 to 0.4 based on therapist ID
+      if ((dayOfWeek === 0 || dayOfWeek === 6) && Math.random() > weekendChance) {
         continue;
       }
       
-      // Generate 1-5 sessions per day
-      const sessionsCount = Math.floor(Math.random() * 5) + 1;
+      // Generate 1-5 sessions per day (vary by therapist ID)
+      const maxSessions = 3 + (therapistIdNum % 3); // 3-5 sessions based on therapist ID
+      const sessionsCount = Math.floor(Math.random() * maxSessions) + 1;
       let dailyAmount = 0;
       let dailySessions = 0;
       
       for (let i = 0; i < sessionsCount; i++) {
         // Generate a random session fee between $60 and $180
-        const sessionFee = Math.floor(Math.random() * 120) + 60;
+        // Adjust base fee by therapist ID (more experienced therapists charge more)
+        const baseFee = 60 + (therapistIdNum % 5) * 10; // 60-100 base fee
+        const sessionFee = Math.floor(Math.random() * 120) + baseFee;
         
         // Determine session status with probabilities
         const rand = Math.random();
@@ -334,8 +338,13 @@ export function generateMockEarnings(therapistId, year, month) {
  * @returns {Object} Mock attendance data
  */
 export function generateMockPatientTherapistAttendance(therapistId, patientId, year, month) {
-  // Create mock data with attendance rate based on patient ID
-  const attendanceRate = 65 + (parseInt(patientId) % 30);
+  // Parse IDs to numbers
+  const therapistIdNum = parseInt(therapistId) || 1;
+  
+  // Create mock data with attendance rate based on patient ID and therapist ID
+  // Therapist ID influences the base attendance rate (better therapists have higher attendance)
+  const baseAttendanceRate = 65 + (therapistIdNum % 5) * 2; // 65-73 base rate
+  const attendanceRate = baseAttendanceRate + (parseInt(patientId) % 20); // Add patient variation
   
   // Generate weekly schedule based on patient ID
   const weeklySchedule = generateWeeklySchedule(patientId);

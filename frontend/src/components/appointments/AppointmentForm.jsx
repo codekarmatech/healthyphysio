@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import appointmentService from '../../services/appointmentService';
@@ -25,6 +25,42 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
     mobilityIssues: ''
   });
   const [errors, setErrors] = useState({});
+
+  const fetchAppointment = useCallback(async (id) => {
+    try {
+      setLoading(true);
+      const response = await appointmentService.getById(id);
+      const data = response.data || response;
+      
+      // Extract date from datetime if available
+      let appointmentDate = '';
+      let appointmentTime = '';
+      
+      if (data.datetime) {
+        const dateObj = new Date(data.datetime);
+        appointmentDate = dateObj.toISOString().split('T')[0];
+        appointmentTime = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      }
+      
+      setFormData({
+        therapistId: data.therapist || (user.role === 'therapist' ? user.id : ''),
+        patientId: data.patient || (user.role === 'patient' ? user.id : ''),
+        date: appointmentDate,
+        time: appointmentTime,
+        type: data.type || 'initial-assessment',
+        notes: data.notes || '',
+        reasonForVisit: data.issue || '',  // Backend uses 'issue' for reason for visit
+        previousTreatments: data.previous_treatments || '',
+        painLevel: data.pain_level || '0',
+        mobilityIssues: data.mobility_issues || ''
+      });
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching appointment:', error);
+      setLoading(false);
+    }
+  }, [user.role, user.id]);
 
   useEffect(() => {
     const fetchTherapists = async () => {
@@ -63,58 +99,22 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
     if (editMode && appointmentId) {
       fetchAppointment(appointmentId);
     }
-  }, [editMode, appointmentId]);
+  }, [editMode, appointmentId, user.id, user.role, fetchAppointment]);
 
-  const fetchAppointment = async (id) => {
-    try {
-      setLoading(true);
-      const response = await appointmentService.getById(id);
-      const data = response.data || response;
-      
-      // Extract date from datetime if available
-      let appointmentDate = '';
-      let appointmentTime = '';
-      
-      if (data.datetime) {
-        const dateObj = new Date(data.datetime);
-        appointmentDate = dateObj.toISOString().split('T')[0];
-        appointmentTime = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-      }
-      
-      setFormData({
-        therapistId: data.therapist || (user.role === 'therapist' ? user.id : ''),
-        patientId: data.patient || (user.role === 'patient' ? user.id : ''),
-        date: appointmentDate,
-        time: appointmentTime,
-        type: data.type || 'initial-assessment',
-        notes: data.notes || '',
-        reasonForVisit: data.issue || '',  // Backend uses 'issue' for reason for visit
-        previousTreatments: data.previous_treatments || '',
-        painLevel: data.pain_level || '0',
-        mobilityIssues: data.mobility_issues || ''
-      });
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching appointment:', error);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (formData.therapistId && formData.date) {
-      fetchAvailableSlots();
-    }
-  }, [formData.therapistId, formData.date]);
-
-  const fetchAvailableSlots = async () => {
+  const fetchAvailableSlots = useCallback(async () => {
     try {
       const slots = await appointmentService.getAvailableSlots(formData.therapistId, formData.date);
       setAvailableSlots(slots);
     } catch (error) {
       console.error('Error fetching available slots:', error);
     }
-  };
+  }, [formData.therapistId, formData.date]);
+
+  useEffect(() => {
+    if (formData.therapistId && formData.date) {
+      fetchAvailableSlots();
+    }
+  }, [formData.therapistId, formData.date, fetchAvailableSlots]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

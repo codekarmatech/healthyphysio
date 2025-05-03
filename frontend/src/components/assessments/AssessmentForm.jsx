@@ -170,6 +170,33 @@ const AssessmentForm = ({ templateId, patientId, appointmentId, initialData = nu
     });
   };
   
+  // Save assessment ID to recent assessments in localStorage
+  const saveToRecentAssessments = (assessmentId, templateId) => {
+    try {
+      // Get existing recent assessments or initialize empty array
+      const recentAssessmentsJson = localStorage.getItem('recentAssessments');
+      let recentAssessments = recentAssessmentsJson ? JSON.parse(recentAssessmentsJson) : [];
+      
+      // Add the new assessment to the beginning of the array
+      recentAssessments.unshift({
+        id: assessmentId,
+        templateId: templateId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Keep only the 5 most recent assessments
+      recentAssessments = recentAssessments.slice(0, 5);
+      
+      // Save back to localStorage
+      localStorage.setItem('recentAssessments', JSON.stringify(recentAssessments));
+      
+      // Also save the most recent assessment ID for quick access
+      localStorage.setItem('recentAssessmentId', assessmentId);
+    } catch (error) {
+      console.error('Error saving recent assessment:', error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -182,7 +209,9 @@ const AssessmentForm = ({ templateId, patientId, appointmentId, initialData = nu
         patient_id: patientId,
         appointment_id: appointmentId,
         data: formData,
-        status: 'completed'
+        status: 'completed',
+        created_by: user?.id || null,
+        last_updated: new Date().toISOString()
       };
       
       // If this is a custom assessment, include the template definition
@@ -210,6 +239,9 @@ const AssessmentForm = ({ templateId, patientId, appointmentId, initialData = nu
       if (templateId === 'custom-assessment') {
         sessionStorage.removeItem('customTemplate');
       }
+      
+      // Save to recent assessments in localStorage
+      saveToRecentAssessments(response.data.id, templateId);
       
       // Redirect to the assessment detail page
       navigate(`/assessments/${response.data.id}`);
