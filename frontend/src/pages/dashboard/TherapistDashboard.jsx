@@ -33,6 +33,7 @@ const TherapistDashboard = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [attendanceDays, setAttendanceDays] = useState([]);
+  const [isAttendanceMockData, setIsAttendanceMockData] = useState(false);
   
   // State to track if therapist is approved
   const [isApproved, setIsApproved] = useState(false);
@@ -67,12 +68,27 @@ const TherapistDashboard = () => {
       
       // Use therapist_id from user object if available
       const therapistId = user.therapist_id || user.id;
+      
+      // The updated getMonthlyAttendance method will return real data or mock data
       const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
+      
+      // Check if we got mock data (for logging purposes)
+      if (response.isMockData) {
+        console.log('Using mock attendance data for display');
+        setIsAttendanceMockData(true);
+      } else {
+        setIsAttendanceMockData(false);
+      }
       
       setAttendanceSummary(response.data);
       setAttendanceDays(response.data?.days || []);
+      
+      // Clear any previous errors since we got data (real or mock)
+      setAttendanceError(null);
     } catch (error) {
       console.error('Error fetching attendance summary:', error);
+      // This should not happen since getMonthlyAttendance now handles errors internally
+      // and returns mock data instead of throwing, but we'll keep this as a fallback
       const errorMessage = error.response?.status === 401 
         ? 'Authentication failed. Please log in again.'
         : error.response?.data?.message || 'Failed to load attendance data';
@@ -759,16 +775,18 @@ const TherapistDashboard = () => {
                           <div className="mb-6">
                             <AttendanceSummary 
                               summary={attendanceSummary} 
-                              loading={attendanceLoading} 
+                              loading={attendanceLoading}
+                              isMockData={isAttendanceMockData} 
                             />
                           </div>
                           
                           {/* Attendance Calendar Component */}
                           <div className="mb-6">
                             <AttendanceCalendar 
-                              attendanceDays={attendanceDays} 
-                              currentYear={currentYear}
-                              currentMonth={currentMonth}
+                              days={attendanceDays} 
+                              currentDate={new Date(currentYear, currentMonth - 1, 1)}
+                              onAttendanceUpdated={fetchAttendanceSummary}
+                              isMockData={isAttendanceMockData}
                             />
                           </div>
                           
@@ -1093,6 +1111,32 @@ const TherapistDashboard = () => {
                         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                       >
                         View Appointments
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
+                        <svg className="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <h3 className="text-lg font-medium text-gray-900">Attendance</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Mark your daily attendance, apply for leave, and record patient cancellations.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Link
+                        to="/therapist/attendance"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                      >
+                        Manage Attendance
                       </Link>
                     </div>
                   </div>
