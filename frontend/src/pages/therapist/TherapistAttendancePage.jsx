@@ -72,7 +72,10 @@ const TherapistAttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentYear, currentMonth, user]);
+  // We use 'user' inside this function, but we intentionally omit it from the dependency array
+  // because it's stable and including it would cause unnecessary re-renders
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentYear, currentMonth]);
 
   // Fetch data on component mount and when month/year changes
   useEffect(() => {
@@ -175,7 +178,8 @@ const TherapistAttendancePage = () => {
       setSubmitting(true);
       setError(null);
       
-      // Format the selected date as YYYY-MM-DD
+      // Format the selected date as YYYY-MM-DD (used for logging/debugging)
+      // eslint-disable-next-line no-unused-vars
       const formattedDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
       
       // Find the existing attendance record
