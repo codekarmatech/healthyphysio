@@ -24,6 +24,8 @@ from django.conf import settings
 from cryptography.fernet import Fernet
 import base64
 import os
+import json
+from django.utils import timezone
 
 # Create a custom encryption field first
 class EncryptedFileField(models.FileField):
@@ -118,3 +120,80 @@ class Doctor(models.Model):
     
     def __str__(self):
         return f"Doctor: {self.user.username}"
+
+
+class ProfileChangeRequest(models.Model):
+    """
+    Model to track therapist profile change requests that require admin approval
+    """
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+    
+    therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='change_requests')
+    requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='requested_profile_changes')
+    current_data = models.TextField(help_text="JSON representation of current profile data")
+    requested_data = models.TextField(help_text="JSON representation of requested changes")
+    reason = models.TextField(blank=True, help_text="Reason for the change request")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, 
+                                   related_name='resolved_profile_changes')
+    rejection_reason = models.TextField(blank=True, help_text="Reason for rejection if applicable")
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Profile change request for {self.therapist.user.username} ({self.status})"
+    
+    def save(self, *args, **kwargs):
+        # Convert dictionaries to JSON strings if they're not already strings
+        if isinstance(self.current_data, dict):
+            self.current_data = json.dumps(self.current_data)
+        if isinstance(self.requested_data, dict):
+            self.requested_data = json.dumps(self.requested_data)
+        super().save(*args, **kwargs)
+    
+    def get_current_data(self):
+        """Get the current data as a dictionary"""
+        if isinstance(self.current_data, str):
+            return json.loads(self.current_data)
+        return self.current_data
+    
+    def get_requested_data(self):
+        """Get the requested data as a dictionary"""
+        if isinstance(self.requested_data, str):
+            return json.loads(self.requested_data)
+        return self.requested_data
+    
+    def approve(self, admin_user):
+        """Approve the change request and apply changes"""
+        self.status = 'approved'
+        self.resolved_at = timezone.now()
+        self.resolved_by = admin_user
+        
+        # Apply the requested changes to the therapist profile
+        requested_data = self.get_requested_data()
+        
+        # Update each field in the therapist profile
+        for field, value in requested_data.items():
+            if hasattr(self.therapist, field):
+                setattr(self.therapist, field, value)
+        
+        # Save the therapist profile
+        self.therapist.save()
+        
+        # Save the change request
+        self.save()
+    
+    def reject(self, admin_user, reason):
+        """Reject the change request"""
+        self.status = 'rejected'
+        self.resolved_at = timezone.now()
+        self.resolved_by = admin_user
+        self.rejection_reason = reason
+        self.save()

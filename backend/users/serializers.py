@@ -5,9 +5,10 @@ Connected to: User authentication and profile management
 """
 
 from rest_framework import serializers
-from .models import User, Patient, Therapist, Doctor
+from .models import User, Patient, Therapist, Doctor, ProfileChangeRequest
 from django.utils import timezone
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+import json
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -76,20 +77,54 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("User is required")
 
 class TherapistSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    user = UserSerializer(read_only=True)
 
     class Meta:
         model = Therapist
         fields = ['id', 'user', 'license_number', 'specialization', 'years_of_experience', 
                  'photo', 'experience', 'residential_address', 'preferred_areas', 
                  'is_approved', 'approval_date']
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'is_approved', 'approval_date']
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         if instance.approval_date:
             representation['approval_date'] = timezone.localtime(instance.approval_date).strftime('%Y-%m-%dT%H:%M:%S%z')
         return representation
+        
+    def update(self, instance, validated_data):
+        """
+        Override update method to handle profile update requests
+        """
+        # Create a change request instead of directly updating the profile
+        from .models import ProfileChangeRequest
+        
+        # Get the current user from the context
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            user = request.user
+            
+            # Create a change request with the current data and requested changes
+            change_request = ProfileChangeRequest.objects.create(
+                therapist=instance,
+                requested_by=user,
+                current_data={
+                    'license_number': instance.license_number,
+                    'specialization': instance.specialization,
+                    'years_of_experience': instance.years_of_experience,
+                    'experience': instance.experience,
+                    'residential_address': instance.residential_address,
+                    'preferred_areas': instance.preferred_areas,
+                },
+                requested_data=validated_data,
+                status='pending'
+            )
+            
+            # Return the instance without changes, as they will be applied after approval
+            return instance
+        
+        # If no request context is available, just update normally (for admin use)
+        return super().update(instance, validated_data)
 
 class DoctorSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -129,3 +164,37 @@ class PatientSignupStep3Serializer(serializers.Serializer):
     disease = serializers.CharField()
 
     read_only_fields = ['id']
+    
+    
+class ProfileChangeRequestSerializer(serializers.ModelSerializer):
+    therapist = serializers.PrimaryKeyRelatedField(read_only=True)
+    requested_by = UserSerializer(read_only=True)
+    resolved_by = UserSerializer(read_only=True)
+    current_data = serializers.JSONField(read_only=True)
+    requested_data = serializers.JSONField()
+    
+    class Meta:
+        model = ProfileChangeRequest
+        fields = ['id', 'therapist', 'requested_by', 'current_data', 'requested_data', 
+                 'reason', 'status', 'created_at', 'resolved_at', 'resolved_by', 'rejection_reason']
+        read_only_fields = ['id', 'therapist', 'requested_by', 'current_data', 'status', 
+                           'created_at', 'resolved_at', 'resolved_by', 'rejection_reason']
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        
+        # Convert string JSON to actual JSON objects
+        if 'current_data' in representation and isinstance(representation['current_data'], str):
+            representation['current_data'] = json.loads(representation['current_data'])
+            
+        if 'requested_data' in representation and isinstance(representation['requested_data'], str):
+            representation['requested_data'] = json.loads(representation['requested_data'])
+            
+        # Format timestamps
+        if instance.created_at:
+            representation['created_at'] = timezone.localtime(instance.created_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+            
+        if instance.resolved_at:
+            representation['resolved_at'] = timezone.localtime(instance.resolved_at).strftime('%Y-%m-%dT%H:%M:%S%z')
+            
+        return representation

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import patientService from '../../services/patientService';
@@ -12,7 +12,7 @@ import PatientAttendanceCalendar from '../../components/attendance/PatientAttend
 const TherapistPatientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [patient, setPatient] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [assessments, setAssessments] = useState([]);
@@ -23,36 +23,70 @@ const TherapistPatientDetailPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Use the logout function from AuthContext
+      await logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showProfileMenu) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
 
   // Fetch attendance and earnings data when month/year changes
   useEffect(() => {
     const fetchMonthlyData = async () => {
       if (!id || !user) return;
-      
+
       // Fetch attendance data
       try {
         // Get the therapist ID from the user object
         const therapistId = user.therapist_id || user.id;
-        
+
         // Use the service to get patient-therapist attendance data
         const attendanceResponse = await attendanceService.getPatientTherapistAttendance(
-          therapistId, 
-          id, 
-          currentYear, 
+          therapistId,
+          id,
+          currentYear,
           currentMonth
         );
-        
-        setAttendance({
-          summary: attendanceResponse.data.summary,
-          days: attendanceResponse.data.appointments.map(app => ({
-            date: app.date,
-            status: app.status
-          }))
-        });
+
+        // Make sure we have valid data before mapping
+        if (attendanceResponse && attendanceResponse.data && attendanceResponse.data.appointments) {
+          setAttendance({
+            summary: attendanceResponse.data.summary || {},
+            days: attendanceResponse.data.appointments.map(app => ({
+              date: app.date,
+              status: app.status
+            }))
+          });
+        } else {
+          // Set default empty data if response is invalid
+          setAttendance({
+            summary: {},
+            days: []
+          });
+        }
       } catch (error) {
         console.error('Error fetching attendance data:', error);
       }
-      
+
       // Fetch earnings data
       try {
         const earningsResponse = await earningsService.getPatientEarnings(
@@ -60,7 +94,7 @@ const TherapistPatientDetailPage = () => {
           currentYear,
           currentMonth
         );
-        
+
         // Make sure we have valid data
         if (earningsResponse && earningsResponse.data) {
           setEarnings(earningsResponse.data);
@@ -71,7 +105,7 @@ const TherapistPatientDetailPage = () => {
         console.error('Error fetching earnings data:', error);
       }
     };
-    
+
     if (patient) {
       fetchMonthlyData();
     }
@@ -82,18 +116,21 @@ const TherapistPatientDetailPage = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Try to fetch real patient data
         let patientData = null;
         try {
+          // Try to get patient data using the service
+          // Note: The backend endpoint for this functionality is not yet implemented
+          // This will throw an error and we'll use mock data instead
           const patientResponse = await patientService.getById(id);
-          if (patientResponse.data) {
+          if (patientResponse && patientResponse.data) {
             patientData = patientResponse.data;
           }
         } catch (patientError) {
           console.log('Using mock patient data:', patientError);
         }
-        
+
         // If no real data, use mock patient data
         if (!patientData) {
           patientData = {
@@ -118,9 +155,9 @@ const TherapistPatientDetailPage = () => {
             last_visit: new Date(Date.now() - (Math.random() * 10 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
           };
         }
-        
+
         setPatient(patientData);
-        
+
         // Try to fetch real appointment data
         let appointmentData = [];
         try {
@@ -131,7 +168,7 @@ const TherapistPatientDetailPage = () => {
         } catch (appointmentsError) {
           console.log('Using mock appointment data:', appointmentsError);
         }
-        
+
         // If no real data, use mock appointment data
         if (appointmentData.length === 0) {
           const today = new Date();
@@ -144,10 +181,10 @@ const TherapistPatientDetailPage = () => {
             'Strength training',
             'Mobility assessment'
           ];
-          
+
           appointmentData = Array(8).fill().map((_, index) => {
             const appointmentDate = new Date();
-            
+
             // Past appointments
             if (index < 5) {
               appointmentDate.setDate(today.getDate() - (index * 7 + Math.floor(Math.random() * 3)));
@@ -162,7 +199,7 @@ const TherapistPatientDetailPage = () => {
                 notes: index % 3 === 0 ? 'Patient reported improvement in mobility.' : '',
                 created_at: new Date(appointmentDate.getTime() - 1000000).toISOString()
               };
-            } 
+            }
             // Future appointments
             else {
               appointmentDate.setDate(today.getDate() + ((index - 4) * 7 + Math.floor(Math.random() * 3)));
@@ -180,9 +217,9 @@ const TherapistPatientDetailPage = () => {
             }
           });
         }
-        
+
         setAppointments(appointmentData);
-        
+
         // Try to fetch real assessment data
         let assessmentData = [];
         try {
@@ -193,7 +230,7 @@ const TherapistPatientDetailPage = () => {
         } catch (assessmentsError) {
           console.log('Using mock assessment data:', assessmentsError);
         }
-        
+
         // If no real data, use mock assessment data
         if (assessmentData.length === 0) {
           const assessmentTypes = [
@@ -203,11 +240,11 @@ const TherapistPatientDetailPage = () => {
             'Range of Motion Test',
             'Strength Assessment'
           ];
-          
+
           assessmentData = Array(4).fill().map((_, index) => {
             const assessmentDate = new Date();
             assessmentDate.setDate(assessmentDate.getDate() - (index * 14 + Math.floor(Math.random() * 5)));
-            
+
             return {
               id: 2000 + index,
               patient_id: parseInt(id),
@@ -221,9 +258,9 @@ const TherapistPatientDetailPage = () => {
             };
           });
         }
-        
+
         setAssessments(assessmentData);
-        
+
         // Initial data will be loaded by the useEffect hooks
         // Just set the patient data here
         setLoading(false);
@@ -233,7 +270,7 @@ const TherapistPatientDetailPage = () => {
         setLoading(false);
       }
     };
-    
+
     if (id) {
       fetchPatientData();
     }
@@ -359,8 +396,31 @@ const TherapistPatientDetailPage = () => {
                 <div className="ml-3 relative">
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-700 mr-2">{user?.first_name} {user?.last_name}</span>
-                    <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                      {user?.first_name ? user.first_name[0].toUpperCase() : ''}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowProfileMenu(!showProfileMenu)}
+                        className="rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        <span className="sr-only">Open user menu</span>
+                        <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                          {user?.first_name ? user.first_name[0].toUpperCase() : ''}
+                        </div>
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {showProfileMenu && (
+                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                          <Link to="/therapist/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            View Therapist Profile
+                          </Link>
+                          <button
+                            onClick={handleLogout}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -836,10 +896,10 @@ const TherapistPatientDetailPage = () => {
                 <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
                   <div className="h-80">
                     {earnings ? (
-                      <PatientEarningsChart 
-                        data={earnings} 
-                        year={currentYear} 
-                        month={currentMonth} 
+                      <PatientEarningsChart
+                        data={earnings}
+                        year={currentYear}
+                        month={currentMonth}
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">
@@ -911,10 +971,10 @@ const TherapistPatientDetailPage = () => {
                 <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
                   <div className="h-80">
                     {attendance?.days?.length > 0 ? (
-                      <PatientAttendanceCalendar 
-                        days={attendance.days} 
-                        year={currentYear} 
-                        month={currentMonth} 
+                      <PatientAttendanceCalendar
+                        days={attendance.days}
+                        year={currentYear}
+                        month={currentMonth}
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">
@@ -956,8 +1016,8 @@ const TherapistPatientDetailPage = () => {
                         {attendance?.summary?.attendanceRate || 0}%
                       </p>
                       <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                        <div 
-                          className="bg-primary-600 h-2.5 rounded-full" 
+                        <div
+                          className="bg-primary-600 h-2.5 rounded-full"
                           style={{ width: `${attendance?.summary?.attendanceRate || 0}%` }}
                         ></div>
                       </div>

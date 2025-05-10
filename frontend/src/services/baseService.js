@@ -28,7 +28,9 @@ class BaseService {
    * @returns {Promise} API response
    */
   getById(id) {
-    return api.get(`${this.basePath}${id}/`);
+    // Ensure there's a slash between basePath and id
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.get(`${this.basePath}${separator}${id}/`);
   }
 
   /**
@@ -47,7 +49,9 @@ class BaseService {
    * @returns {Promise} API response
    */
   update(id, data) {
-    return api.put(`${this.basePath}${id}/`, data);
+    // Ensure there's a slash between basePath and id
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.put(`${this.basePath}${separator}${id}/`, data);
   }
 
   /**
@@ -56,7 +60,9 @@ class BaseService {
    * @returns {Promise} API response
    */
   delete(id) {
-    return api.delete(`${this.basePath}${id}/`);
+    // Ensure there's a slash between basePath and id
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.delete(`${this.basePath}${separator}${id}/`);
   }
 
   /**
@@ -77,7 +83,9 @@ class BaseService {
    * @returns {Promise} API response
    */
   performAction(id, action, data = {}) {
-    return api.post(`${this.basePath}${id}/${action}/`, data);
+    // Ensure there's a slash between basePath and id
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.post(`${this.basePath}${separator}${id}/${action}/`, data);
   }
 }
 

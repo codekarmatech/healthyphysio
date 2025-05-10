@@ -44,6 +44,7 @@ class Attendance(models.Model):
     approved_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     is_paid = models.BooleanField(default=True)
+    changed_from = models.CharField(max_length=20, blank=True, null=True, help_text="Previous status before change")
     
     class Meta:
         unique_together = ('therapist', 'date')
@@ -64,6 +65,12 @@ class Attendance(models.Model):
             self.is_paid = False
         elif self.status in ['present', 'approved_leave']:
             self.is_paid = True
+        elif self.status == 'half_day':
+            # Half day is paid at 50% rate
+            self.is_paid = True
+        elif self.status == 'absent':
+            # Absent is not paid
+            self.is_paid = False
         
         super().save(*args, **kwargs)
 

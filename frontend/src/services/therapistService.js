@@ -15,7 +15,10 @@ class TherapistService extends BaseService {
    * @returns {Promise} API response
    */
   getCurrentProfile() {
-    return api.get(`${this.basePath}me/`);
+    // Ensure there's a slash between basePath and the endpoint
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    // Use the profile endpoint from TherapistViewSet
+    return api.get(`${this.basePath}${separator}profile/`);
   }
 
   /**
@@ -24,7 +27,74 @@ class TherapistService extends BaseService {
    * @returns {Promise} API response
    */
   updateProfile(profileData) {
-    return api.put(`${this.basePath}me/`, profileData);
+    // Ensure there's a slash between basePath and the endpoint
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.put(`${this.basePath}${separator}profile/`, profileData);
+  }
+
+  /**
+   * Get all change requests for the current therapist
+   * @returns {Promise} - The API response or mock data if API fails
+   */
+  async getChangeRequests() {
+    try {
+      // Ensure there's a slash between basePath and the endpoint
+      const separator = this.basePath.endsWith('/') ? '' : '/';
+      const url = `${this.basePath}${separator}change-requests/`;
+      console.log(`Fetching change requests from: ${url}`);
+
+      const response = await api.get(url);
+      console.log('Successfully fetched change requests');
+      return response;
+    } catch (error) {
+      // Log the error and return mock data
+      console.error('Error fetching change requests:', error);
+      console.log('Returning mock data instead');
+      return this.getMockChangeRequests();
+    }
+  }
+
+  /**
+   * Get mock change requests data
+   * @returns {Object} Mock change requests data
+   */
+  getMockChangeRequests() {
+    return {
+      data: [
+        {
+          id: 1,
+          therapist_id: 1,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          requested_data: {
+            specialization: 'Orthopedic Therapy',
+            years_of_experience: 5
+          }
+        }
+      ]
+    };
+  }
+
+  /**
+   * Request profile deletion
+   * @param {string} reason - The reason for deletion
+   * @returns {Promise} - The API response
+   */
+  requestDeletion(reason) {
+    // Ensure there's a slash between basePath and the endpoint
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.post(`${this.basePath}${separator}request-deletion/`, { reason });
+  }
+
+  /**
+   * Get a therapist's profile by user ID
+   * @param {number} userId - The user ID
+   * @returns {Promise} - The API response
+   */
+  getTherapistProfileByUserId(userId) {
+    // Use the dedicated endpoint for getting a therapist profile by user ID
+    return api.get(`/users/therapist-profile/${userId}/`);
   }
 
   /**

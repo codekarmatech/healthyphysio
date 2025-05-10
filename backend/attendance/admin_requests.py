@@ -42,17 +42,36 @@ class AttendanceChangeRequest(models.Model):
         self.status = 'approved'
         self.resolved_at = timezone.now()
         self.resolved_by = admin_user
-        self.save()
         
         # Apply the requested changes to the attendance record
         if self.request_type == 'change_status' and self.requested_status:
+            # Store the original status for tracking changes
+            original_status = self.attendance.status
+            
+            # Update the attendance record with the requested status
             self.attendance.status = self.requested_status
-            self.attendance.notes = f"{self.attendance.notes or ''}\nChanged from {self.current_status} to {self.requested_status} via admin request."
+            self.attendance.notes = f"{self.attendance.notes or ''}\nChanged from {original_status} to {self.requested_status} via admin request."
             self.attendance.approved_by = admin_user
             self.attendance.approved_at = timezone.now()
+            self.attendance.changed_from = original_status  # Track the original status
+            
+            # Make sure is_paid is updated based on the new status
+            if self.requested_status in ['sick_leave', 'emergency_leave']:
+                self.attendance.is_paid = False
+            elif self.requested_status in ['present', 'approved_leave']:
+                self.attendance.is_paid = True
+            
+            # Save the attendance record to persist changes
             self.attendance.save()
+            
+            # Log the change
+            print(f"Attendance record updated: ID {self.attendance.id}, Status changed from {original_status} to {self.requested_status}")
         elif self.request_type == 'delete':
             self.attendance.delete()
+            print(f"Attendance record deleted: ID {self.attendance.id}")
+        
+        # Save the change request after processing the attendance record
+        self.save()
     
     def reject(self, admin_user):
         """Reject the attendance change request"""

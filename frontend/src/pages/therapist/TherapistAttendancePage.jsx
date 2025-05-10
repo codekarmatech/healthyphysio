@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import attendanceService from '../../services/attendanceService';
 import api from '../../services/api';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { toast } from 'react-toastify';
 import MonthSelector from '../../components/attendance/MonthSelector';
 import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
@@ -10,19 +10,28 @@ import AttendanceSummary from '../../components/attendance/AttendanceSummary';
 import LeaveApplicationForm from '../../components/attendance/LeaveApplicationForm';
 import LeaveApplicationsList from '../../components/attendance/LeaveApplicationsList';
 import PatientCancellationForm from '../../components/attendance/PatientCancellationForm';
+import AttendanceHistoryTable from '../../components/attendance/AttendanceHistoryTable';
 
 /**
  * Therapist Attendance Page
  * Allows therapists to view and manage their attendance, apply for leave, and record patient cancellations
  */
 const TherapistAttendancePage = () => {
-  const { user } = useAuth();
+  const { user, therapistProfile } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [attendanceSummary, setAttendanceSummary] = useState(null);
   const [attendanceDays, setAttendanceDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAttendanceMockData, setIsAttendanceMockData] = useState(false);
+  
+  // State for attendance history
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(null);
+  
+  // State to track which change requests we've already shown notifications for
+  const [notifiedChangeRequests, setNotifiedChangeRequests] = useState([]);
   
   // State for modals
   const [showLeaveForm, setShowLeaveForm] = useState(false);
@@ -42,13 +51,64 @@ const TherapistAttendancePage = () => {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
 
+  // Log user object for debugging
+  useEffect(() => {
+    console.log('TherapistAttendancePage - User object:', user);
+    console.log('TherapistAttendancePage - Therapist profile:', therapistProfile);
+    if (therapistProfile?.id) {
+      console.log('Using therapist profile ID:', therapistProfile.id);
+    } else if (user?.id) {
+      console.log('Using user ID as fallback:', user.id);
+    } else {
+      console.warn('No therapist ID found in user or therapist profile');
+    }
+  }, [user, therapistProfile]);
+
+  // Fetch attendance history
+  const fetchAttendanceHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    
+    try {
+      // Use therapist profile ID if available, otherwise fall back to user ID
+      const therapistId = therapistProfile?.id || user?.id;
+      console.log(`Fetching attendance history for therapist ID: ${therapistId}`);
+      
+      const response = await attendanceService.getAttendanceHistory(therapistId);
+      
+      if (response.error) {
+        setHistoryError(response.error);
+      } else {
+        setAttendanceHistory(response.data || []);
+        
+        // Check if we're using mock data
+        if (response.isMockData) {
+          console.log('Using example attendance history data for display');
+          toast.info('Showing EXAMPLE attendance records. These are not real attendance records. Your actual attendance history will appear here once you start marking attendance.', {
+            position: "top-center",
+            autoClose: 7000
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching attendance history:', err);
+      setHistoryError('Failed to load attendance history. Please try again.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  // We need both user and therapistProfile as dependencies
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, therapistProfile]);
+
   // Fetch attendance data
   const fetchAttendanceData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const therapistId = user.therapist_id || user.id;
+      // Use therapist profile ID if available, otherwise fall back to user ID
+      const therapistId = therapistProfile?.id || user?.id;
+      console.log(`Fetching attendance data for therapist ID: ${therapistId}, year: ${currentYear}, month: ${currentMonth}`);
       const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
       
       // Check if we got mock data
@@ -72,15 +132,149 @@ const TherapistAttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  // We use 'user' inside this function, but we intentionally omit it from the dependency array
-  // because it's stable and including it would cause unnecessary re-renders
+  // We use 'user' and 'therapistProfile' inside this function, but we intentionally omit them from the dependency array
+  // because they're stable and including them would cause unnecessary re-renders
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentYear, currentMonth]);
 
   // Fetch data on component mount and when month/year changes
   useEffect(() => {
     fetchAttendanceData();
-  }, [fetchAttendanceData]);
+    
+    // Set up an interval to refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('Auto-refreshing attendance data...');
+      fetchAttendanceData();
+      if (activeTab === 'history') {
+        fetchAttendanceHistory();
+      }
+    }, 30000); // 30 seconds
+    
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(refreshInterval);
+  }, [fetchAttendanceData, fetchAttendanceHistory, activeTab]);
+  
+  // Fetch attendance history when tab changes to history or when component mounts
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchAttendanceHistory();
+    }
+  }, [activeTab, fetchAttendanceHistory]);
+  
+  // Check for change request status updates
+  const checkChangeRequestStatus = useCallback(async () => {
+    try {
+      // Get all approved and rejected change requests for the current user
+      // We need to check both statuses to find recently resolved requests
+      let approvedRequests = [];
+      let rejectedRequests = [];
+      
+      try {
+        approvedRequests = await attendanceService.getAttendanceChangeRequests('approved');
+      } catch (error) {
+        // If the endpoint doesn't exist, just continue with empty array
+      }
+      
+      try {
+        rejectedRequests = await attendanceService.getAttendanceChangeRequests('rejected');
+      } catch (error) {
+        // If the endpoint doesn't exist, just continue with empty array
+      }
+      
+      // Combine the results
+      const changeRequests = [...approvedRequests, ...rejectedRequests];
+      
+      // If we got an empty array, it could be because there are no requests
+      // or because the endpoint doesn't exist
+      if (!changeRequests || changeRequests.length === 0) {
+        // No need to log this, it's a normal condition
+        return;
+      }
+      
+      // Filter to find recently resolved requests (in the last hour)
+      const oneHourAgo = new Date();
+      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+      
+      const recentlyResolved = changeRequests.filter(req => {
+        // Skip if we've already shown a notification for this request
+        if (notifiedChangeRequests.includes(req.id)) {
+          return false;
+        }
+        
+        if (req.status !== 'pending' && req.resolved_at) {
+          try {
+            const resolvedTime = parseISO(req.resolved_at);
+            return resolvedTime > oneHourAgo;
+          } catch (error) {
+            console.error('Error parsing resolved_at date:', error);
+            return false;
+          }
+        }
+        return false;
+      });
+      
+      // If we have new resolved requests, update our notified list
+      if (recentlyResolved.length > 0) {
+        const newNotifiedIds = recentlyResolved.map(req => req.id);
+        setNotifiedChangeRequests(prev => [...prev, ...newNotifiedIds]);
+        
+        // Show notifications for recently resolved requests
+        recentlyResolved.forEach(req => {
+          let formattedDate = 'Unknown date';
+          
+          try {
+            if (req.attendance_date) {
+              formattedDate = format(parseISO(req.attendance_date), 'MMM d, yyyy');
+            }
+          } catch (error) {
+            console.error('Error parsing date:', error);
+          }
+          
+          if (req.status === 'approved') {
+            toast.success(`Your attendance change request for ${formattedDate} has been approved! Status changed to ${req.requested_status.replace('_', ' ')}.`);
+          } else if (req.status === 'rejected') {
+            toast.error(`Your attendance change request for ${formattedDate} has been rejected. Please contact an administrator for more information.`);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error checking change request status:', error);
+    }
+  }, [notifiedChangeRequests]);
+
+  // Force refresh data when the component mounts or when the user navigates to this page
+  useEffect(() => {
+    // Immediately fetch attendance data and history
+    fetchAttendanceData();
+    fetchAttendanceHistory();
+    
+    // Try to check change request status, but don't worry if it fails
+    try {
+      checkChangeRequestStatus();
+    } catch (error) {
+      // No need to log this, it's handled in the function
+    }
+    
+    // Set up a timer to refresh data periodically
+    const refreshTimer = setInterval(() => {
+      // Refresh data based on active tab
+      if (activeTab === 'calendar') {
+        fetchAttendanceData();
+      } else if (activeTab === 'history') {
+        fetchAttendanceHistory();
+      }
+      
+      // Try to check change request status, but don't worry if it fails
+      try {
+        checkChangeRequestStatus();
+      } catch (error) {
+        // No need to log this, it's handled in the function
+      }
+    }, 60000); // Refresh every minute
+    
+    return () => clearInterval(refreshTimer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle month navigation
   const handlePrevMonth = () => {
@@ -134,6 +328,9 @@ const TherapistAttendancePage = () => {
     // Format the date to match the format in attendanceDays
     const formattedDate = format(date, 'yyyy-MM-dd');
     
+    console.log(`Checking for existing attendance on ${formattedDate}`);
+    console.log('Available attendance days:', attendanceDays);
+    
     // Find if there's an existing attendance record for this date
     const existingAttendance = attendanceDays.find(day => 
       day.date === formattedDate && 
@@ -142,13 +339,20 @@ const TherapistAttendancePage = () => {
     
     // If we found an attendance record, make sure it has all the necessary properties
     if (existingAttendance) {
+      console.log('Found existing attendance record:', existingAttendance);
+      
       // If the record doesn't have an ID, we'll need to add a placeholder
       // This will be replaced with the actual ID when making the API call
       if (!existingAttendance.id) {
         console.log('Attendance record found but missing ID, will fetch from API when needed');
+        console.log('This is likely because the data is from mock data and not from the database');
+      } else {
+        console.log('Attendance record has ID:', existingAttendance.id);
       }
       
       return existingAttendance;
+    } else {
+      console.log(`No existing attendance found for date ${formattedDate}`);
     }
     
     return null;
@@ -182,13 +386,13 @@ const TherapistAttendancePage = () => {
       // eslint-disable-next-line no-unused-vars
       const formattedDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
       
-      // Find the existing attendance record
+      // Find the existing attendance record in our local state
       const existingAttendance = checkExistingAttendance(selectedDate || new Date());
       
+      // We'll continue even if there's no existing attendance in our local state
+      // because we'll create one if needed
       if (!existingAttendance) {
-        toast.error('No attendance record found for this date.');
-        setSubmitting(false);
-        return;
+        console.log('No attendance record found in local state for this date. Will attempt to create one.');
       }
       
       if (!changeReason.trim()) {
@@ -210,14 +414,74 @@ const TherapistAttendancePage = () => {
           const apiDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
           
           // Make an API call to get the attendance record for this date
-          const response = await api.get(`/api/attendance/?date=${apiDate}`);
+          // Remove the duplicate /api/ prefix since it's already in the baseURL
+          const response = await api.get(`/attendance/?date=${apiDate}`);
           
-          // Find the attendance record for this date
-          const attendanceRecord = response.data.find(record => record.date === apiDate);
+          // Log the response for debugging
+          console.log('Attendance API response:', response.data);
           
-          if (attendanceRecord && attendanceRecord.id) {
+          let attendanceRecord = null;
+          
+          // Check if the response is an array (as expected)
+          if (Array.isArray(response.data)) {
+            // Find the attendance record for this date
+            attendanceRecord = response.data.find(record => record.date === apiDate);
+            console.log('Found attendance record:', attendanceRecord);
+          } else if (response.data && typeof response.data === 'object') {
+            // If it's a single object, check if it matches our date
+            if (response.data.date === apiDate) {
+              attendanceRecord = response.data;
+              console.log('Found attendance record (single object):', attendanceRecord);
+            }
+          }
+          
+          // If no matching record was found
+          if (!attendanceRecord) {
+            console.log('No matching attendance record found for date:', apiDate);
+            
+            // Since we couldn't find the attendance record in the database,
+            // but we have it in our frontend state (from existingAttendance),
+            // we need to create it in the database first
+            try {
+              console.log('Creating attendance record for date:', apiDate);
+              
+              // Use the existing attendance data to create a new record
+              // If existingAttendance has a status, use it, otherwise default to 'present'
+              const status = existingAttendance && existingAttendance.status ? existingAttendance.status : 'present';
+              const notes = existingAttendance && existingAttendance.notes ? existingAttendance.notes : 'Created for change request';
+              
+              console.log(`Creating attendance with status: ${status}, notes: ${notes}`);
+              
+              const createResponse = await attendanceService.submitAttendance(
+                status,
+                apiDate,
+                notes
+              );
+              
+              console.log('Created attendance record:', createResponse.data);
+              
+              // Now we should have an ID
+              if (createResponse.data && createResponse.data.id) {
+                attendanceId = createResponse.data.id;
+                console.log('Successfully created attendance record with ID:', attendanceId);
+              } else {
+                // If we still don't have an ID, show an error
+                console.error('Created attendance record does not have an ID:', createResponse.data);
+                toast.error('Could not create attendance record. Please try again later.');
+                setSubmitting(false);
+                return;
+              }
+            } catch (createError) {
+              console.error('Error creating attendance record:', createError);
+              toast.error('Failed to create attendance record. Please try again later.');
+              setSubmitting(false);
+              return;
+            }
+          } else if (attendanceRecord && attendanceRecord.id) {
+            // We found the record and it has an ID
             attendanceId = attendanceRecord.id;
           } else {
+            // We found a record but it doesn't have an ID
             toast.error('Could not find attendance record ID. Please try again later.');
             setSubmitting(false);
             return;
@@ -376,6 +640,23 @@ const TherapistAttendancePage = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Attendance Management</h1>
+      
+      {/* Warning message about attendance marking */}
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-yellow-700">
+              <strong>Important:</strong> You must mark your attendance status (Present, Absent, or Half Day) before 11:00 AM every day.
+              If you don't mark your status or haven't applied for sick or emergency leave, you will be automatically marked as <strong>ABSENT</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
       
       {/* Error message */}
       {error && (
@@ -578,6 +859,7 @@ const TherapistAttendancePage = () => {
             </div>
             
             <LeaveApplicationsList 
+              therapistId={user?.id}
               onRefresh={fetchAttendanceData}
             />
           </div>
@@ -617,19 +899,42 @@ const TherapistAttendancePage = () => {
       {/* Attendance History Tab */}
       {activeTab === 'history' && (
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Attendance History</h2>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">Attendance History</h2>
+              <p className="text-gray-600 mt-1">
+                View your complete attendance history, including present days, absences, leaves, and patient cancellations.
+              </p>
+            </div>
+            
+            <button
+              onClick={fetchAttendanceHistory}
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              disabled={historyLoading}
+            >
+              {historyLoading ? (
+                <>
+                  <div className="animate-spin h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full"></div>
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </>
+              )}
+            </button>
+          </div>
           
-          <p className="text-gray-600 mb-4">
-            View your complete attendance history, including present days, absences, leaves, and patient cancellations.
-          </p>
-          
-          {/* This would be replaced with a proper attendance history component */}
-          <div className="p-8 text-center text-gray-500">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No attendance history</h3>
-            <p className="mt-1 text-sm text-gray-500">Attendance history will be available here soon.</p>
+          <div className="mt-4">
+            <AttendanceHistoryTable 
+              attendanceData={attendanceHistory} 
+              isLoading={historyLoading} 
+              error={historyError}
+              onRefresh={fetchAttendanceHistory}
+            />
           </div>
         </div>
       )}

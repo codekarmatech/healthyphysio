@@ -15,13 +15,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from django.db import transaction
 from django.contrib.auth import get_user_model  # Add this import for get_user_model
-from .models import Therapist, Doctor
-from .serializers import UserSerializer, PatientSerializer, TherapistSerializer, DoctorSerializer
+from .models import Therapist, Doctor, ProfileChangeRequest
+from .serializers import UserSerializer, PatientSerializer, TherapistSerializer, DoctorSerializer, ProfileChangeRequestSerializer
 from .permissions import IsAdminUser, IsTherapistUser, IsDoctorUser, IsPatientUser
 
 # Add these imports for timezone and timedelta
 from django.utils import timezone
 from datetime import timedelta
+import json
 from scheduling.models import Appointment
 
 # Import for CustomTokenObtainPairSerializer
@@ -95,12 +96,222 @@ class TherapistViewSet(viewsets.ModelViewSet):
                 {"error": "Therapist not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+            
+    @action(detail=False, methods=['get'], url_path='profile')
+    def get_profile(self, request):
+        """
+        Get the therapist profile for the current user
+        """
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            serializer = self.get_serializer(therapist)
+            return Response(serializer.data)
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found for current user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+    @action(detail=False, methods=['put', 'patch'], url_path='profile')
+    def update_profile(self, request):
+        """
+        Update the therapist profile for the current user
+        Creates a change request that requires admin approval
+        """
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            serializer = self.get_serializer(therapist, data=request.data, partial=True)
+            
+            if serializer.is_valid():
+                # The update method in the serializer will create a change request
+                serializer.save()
+                return Response({
+                    "message": "Profile update request submitted for approval",
+                    "profile": serializer.data
+                })
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found for current user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+    @action(detail=False, methods=['get'], url_path='change-requests')
+    def get_change_requests(self, request):
+        """
+        Get all profile change requests for the current user
+        """
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            change_requests = ProfileChangeRequest.objects.filter(therapist=therapist)
+            serializer = ProfileChangeRequestSerializer(change_requests, many=True)
+            return Response(serializer.data)
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found for current user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+    @action(detail=False, methods=['post'], url_path='request-deletion')
+    def request_deletion(self, request):
+        """
+        Create a profile deletion request that requires admin approval
+        """
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            reason = request.data.get('reason', '')
+            
+            if not reason:
+                return Response(
+                    {"error": "Reason for deletion is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            # Create a special change request for deletion
+            change_request = ProfileChangeRequest.objects.create(
+                therapist=therapist,
+                requested_by=request.user,
+                current_data=json.dumps({
+                    'license_number': therapist.license_number,
+                    'specialization': therapist.specialization,
+                    'years_of_experience': therapist.years_of_experience,
+                    'experience': therapist.experience,
+                    'residential_address': therapist.residential_address,
+                    'preferred_areas': therapist.preferred_areas,
+                }),
+                requested_data=json.dumps({'delete_profile': True}),
+                reason=reason,
+                status='pending'
+            )
+            
+            serializer = ProfileChangeRequestSerializer(change_request)
+            return Response({
+                "message": "Profile deletion request submitted for approval",
+                "change_request": serializer.data
+            })
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found for current user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+    @action(detail=True, methods=['get'], url_path='therapist-profile')
+    def get_therapist_profile(self, request, pk=None):
+        """
+        Get the therapist profile for a specific user ID
+        """
+        try:
+            user = User.objects.get(id=pk)
+            if user.role != 'therapist':
+                return Response(
+                    {"error": "User is not a therapist"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+            therapist = Therapist.objects.get(user=user)
+            serializer = self.get_serializer(therapist)
+            return Response(serializer.data)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found for this user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
     # Fix permission classes to use the correct class name
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    
+    
+class ProfileChangeRequestViewSet(viewsets.ModelViewSet):
+    queryset = ProfileChangeRequest.objects.all()
+    serializer_class = ProfileChangeRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_admin:
+            return ProfileChangeRequest.objects.all()
+        elif user.is_therapist:
+            # Therapists can only see their own change requests
+            try:
+                therapist = Therapist.objects.get(user=user)
+                return ProfileChangeRequest.objects.filter(therapist=therapist)
+            except Therapist.DoesNotExist:
+                return ProfileChangeRequest.objects.none()
+        return ProfileChangeRequest.objects.none()
+    
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_request(self, request, pk=None):
+        """
+        Approve a profile change request (admin only)
+        """
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can approve change requests"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        change_request = self.get_object()
+        
+        if change_request.status != 'pending':
+            return Response(
+                {"error": f"Change request is already {change_request.status}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Approve the change request
+        change_request.approve(request.user)
+        
+        serializer = self.get_serializer(change_request)
+        return Response({
+            "message": "Change request approved successfully",
+            "change_request": serializer.data
+        })
+    
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject_request(self, request, pk=None):
+        """
+        Reject a profile change request (admin only)
+        """
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can reject change requests"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        change_request = self.get_object()
+        
+        if change_request.status != 'pending':
+            return Response(
+                {"error": f"Change request is already {change_request.status}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Get the rejection reason from the request data
+        reason = request.data.get('reason', '')
+        
+        if not reason:
+            return Response(
+                {"error": "Rejection reason is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Reject the change request
+        change_request.reject(request.user, reason)
+        
+        serializer = self.get_serializer(change_request)
+        return Response({
+            "message": "Change request rejected successfully",
+            "change_request": serializer.data
+        })
 
 
 # Update the CustomTokenObtainPairSerializer to handle multiple identifier types

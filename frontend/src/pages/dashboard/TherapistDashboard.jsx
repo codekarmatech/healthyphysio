@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import AttendanceSummary from '../../components/attendance/AttendanceSummary';
@@ -14,7 +14,8 @@ import api from '../../services/api';
 import earningsService from '../../services/earningsService';
 
 const TherapistDashboard = () => {
-  const { user } = useAuth(); // Get user from context instead of props
+  const { user, logout } = useAuth(); // Get user and logout function from context
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [stats, setStats] = useState({
     upcomingAppointments: 0,
     todayAppointments: 0,
@@ -23,9 +24,42 @@ const TherapistDashboard = () => {
     equipmentAllocations: 0,
     equipmentRequests: 0,
   });
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Use the logout function from AuthContext
+      await logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  // Create refs for the menu and button
+  const menuRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Only close if menu is open and click is outside both menu and button
+      if (showProfileMenu &&
+          menuRef.current &&
+          buttonRef.current &&
+          !menuRef.current.contains(event.target) &&
+          !buttonRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Add attendance state variables
   const [attendanceSummary, setAttendanceSummary] = useState(null);
   const [attendanceLoading, setAttendanceLoading] = useState(true);
@@ -34,15 +68,15 @@ const TherapistDashboard = () => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [attendanceDays, setAttendanceDays] = useState([]);
   const [isAttendanceMockData, setIsAttendanceMockData] = useState(false);
-  
+
   // State to track if therapist is approved
   const [isApproved, setIsApproved] = useState(false);
-  
+
   // State for earnings data
   const [earningsData, setEarningsData] = useState(null);
   const [earningsLoading, setEarningsLoading] = useState(true);
   const [earningsError, setEarningsError] = useState(null);
-  
+
   // Object to store feature access permissions
   const [featureAccess, setFeatureAccess] = useState({
     attendance: true, // Set to true for development/testing
@@ -52,7 +86,7 @@ const TherapistDashboard = () => {
     // example: patientManagement: false,
     // example: reportGeneration: false,
   });
-  
+
   // Memoized fetch function to satisfy hook dependency requirements
   const fetchAttendanceSummary = useCallback(async () => {
     setAttendanceLoading(true);
@@ -65,13 +99,13 @@ const TherapistDashboard = () => {
         setAttendanceLoading(false);
         return;
       }
-      
+
       // Use therapist_id from user object if available
       const therapistId = user.therapist_id || user.id;
-      
+
       // The updated getMonthlyAttendance method will return real data or mock data
       const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
-      
+
       // Check if we got mock data (for logging purposes)
       if (response.isMockData) {
         console.log('Using mock attendance data for display');
@@ -79,17 +113,17 @@ const TherapistDashboard = () => {
       } else {
         setIsAttendanceMockData(false);
       }
-      
+
       setAttendanceSummary(response.data);
       setAttendanceDays(response.data?.days || []);
-      
+
       // Clear any previous errors since we got data (real or mock)
       setAttendanceError(null);
     } catch (error) {
       console.error('Error fetching attendance summary:', error);
       // This should not happen since getMonthlyAttendance now handles errors internally
       // and returns mock data instead of throwing, but we'll keep this as a fallback
-      const errorMessage = error.response?.status === 401 
+      const errorMessage = error.response?.status === 401
         ? 'Authentication failed. Please log in again.'
         : error.response?.data?.message || 'Failed to load attendance data';
       setAttendanceError(errorMessage);
@@ -103,63 +137,63 @@ const TherapistDashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        
+
         // Get therapist ID from user object
         const therapistId = user.therapist_id || user.id;
-        
+
         // Fetch upcoming appointments
         const upcomingResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&status=SCHEDULED,RESCHEDULED`);
-        
+
         // Fetch today's appointments
         const today = new Date().toISOString().split('T')[0];
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
         const todayResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&datetime__gte=${today}&datetime__lt=${tomorrowStr}`);
-        
+
         // Fetch assigned patients count
         const patientsResponse = await api.get(`/users/patients/?therapist=${therapistId}`);
         const patientCount = patientsResponse.data.count || patientsResponse.data.length || 0;
-        
+
         // Fetch pending assessments
         const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
-        
+
         // Fetch equipment allocations
         let equipmentAllocations = 0;
         let equipmentRequests = 0;
         try {
           const allocationsResponse = await api.get(`/equipment/allocations/`);
           equipmentAllocations = allocationsResponse.data.count || allocationsResponse.data.length || 0;
-          
+
           const requestsResponse = await api.get(`/equipment/requests/`);
           equipmentRequests = requestsResponse.data.count || requestsResponse.data.length || 0;
         } catch (equipmentError) {
           console.error('Error fetching equipment data:', equipmentError);
         }
-        
+
         // Fetch recent appointments (limit to 5)
         const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
-        
+
         // Fetch monthly earnings
         let monthlyEarnings = 0;
         try {
           // Get real earnings data from API
           const currentMonth = new Date().getMonth() + 1;
           const currentYear = new Date().getFullYear();
-          
+
           console.log(`Fetching earnings data for therapist ${therapistId}, ${currentYear}-${currentMonth}`);
-          
+
           // Use the earnings service instead of direct API call
           // Use the earnings service to get monthly earnings
           const earningsService = (await import('../../services/earningsService')).default;
           const earningsResponse = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
-          
+
           // Check if we have a valid response
           if (earningsResponse && earningsResponse.data) {
             // The API will return either real data or sample data for new therapists
             if (earningsResponse.data.summary) {
               monthlyEarnings = earningsResponse.data.summary.totalEarned || 0;
-              
+
               // If this is sample data, log it (but still use it)
               if (earningsResponse.data.isMockData) {
                 console.info('Using sample earnings data for new therapist');
@@ -176,7 +210,7 @@ const TherapistDashboard = () => {
           console.error('Error fetching earnings data:', earningsError);
           monthlyEarnings = 0;
         }
-        
+
         // Update stats
         setStats({
           upcomingAppointments: upcomingResponse.data.count || upcomingResponse.data.length || 0,
@@ -187,18 +221,18 @@ const TherapistDashboard = () => {
           equipmentAllocations: equipmentAllocations,
           equipmentRequests: equipmentRequests
         });
-        
+
         // Format recent appointments
         const formattedAppointments = (recentResponse.data.results || recentResponse.data).map(appointment => ({
           id: appointment.id,
-          patientName: appointment.patient_details ? 
-            `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` : 
+          patientName: appointment.patient_details ?
+            `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` :
             'Unknown Patient',
           date: appointment.datetime,
           status: appointment.status.toLowerCase(),
           type: appointment.issue || 'Consultation',
         }));
-        
+
         setRecentAppointments(formattedAppointments);
         setLoading(false);
       } catch (error) {
@@ -217,7 +251,7 @@ const TherapistDashboard = () => {
         setLoading(false);
       }
     };
-    
+
     if (user) {
       fetchDashboardData();
     }
@@ -228,27 +262,27 @@ const TherapistDashboard = () => {
     const checkApprovalStatus = async () => {
       try {
         if (!user) return;
-        
+
         // Get therapist ID from user object
         const therapistId = user.therapist_id || user.id;
-        
+
         // Define all possible endpoints to try
         const endpoints = [
           `/users/therapist-status/`,
           `/users/therapists/${therapistId}/status/`
         ];
-        
+
         let success = false;
-        
+
         // Try each endpoint until one succeeds
         for (const endpoint of endpoints) {
           try {
             console.log(`Trying endpoint: ${endpoint}`);
             const response = await api.get(endpoint);
-            
+
             // Update approval status
             setIsApproved(response.data.is_approved);
-            
+
             // Update feature access based on approval status
             setFeatureAccess(prevAccess => ({
               ...prevAccess,
@@ -257,7 +291,7 @@ const TherapistDashboard = () => {
               equipment: response.data.is_approved,
               // Update other features as needed based on response data
             }));
-            
+
             console.log(`Approval status: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
             success = true;
             break; // Exit the loop if successful
@@ -266,7 +300,7 @@ const TherapistDashboard = () => {
             // Continue to the next endpoint
           }
         }
-        
+
         // If all endpoints failed, set default values
         if (!success) {
           console.error('All approval status endpoints failed');
@@ -279,7 +313,7 @@ const TherapistDashboard = () => {
             // Reset other features as needed
           }));
         }
-        
+
       } catch (error) {
         console.error('Error checking approval status:', error);
         setIsApproved(false);
@@ -292,7 +326,7 @@ const TherapistDashboard = () => {
         }));
       }
     };
-    
+
     checkApprovalStatus();
   }, [user]);
 
@@ -308,26 +342,26 @@ const TherapistDashboard = () => {
         setEarningsLoading(false);
         return;
       }
-      
+
       // Use therapist_id from user object if available
       const therapistId = user.therapist_id || user.id;
-      
+
       try {
         // Use earningsService instead of direct API call
         const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
-        
+
         // Check if we have a valid response
         if (response && response.data) {
           setEarningsData(response.data);
-          
+
           // If this is sample data, log it (but still use it)
           if (response.data.isMockData) {
             console.info('Using sample earnings data for new therapist');
           }
-          
+
           // Clear any previous errors since we got data successfully
           setEarningsError(null);
-          
+
           // Log success for debugging
           console.log('Successfully loaded earnings data:', response.data);
         } else {
@@ -337,7 +371,7 @@ const TherapistDashboard = () => {
       } catch (apiError) {
         console.error('Error fetching earnings data:', apiError);
         setEarningsData(null);
-        
+
         // Set an appropriate error message
         if (apiError.response?.status === 404) {
           setEarningsError('Earnings data not found for this period.');
@@ -349,11 +383,11 @@ const TherapistDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching earnings data:', error);
-      const errorMessage = error.response?.status === 401 
+      const errorMessage = error.response?.status === 401
         ? 'Authentication failed. Please log in again.'
         : error.response?.data?.message || 'Failed to load earnings data';
       setEarningsError(errorMessage);
-      
+
       // Set a user-friendly error message
       if (error.response?.status === 404) {
         setEarningsError('The earnings data endpoint is not available yet. Using mock data instead.');
@@ -372,7 +406,7 @@ const TherapistDashboard = () => {
       fetchAttendanceSummary();
     }
   }, [fetchAttendanceSummary, featureAccess.attendance]);
-  
+
   // Add useEffect for earnings data
   useEffect(() => {
     // Only fetch earnings data if the feature is accessible
@@ -380,7 +414,7 @@ const TherapistDashboard = () => {
       fetchEarningsData();
     }
   }, [fetchEarningsData, featureAccess.earnings]);
-  
+
   // Add an effect to check approval status periodically
   // This ensures that if admin revokes approval, the UI updates
   useEffect(() => {
@@ -390,57 +424,57 @@ const TherapistDashboard = () => {
         const checkApprovalStatus = async () => {
           try {
             const therapistId = user.therapist_id || user.id;
-            
+
             // Define all possible endpoints to try
             const endpoints = [
               `/users/therapist-status/`,
               `/users/therapists/${therapistId}/status/`
             ];
-            
+
             let success = false;
-            
+
             // Try each endpoint until one succeeds
             for (const endpoint of endpoints) {
               try {
                 const response = await api.get(endpoint);
-                
+
                 // Update approval status
                 setIsApproved(response.data.is_approved);
-                
+
                 // Update feature access based on approval status
                 setFeatureAccess(prevAccess => ({
                   ...prevAccess,
                   attendance: response.data.is_approved,
                   earnings: response.data.is_approved,
                 }));
-                
+
                 // Log status change if it changed
                 if (response.data.is_approved !== isApproved) {
                   console.log(`Approval status changed to: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
                 }
-                
+
                 success = true;
                 break; // Exit the loop if successful
               } catch (endpointError) {
                 // Continue to the next endpoint silently in periodic check
               }
             }
-            
+
             // If all endpoints failed, set default values
             if (!success) {
               console.log('Periodic check: All approval status endpoints failed');
               // Don't reset values here to avoid flickering if it's just a temporary network issue
             }
-            
+
           } catch (error) {
             console.error('Error in periodic approval status check:', error);
           }
         };
-        
+
         checkApprovalStatus();
       }
     }, 30000); // 30 seconds
-    
+
     // Clean up interval on component unmount
     return () => clearInterval(intervalId);
   }, [user, isApproved]);
@@ -483,12 +517,12 @@ const TherapistDashboard = () => {
         </div>
       );
     }
-    
+
     // If user has access to the feature, show the component
     if (featureAccess[featureName]) {
       return component;
-    } 
-    
+    }
+
     // Otherwise show the waiting message
     return (
       <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
@@ -536,12 +570,36 @@ const TherapistDashboard = () => {
                 <div className="ml-3 relative">
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-700 mr-2">{user.first_name} {user.last_name}</span>
-                    <button className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                      <span className="sr-only">Open user menu</span>
-                      <div className="h-8 w-8 rounded-full …">
-                       {(user.first_name || '').charAt(0).toUpperCase()}
-                      </div>
-                    </button>
+                    <div className="relative">
+                      <button
+                        ref={buttonRef}
+                        onClick={() => setShowProfileMenu(!showProfileMenu)}
+                        className="rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        <span className="sr-only">Open user menu</span>
+                        <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                          {(user.first_name || '').charAt(0).toUpperCase()}
+                        </div>
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {showProfileMenu && (
+                        <div
+                          ref={menuRef}
+                          className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
+                        >
+                          <Link to="/therapist/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            View Therapist Profile
+                          </Link>
+                          <button
+                            onClick={handleLogout}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -735,7 +793,7 @@ const TherapistDashboard = () => {
                     </p>
                   </div>
                 </div>
-                
+
                 {featureAccess.attendance ? (
                   <div className="border-t border-gray-200">
                     {attendanceLoading ? (
@@ -764,7 +822,7 @@ const TherapistDashboard = () => {
                     ) : (
                       <>
                         <div className="px-4 py-3 bg-gray-50">
-                          <MonthSelector 
+                          <MonthSelector
                             currentDate={currentDate}
                             onPrevMonth={handlePrevMonth}
                             onNextMonth={handleNextMonth}
@@ -773,23 +831,23 @@ const TherapistDashboard = () => {
                         <div className="px-4 py-5 sm:p-6">
                           {/* Attendance Summary Component */}
                           <div className="mb-6">
-                            <AttendanceSummary 
-                              summary={attendanceSummary} 
+                            <AttendanceSummary
+                              summary={attendanceSummary}
                               loading={attendanceLoading}
-                              isMockData={isAttendanceMockData} 
+                              isMockData={isAttendanceMockData}
                             />
                           </div>
-                          
+
                           {/* Attendance Calendar Component */}
                           <div className="mb-6">
-                            <AttendanceCalendar 
-                              days={attendanceDays} 
+                            <AttendanceCalendar
+                              days={attendanceDays}
                               currentDate={new Date(currentYear, currentMonth - 1, 1)}
                               onAttendanceUpdated={fetchAttendanceSummary}
                               isMockData={isAttendanceMockData}
                             />
                           </div>
-                          
+
                           {/* Weekly Schedule Table */}
                           <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
@@ -823,7 +881,7 @@ const TherapistDashboard = () => {
                                 {[1, 2, 3, 4, 5].map((patientId) => {
                                   // Generate weekly schedule based on patient ID
                                   const weeklySchedule = [];
-                                  
+
                                   // Assign days based on patient ID (to make it consistent)
                                   if (patientId % 5 === 0) {
                                     weeklySchedule.push(1, 3, 5); // Mon, Wed, Fri
@@ -836,7 +894,7 @@ const TherapistDashboard = () => {
                                   } else {
                                     weeklySchedule.push(1, 3, 6); // Mon, Wed, Sat
                                   }
-                                  
+
                                   // Generate random status for each day
                                   const attendanceRate = 65 + (patientId % 30);
                                   const getRandomStatus = () => {
@@ -849,7 +907,7 @@ const TherapistDashboard = () => {
                                       return { status: 'missed', paid: false };
                                     }
                                   };
-                                  
+
                                   // Create status for each day of the week
                                   const dayStatus = {
                                     1: weeklySchedule.includes(1) ? getRandomStatus() : null,
@@ -859,7 +917,7 @@ const TherapistDashboard = () => {
                                     5: weeklySchedule.includes(5) ? getRandomStatus() : null,
                                     6: weeklySchedule.includes(6) ? getRandomStatus() : null,
                                   };
-                                  
+
                                   return (
                                     <tr key={patientId}>
                                       <td className="px-6 py-4 whitespace-nowrap">
@@ -883,9 +941,9 @@ const TherapistDashboard = () => {
                                         <td key={`${patientId}-${day}`} className="px-6 py-4 whitespace-nowrap">
                                           {dayStatus[day] ? (
                                             <div className="flex flex-col items-center">
-                                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                ${dayStatus[day].status === 'attended' ? 'bg-green-100 text-green-800' : 
-                                                  dayStatus[day].status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                ${dayStatus[day].status === 'attended' ? 'bg-green-100 text-green-800' :
+                                                  dayStatus[day].status === 'cancelled' ? 'bg-red-100 text-red-800' :
                                                   'bg-yellow-100 text-yellow-800'}`}>
                                                 {dayStatus[day].status.charAt(0).toUpperCase() + dayStatus[day].status.slice(1)}
                                               </span>
@@ -1031,7 +1089,7 @@ const TherapistDashboard = () => {
                 </Link>
               </div>
               <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                {renderFeature('equipment', 
+                {renderFeature('equipment',
                   <div className="px-4 py-5 sm:p-6">
                     <EquipmentRequestsSummary />
                   </div>,
@@ -1054,26 +1112,26 @@ const TherapistDashboard = () => {
               <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
                 {/* Earnings Chart */}
                 <div className="bg-white overflow-hidden shadow-md rounded-lg border border-gray-100">
-                  {renderFeature('earnings', 
+                  {renderFeature('earnings',
                     <div className="px-4 py-5 sm:p-6 h-80">
-                      <EarningsChart 
-                        therapistId={user?.therapist_id || user?.id} 
-                        year={currentYear} 
-                        month={currentMonth} 
+                      <EarningsChart
+                        therapistId={user?.therapist_id || user?.id}
+                        year={currentYear}
+                        month={currentMonth}
                       />
                     </div>,
                     "Earnings visualization requires admin approval.",
                     earningsError
                   )}
                 </div>
-                
+
                 {/* Earnings Summary */}
                 <div className="bg-white overflow-hidden shadow-md rounded-lg border border-gray-100">
-                  {renderFeature('earnings', 
+                  {renderFeature('earnings',
                     <div className="px-4 py-5 sm:p-6 h-80 flex items-center">
-                      <EarningsSummary 
-                        summary={earningsData?.summary} 
-                        loading={earningsLoading} 
+                      <EarningsSummary
+                        summary={earningsData?.summary}
+                        loading={earningsLoading}
                       />
                     </div>,
                     "Earnings summary requires admin approval.",

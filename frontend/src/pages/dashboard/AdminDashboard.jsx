@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import rescheduleRequestService from '../../services/rescheduleRequestService';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 
-const AdminDashboard = ({ user }) => {
+const AdminDashboard = () => {
+  const { user, logout } = useAuth();
   const [stats, setStats] = useState({
     totalDoctors: 0,
     totalTherapists: 0,
@@ -12,12 +14,37 @@ const AdminDashboard = ({ user }) => {
   });
   const [recentUsers, setRecentUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
   // Add state for pending therapists and reschedule requests
   const [pendingTherapists, setPendingTherapists] = useState([]);
   const [pendingReschedules, setPendingReschedules] = useState([]);
   const [loadingTherapists, setLoadingTherapists] = useState(false);
   const [loadingReschedules, setLoadingReschedules] = useState(false);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Use the logout function from AuthContext
+      await logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showProfileMenu) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
 
   useEffect(() => {
     // Simulate fetching dashboard data
@@ -28,7 +55,7 @@ const AdminDashboard = ({ user }) => {
         totalPatients: 120,
         pendingApprovals: 3,
       });
-      
+
       setRecentUsers([
         {
           id: 1,
@@ -55,7 +82,7 @@ const AdminDashboard = ({ user }) => {
           status: 'pending',
         },
       ]);
-      
+
       setLoading(false);
     }, 1000);
   }, []);
@@ -73,10 +100,10 @@ const AdminDashboard = ({ user }) => {
         setLoadingTherapists(false);
       }
     };
-    
+
     fetchPendingTherapists();
   }, []);
-  
+
   // Fetch pending reschedule requests
   useEffect(() => {
     const fetchPendingReschedules = async () => {
@@ -90,7 +117,7 @@ const AdminDashboard = ({ user }) => {
         setLoadingReschedules(false);
       }
     };
-    
+
     fetchPendingReschedules();
   }, []);
 
@@ -104,7 +131,7 @@ const AdminDashboard = ({ user }) => {
       console.error('Error approving therapist:', error);
     }
   };
-  
+
   // Approve reschedule request function
   const approveReschedule = async (requestId) => {
     try {
@@ -115,7 +142,7 @@ const AdminDashboard = ({ user }) => {
       console.error('Error approving reschedule request:', error);
     }
   };
-  
+
   // Reject reschedule request function
   const rejectReschedule = async (requestId) => {
     const reason = prompt('Please provide a reason for rejecting this reschedule request:');
@@ -157,12 +184,32 @@ const AdminDashboard = ({ user }) => {
                 <div className="ml-3 relative">
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-700 mr-2">{user?.firstName} {user?.lastName}</span>
-                    <button className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                      <span className="sr-only">Open user menu</span>
-                      <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                        {user?.firstName?.charAt(0)}
-                      </div>
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowProfileMenu(!showProfileMenu)}
+                        className="rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        <span className="sr-only">Open user menu</span>
+                        <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                          {user?.firstName?.charAt(0)}
+                        </div>
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {showProfileMenu && (
+                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                          <Link to="/admin/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            View Admin Profile
+                          </Link>
+                          <button
+                            onClick={handleLogout}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

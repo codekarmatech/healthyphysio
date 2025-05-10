@@ -20,6 +20,7 @@ urlpatterns = [
     path('leave/<int:pk>/approve/', views.LeaveViewSet.as_view({'put': 'approve'}), name='leave-approve'),
     path('leave/<int:pk>/reject/', views.LeaveViewSet.as_view({'put': 'reject'}), name='leave-reject'),
     path('leave/<int:pk>/cancel/', views.LeaveViewSet.as_view({'put': 'cancel'}), name='leave-cancel'),
+    path('leave/therapist/<int:therapist_id>/', views.LeaveViewSet.as_view({'get': 'therapist_leaves'}), name='therapist-leaves'),
     
     # Add specific endpoints for attendance change requests
     path('change-requests/<int:pk>/approve/', views.AttendanceChangeRequestViewSet.as_view({'put': 'approve'}), name='change-request-approve'),
@@ -31,4 +32,7 @@ urlpatterns = [
     # Add explicit endpoint for monthly summary (with and without trailing slash)
     path('monthly-summary', views.AttendanceViewSet.as_view({'get': 'monthly_summary'}), name='attendance-monthly-summary-no-slash'),
     path('monthly-summary/', views.AttendanceViewSet.as_view({'get': 'monthly_summary'}), name='attendance-monthly-summary'),
+    
+    # Add explicit endpoint for change requests by status
+    path('change-requests/status/<str:status>/', views.AttendanceChangeRequestViewSet.as_view({'get': 'list'}), name='change-requests-by-status'),
 ]

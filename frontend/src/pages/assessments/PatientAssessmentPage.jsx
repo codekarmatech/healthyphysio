@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { mockAssessments } from '../../data/mockAssessments';
 
 const PatientAssessmentPage = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { patientId } = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,6 +12,31 @@ const PatientAssessmentPage = () => {
   const [assessments, setAssessments] = useState([]);
   // eslint-disable-next-line no-unused-vars
   const [useMockData, setUseMockData] = useState(true); // Flag to use mock data
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Use the logout function from AuthContext
+      await logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showProfileMenu) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
 
   useEffect(() => {
     const fetchPatientData = async () => {
@@ -187,8 +212,31 @@ const PatientAssessmentPage = () => {
                 <div className="ml-3 relative">
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-700 mr-2">{user?.first_name} {user?.last_name}</span>
-                    <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                      {user?.first_name ? user.first_name[0].toUpperCase() : ''}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowProfileMenu(!showProfileMenu)}
+                        className="rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        <span className="sr-only">Open user menu</span>
+                        <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                          {user?.first_name ? user.first_name[0].toUpperCase() : ''}
+                        </div>
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {showProfileMenu && (
+                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                          <Link to="/therapist/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            View Therapist Profile
+                          </Link>
+                          <button
+                            onClick={handleLogout}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

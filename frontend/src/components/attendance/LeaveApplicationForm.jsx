@@ -71,7 +71,11 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
     setError(null);
     
     try {
-      const therapistId = user.therapist_id || user.id;
+      // For therapists, the user.id is the therapist ID
+      const therapistId = user?.id;
+      console.log('Applying for leave with therapist ID:', therapistId);
+      console.log('User object:', user);
+      
       // Pass the therapistId to the service method
       await attendanceService.applyForLeave(startDate, endDate, reason, leaveType, therapistId);
       

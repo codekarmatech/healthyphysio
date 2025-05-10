@@ -32,7 +32,18 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
         response = await attendanceService.getPendingLeaveApplications();
       } else {
         // Therapist fetches their own applications
-        const id = therapistId || user?.therapist_id || user?.id;
+        // For therapists, the user.id is the therapist ID
+        const id = therapistId || user?.id;
+        
+        console.log('User object:', user);
+        console.log('Using therapist ID for leave applications:', id);
+        
+        if (!id) {
+          console.error('No therapist ID found in user object:', user);
+          setError('Could not determine therapist ID. Please contact support.');
+          setLoading(false);
+          return;
+        }
         
         try {
           response = await attendanceService.getLeaveApplications(id);

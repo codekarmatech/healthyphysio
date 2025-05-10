@@ -25,7 +25,9 @@ class PatientService extends BaseService {
    * @returns {Promise} API response
    */
   getMedicalHistory(patientId) {
-    return api.get(`${this.basePath}${patientId}/medical-history/`);
+    // Ensure there's a slash between basePath and id
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.get(`${this.basePath}${separator}${patientId}/medical-history/`);
   }
 
   /**
@@ -35,7 +37,9 @@ class PatientService extends BaseService {
    * @returns {Promise} API response
    */
   updateMedicalHistory(patientId, historyData) {
-    return api.put(`${this.basePath}${patientId}/medical-history/`, historyData);
+    // Ensure there's a slash between basePath and id
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.put(`${this.basePath}${separator}${patientId}/medical-history/`, historyData);
   }
 
   /**
@@ -44,7 +48,9 @@ class PatientService extends BaseService {
    * @returns {Promise} API response
    */
   getTreatmentProgress(patientId) {
-    return api.get(`${this.basePath}${patientId}/treatment-progress/`);
+    // Ensure there's a slash between basePath and id
+    const separator = this.basePath.endsWith('/') ? '' : '/';
+    return api.get(`${this.basePath}${separator}${patientId}/treatment-progress/`);
   }
 
   /**

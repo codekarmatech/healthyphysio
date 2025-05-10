@@ -57,6 +57,7 @@ import AdminAttendancePage from './pages/admin/AdminAttendancePage';
 
 // Therapist Pages
 import TherapistAttendancePage from './pages/therapist/TherapistAttendancePage';
+import TherapistProfilePage from './pages/therapist/TherapistProfilePage';
 
 // Other Pages
 import Landing from './pages/Landing';
@@ -123,6 +124,7 @@ function App() {
             <Route path="/therapist/patients/:id" element={<TherapistPatientDetailPage />} />
             <Route path="/therapist/earnings" element={<EarningsPage />} />
             <Route path="/therapist/attendance" element={<TherapistAttendancePage />} />
+            <Route path="/therapist/profile" element={<TherapistProfilePage />} />
             <Route path="/therapist/assessments" element={<AssessmentsPage />} />
             <Route path="/therapist/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/therapist/referrals" element={<NotFound />} />

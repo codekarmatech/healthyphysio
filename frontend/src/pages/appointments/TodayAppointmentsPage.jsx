@@ -5,47 +5,72 @@ import appointmentService from '../../services/appointmentService';
 import AppointmentStatusBadge from '../../components/appointments/AppointmentStatusBadge';
 
 const TodayAppointmentsPage = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Use the logout function from AuthContext
+      await logout();
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showProfileMenu) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
 
   useEffect(() => {
     const fetchTodayAppointments = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Get therapist ID from user object
         const therapistId = user.therapist_id || user.id;
-        
+
         // Fetch today's appointments
         const today = new Date().toISOString().split('T')[0];
-        
+
         const response = await appointmentService.getByTherapist(therapistId);
-        
+
         // Extract the data array from the response
         const data = response.data.results || response.data || [];
-        
+
         // Filter for today's appointments
         const todayAppointments = data.filter(appointment => {
           const appointmentDate = new Date(appointment.datetime || appointment.date);
           const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
           return appointmentDateStr === today;
         });
-        
+
         // Sort appointments by time
         todayAppointments.sort((a, b) => {
           const timeA = new Date(a.datetime || a.date);
           const timeB = new Date(b.datetime || b.date);
           return timeA - timeB;
         });
-        
+
         // Format the appointments for display
         const formattedAppointments = todayAppointments.map(appointment => ({
           id: appointment.id,
-          patientName: appointment.patient_details ? 
-            `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` : 
+          patientName: appointment.patient_details ?
+            `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` :
             'Unknown Patient',
           patientFirstName: appointment.patient_details?.user?.first_name || 'Unknown',
           patientLastName: appointment.patient_details?.user?.last_name || 'Patient',
@@ -56,7 +81,7 @@ const TodayAppointmentsPage = () => {
           status: appointment.status.toLowerCase(),
           type: appointment.issue || appointment.type || 'Consultation'
         }));
-        
+
         setAppointments(formattedAppointments);
         setLoading(false);
       } catch (error) {
@@ -66,7 +91,7 @@ const TodayAppointmentsPage = () => {
         setLoading(false);
       }
     };
-    
+
     if (user) {
       fetchTodayAppointments();
     }
@@ -100,6 +125,41 @@ const TodayAppointmentsPage = () => {
                 <Link to="/therapist/assessments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   Assessments
                 </Link>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <div className="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
+                <div className="ml-3 relative">
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-gray-700 mr-2">{user.first_name} {user.last_name}</span>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowProfileMenu(!showProfileMenu)}
+                        className="rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        <span className="sr-only">Open user menu</span>
+                        <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                          {(user.first_name || '').charAt(0).toUpperCase()}
+                        </div>
+                      </button>
+
+                      {/* Dropdown menu */}
+                      {showProfileMenu && (
+                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                          <Link to="/therapist/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            View Therapist Profile
+                          </Link>
+                          <button
+                            onClick={handleLogout}
+                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -151,7 +211,7 @@ const TodayAppointmentsPage = () => {
                               <AppointmentStatusBadge status={appointment.status} />
                             </div>
                           </div>
-                          
+
                           <div className="mt-2 sm:flex sm:justify-between">
                             <div className="sm:flex">
                               <div className="flex items-center text-sm text-gray-500">
@@ -168,7 +228,7 @@ const TodayAppointmentsPage = () => {
                               >
                                 View details
                               </Link>
-                              
+
                               {appointment.status === 'scheduled' && user.is_admin && (
                                 <Link
                                   to={`/therapist/appointments/${appointment.id}`}
@@ -177,7 +237,7 @@ const TodayAppointmentsPage = () => {
                                   Start Session
                                 </Link>
                               )}
-                              
+
                               {appointment.status === 'scheduled' && !user.is_admin && (
                                 <span className="text-sm text-gray-500 italic">
                                   Waiting for admin to start session

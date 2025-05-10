@@ -14,7 +14,8 @@ from . import views
 from .views import (
     UserViewSet, PatientViewSet, TherapistViewSet, DoctorViewSet,
     PatientDashboardSummaryViewSet, DoctorDashboardSummaryViewSet, 
-    TherapistDashboardSummaryViewSet, AdminDashboardSummaryViewSet
+    TherapistDashboardSummaryViewSet, AdminDashboardSummaryViewSet,
+    ProfileChangeRequestViewSet
 )
 
 router = DefaultRouter()
@@ -23,6 +24,7 @@ router.register(r'users', UserViewSet, basename='user')
 router.register(r'patients', PatientViewSet, basename='patient')
 router.register(r'therapists', TherapistViewSet, basename='therapist')
 router.register(r'doctors', DoctorViewSet, basename='doctor')
+router.register(r'profile-change-requests', ProfileChangeRequestViewSet, basename='profile-change-request')
 
 urlpatterns = [
     # —— AUTHENTICATION —— all routes here will be prefixed with /api/auth/…
