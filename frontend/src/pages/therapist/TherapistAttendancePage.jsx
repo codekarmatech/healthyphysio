@@ -11,6 +11,7 @@ import LeaveApplicationForm from '../../components/attendance/LeaveApplicationFo
 import LeaveApplicationsList from '../../components/attendance/LeaveApplicationsList';
 import PatientCancellationForm from '../../components/attendance/PatientCancellationForm';
 import AttendanceHistoryTable from '../../components/attendance/AttendanceHistoryTable';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 
 /**
  * Therapist Attendance Page
@@ -24,15 +25,15 @@ const TherapistAttendancePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAttendanceMockData, setIsAttendanceMockData] = useState(false);
-  
+
   // State for attendance history
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState(null);
-  
+
   // State to track which change requests we've already shown notifications for
   const [notifiedChangeRequests, setNotifiedChangeRequests] = useState([]);
-  
+
   // State for modals
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [showCancellationForm, setShowCancellationForm] = useState(false);
@@ -68,19 +69,19 @@ const TherapistAttendancePage = () => {
   const fetchAttendanceHistory = useCallback(async () => {
     setHistoryLoading(true);
     setHistoryError(null);
-    
+
     try {
       // Use therapist profile ID if available, otherwise fall back to user ID
       const therapistId = therapistProfile?.id || user?.id;
       console.log(`Fetching attendance history for therapist ID: ${therapistId}`);
-      
+
       const response = await attendanceService.getAttendanceHistory(therapistId);
-      
+
       if (response.error) {
         setHistoryError(response.error);
       } else {
         setAttendanceHistory(response.data || []);
-        
+
         // Check if we're using mock data
         if (response.isMockData) {
           console.log('Using example attendance history data for display');
@@ -104,13 +105,13 @@ const TherapistAttendancePage = () => {
   const fetchAttendanceData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       // Use therapist profile ID if available, otherwise fall back to user ID
       const therapistId = therapistProfile?.id || user?.id;
       console.log(`Fetching attendance data for therapist ID: ${therapistId}, year: ${currentYear}, month: ${currentMonth}`);
       const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
-      
+
       // Check if we got mock data
       if (response.isMockData) {
         console.log('Using mock attendance data for display');
@@ -118,11 +119,11 @@ const TherapistAttendancePage = () => {
       } else {
         setIsAttendanceMockData(false);
       }
-      
+
       // Update the attendance summary and days
       setAttendanceSummary(response.data);
       setAttendanceDays(response.data?.days || []);
-      
+
       // Return the response data for any additional processing
       return response.data;
     } catch (err) {
@@ -140,7 +141,7 @@ const TherapistAttendancePage = () => {
   // Fetch data on component mount and when month/year changes
   useEffect(() => {
     fetchAttendanceData();
-    
+
     // Set up an interval to refresh data every 30 seconds
     const refreshInterval = setInterval(() => {
       console.log('Auto-refreshing attendance data...');
@@ -149,18 +150,18 @@ const TherapistAttendancePage = () => {
         fetchAttendanceHistory();
       }
     }, 30000); // 30 seconds
-    
+
     // Clean up the interval when the component unmounts
     return () => clearInterval(refreshInterval);
   }, [fetchAttendanceData, fetchAttendanceHistory, activeTab]);
-  
+
   // Fetch attendance history when tab changes to history or when component mounts
   useEffect(() => {
     if (activeTab === 'history') {
       fetchAttendanceHistory();
     }
   }, [activeTab, fetchAttendanceHistory]);
-  
+
   // Check for change request status updates
   const checkChangeRequestStatus = useCallback(async () => {
     try {
@@ -168,39 +169,39 @@ const TherapistAttendancePage = () => {
       // We need to check both statuses to find recently resolved requests
       let approvedRequests = [];
       let rejectedRequests = [];
-      
+
       try {
         approvedRequests = await attendanceService.getAttendanceChangeRequests('approved');
       } catch (error) {
         // If the endpoint doesn't exist, just continue with empty array
       }
-      
+
       try {
         rejectedRequests = await attendanceService.getAttendanceChangeRequests('rejected');
       } catch (error) {
         // If the endpoint doesn't exist, just continue with empty array
       }
-      
+
       // Combine the results
       const changeRequests = [...approvedRequests, ...rejectedRequests];
-      
+
       // If we got an empty array, it could be because there are no requests
       // or because the endpoint doesn't exist
       if (!changeRequests || changeRequests.length === 0) {
         // No need to log this, it's a normal condition
         return;
       }
-      
+
       // Filter to find recently resolved requests (in the last hour)
       const oneHourAgo = new Date();
       oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-      
+
       const recentlyResolved = changeRequests.filter(req => {
         // Skip if we've already shown a notification for this request
         if (notifiedChangeRequests.includes(req.id)) {
           return false;
         }
-        
+
         if (req.status !== 'pending' && req.resolved_at) {
           try {
             const resolvedTime = parseISO(req.resolved_at);
@@ -212,16 +213,16 @@ const TherapistAttendancePage = () => {
         }
         return false;
       });
-      
+
       // If we have new resolved requests, update our notified list
       if (recentlyResolved.length > 0) {
         const newNotifiedIds = recentlyResolved.map(req => req.id);
         setNotifiedChangeRequests(prev => [...prev, ...newNotifiedIds]);
-        
+
         // Show notifications for recently resolved requests
         recentlyResolved.forEach(req => {
           let formattedDate = 'Unknown date';
-          
+
           try {
             if (req.attendance_date) {
               formattedDate = format(parseISO(req.attendance_date), 'MMM d, yyyy');
@@ -229,7 +230,7 @@ const TherapistAttendancePage = () => {
           } catch (error) {
             console.error('Error parsing date:', error);
           }
-          
+
           if (req.status === 'approved') {
             toast.success(`Your attendance change request for ${formattedDate} has been approved! Status changed to ${req.requested_status.replace('_', ' ')}.`);
           } else if (req.status === 'rejected') {
@@ -247,14 +248,14 @@ const TherapistAttendancePage = () => {
     // Immediately fetch attendance data and history
     fetchAttendanceData();
     fetchAttendanceHistory();
-    
+
     // Try to check change request status, but don't worry if it fails
     try {
       checkChangeRequestStatus();
     } catch (error) {
       // No need to log this, it's handled in the function
     }
-    
+
     // Set up a timer to refresh data periodically
     const refreshTimer = setInterval(() => {
       // Refresh data based on active tab
@@ -263,7 +264,7 @@ const TherapistAttendancePage = () => {
       } else if (activeTab === 'history') {
         fetchAttendanceHistory();
       }
-      
+
       // Try to check change request status, but don't worry if it fails
       try {
         checkChangeRequestStatus();
@@ -271,7 +272,7 @@ const TherapistAttendancePage = () => {
         // No need to log this, it's handled in the function
       }
     }, 60000); // Refresh every minute
-    
+
     return () => clearInterval(refreshTimer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -322,25 +323,25 @@ const TherapistAttendancePage = () => {
     setShowCancellationForm(false);
     fetchAttendanceData();
   };
-  
+
   // Function to check if attendance already exists for a date
   const checkExistingAttendance = (date) => {
     // Format the date to match the format in attendanceDays
     const formattedDate = format(date, 'yyyy-MM-dd');
-    
+
     console.log(`Checking for existing attendance on ${formattedDate}`);
     console.log('Available attendance days:', attendanceDays);
-    
+
     // Find if there's an existing attendance record for this date
-    const existingAttendance = attendanceDays.find(day => 
-      day.date === formattedDate && 
+    const existingAttendance = attendanceDays.find(day =>
+      day.date === formattedDate &&
       ['present', 'absent', 'half_day', 'approved_leave', 'sick_leave', 'emergency_leave'].includes(day.status)
     );
-    
+
     // If we found an attendance record, make sure it has all the necessary properties
     if (existingAttendance) {
       console.log('Found existing attendance record:', existingAttendance);
-      
+
       // If the record doesn't have an ID, we'll need to add a placeholder
       // This will be replaced with the actual ID when making the API call
       if (!existingAttendance.id) {
@@ -349,12 +350,12 @@ const TherapistAttendancePage = () => {
       } else {
         console.log('Attendance record has ID:', existingAttendance.id);
       }
-      
+
       return existingAttendance;
     } else {
       console.log(`No existing attendance found for date ${formattedDate}`);
     }
-    
+
     return null;
   };
 
@@ -362,49 +363,49 @@ const TherapistAttendancePage = () => {
   const handleAttendanceChangeRequest = () => {
     // Close the submit modal if it's open
     setShowSubmitModal(false);
-    
+
     // Set the selected date if not already set
     if (!selectedDate) {
       setSelectedDate(new Date());
     }
-    
+
     // Show the change request form
     setShowChangeRequestForm(true);
-    
+
     // Reset the form fields
     setRequestedStatus('present');
     setChangeReason('');
   };
-  
+
   // Function to submit attendance change request
   const handleSubmitChangeRequest = async () => {
     try {
       setSubmitting(true);
       setError(null);
-      
+
       // Format the selected date as YYYY-MM-DD (used for logging/debugging)
       // eslint-disable-next-line no-unused-vars
       const formattedDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
-      
+
       // Find the existing attendance record in our local state
       const existingAttendance = checkExistingAttendance(selectedDate || new Date());
-      
+
       // We'll continue even if there's no existing attendance in our local state
       // because we'll create one if needed
       if (!existingAttendance) {
         console.log('No attendance record found in local state for this date. Will attempt to create one.');
       }
-      
+
       if (!changeReason.trim()) {
         toast.error('Please provide a reason for the change request.');
         setSubmitting(false);
         return;
       }
-      
+
       // Get the attendance ID from the existing attendance record
       // If it doesn't exist, we'll need to fetch it first
       let attendanceId;
-      
+
       if (existingAttendance.id) {
         attendanceId = existingAttendance.id;
       } else {
@@ -412,16 +413,16 @@ const TherapistAttendancePage = () => {
         try {
           // Format the date for the API call
           const apiDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
-          
+
           // Make an API call to get the attendance record for this date
           // Remove the duplicate /api/ prefix since it's already in the baseURL
           const response = await api.get(`/attendance/?date=${apiDate}`);
-          
+
           // Log the response for debugging
           console.log('Attendance API response:', response.data);
-          
+
           let attendanceRecord = null;
-          
+
           // Check if the response is an array (as expected)
           if (Array.isArray(response.data)) {
             // Find the attendance record for this date
@@ -434,32 +435,32 @@ const TherapistAttendancePage = () => {
               console.log('Found attendance record (single object):', attendanceRecord);
             }
           }
-          
+
           // If no matching record was found
           if (!attendanceRecord) {
             console.log('No matching attendance record found for date:', apiDate);
-            
+
             // Since we couldn't find the attendance record in the database,
             // but we have it in our frontend state (from existingAttendance),
             // we need to create it in the database first
             try {
               console.log('Creating attendance record for date:', apiDate);
-              
+
               // Use the existing attendance data to create a new record
               // If existingAttendance has a status, use it, otherwise default to 'present'
               const status = existingAttendance && existingAttendance.status ? existingAttendance.status : 'present';
               const notes = existingAttendance && existingAttendance.notes ? existingAttendance.notes : 'Created for change request';
-              
+
               console.log(`Creating attendance with status: ${status}, notes: ${notes}`);
-              
+
               const createResponse = await attendanceService.submitAttendance(
                 status,
                 apiDate,
                 notes
               );
-              
+
               console.log('Created attendance record:', createResponse.data);
-              
+
               // Now we should have an ID
               if (createResponse.data && createResponse.data.id) {
                 attendanceId = createResponse.data.id;
@@ -493,26 +494,26 @@ const TherapistAttendancePage = () => {
           return;
         }
       }
-      
+
       try {
         // Call the API to request a change
         const response = await attendanceService.requestAttendanceChange(attendanceId, requestedStatus, changeReason);
-        
+
         // Show success message from the API or a default one
         const successMessage = response.data?.message || 'Change request submitted successfully. An admin will review your request.';
         toast.success(successMessage);
-        
+
         // Close the form
         setShowChangeRequestForm(false);
-        
+
         // Refresh attendance data
         await fetchAttendanceData();
-        
+
         // Log the response for debugging
         console.log('Change request submitted successfully:', response.data);
       } catch (apiError) {
         console.error('API Error:', apiError);
-        
+
         // If the API endpoint is not implemented yet, show a mock success message
         if (apiError.response && apiError.response.status === 404) {
           console.log('Change request API not yet implemented, showing mock success');
@@ -525,21 +526,21 @@ const TherapistAttendancePage = () => {
       }
     } catch (err) {
       console.error('Error submitting change request:', err);
-      
+
       let errorMessage = 'Failed to submit change request. Please try again.';
-      
+
       if (err.response && err.response.data) {
         if (typeof err.response.data === 'string') {
           errorMessage = err.response.data;
         } else if (err.response.data.message) {
           errorMessage = err.response.data.message;
         } else if (err.response.data.error) {
-          errorMessage = Array.isArray(err.response.data.error) 
-            ? err.response.data.error[0] 
+          errorMessage = Array.isArray(err.response.data.error)
+            ? err.response.data.error[0]
             : err.response.data.error;
         }
       }
-      
+
       toast.error(errorMessage);
     } finally {
       setSubmitting(false);
@@ -551,46 +552,46 @@ const TherapistAttendancePage = () => {
     try {
       setSubmitting(true);
       setError(null);
-      
+
       // Format the selected date as YYYY-MM-DD
       const formattedDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
-      
+
       // Check if there's already an attendance record for this date
       const existingAttendance = checkExistingAttendance(selectedDate || new Date());
-      
+
       if (existingAttendance) {
         // If attendance already exists, show message and offer change request option
         setError('You have already submitted attendance for this date. To change it, please submit a change request to admin.');
         toast.warning('Attendance already exists for this date.');
-        
+
         // Option 1: Show a modal or redirect to change request form
         handleAttendanceChangeRequest();
-        
+
         setSubmitting(false);
         return;
       }
-      
+
       // Call the submitAttendance method with status, date, and notes
       const response = await attendanceService.submitAttendance(selectedStatus, formattedDate, notes);
-      
+
       // Close the modal and clear form
       setShowSubmitModal(false);
       setNotes('');
-      
+
       // Show success message
       toast.success('Attendance submitted successfully');
-      
+
       // Refresh attendance data to update the calendar and summary
       await fetchAttendanceData();
-      
+
       // Return the response for any additional processing
       return response;
     } catch (err) {
       console.error('Error submitting attendance:', err);
-      
+
       // Set a user-friendly error message
       let errorMessage = 'Failed to submit attendance. Please try again.';
-      
+
       if (err.response) {
         // Handle specific error responses from the server
         if (err.response.status === 400) {
@@ -624,10 +625,10 @@ const TherapistAttendancePage = () => {
           handleAttendanceChangeRequest();
         }
       }
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
-      
+
       // Don't re-throw the error if we're handling it with a redirect
       if (!errorMessage.includes('change request')) {
         throw err;
@@ -638,9 +639,7 @@ const TherapistAttendancePage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Attendance Management</h1>
-      
+    <DashboardLayout title="Attendance Management">
       {/* Warning message about attendance marking */}
       <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
         <div className="flex">
@@ -657,14 +656,14 @@ const TherapistAttendancePage = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Error message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-300 rounded-md">
           <p className="text-red-700">{error}</p>
         </div>
       )}
-      
+
       {/* Attendance Change Request Modal */}
       {showChangeRequestForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
@@ -675,7 +674,7 @@ const TherapistAttendancePage = () => {
                 <p className="text-sm text-gray-500 mb-4">
                   You cannot directly change your attendance. Please submit a request to admin for approval.
                 </p>
-                
+
                 <div className="mb-4">
                   <label className="block text-gray-700 text-sm font-bold mb-2 text-left">
                     Date
@@ -687,7 +686,7 @@ const TherapistAttendancePage = () => {
                     disabled
                   />
                 </div>
-                
+
                 <div className="mb-4">
                   <label className="block text-gray-700 text-sm font-bold mb-2 text-left">
                     Current Status
@@ -699,7 +698,7 @@ const TherapistAttendancePage = () => {
                     disabled
                   />
                 </div>
-                
+
                 <div className="mb-4">
                   <label className="block text-gray-700 text-sm font-bold mb-2 text-left">
                     Requested Status
@@ -715,7 +714,7 @@ const TherapistAttendancePage = () => {
                     <option value="sick_leave">Sick Leave</option>
                   </select>
                 </div>
-                
+
                 <div className="mb-4">
                   <label className="block text-gray-700 text-sm font-bold mb-2 text-left">
                     Reason for Change
@@ -750,7 +749,7 @@ const TherapistAttendancePage = () => {
           </div>
         </div>
       )}
-      
+
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
@@ -786,13 +785,13 @@ const TherapistAttendancePage = () => {
           </button>
         </nav>
       </div>
-      
+
       {/* Calendar Tab */}
       {activeTab === 'calendar' && (
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4 md:mb-0">Monthly Attendance</h2>
-            
+
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => {
@@ -806,7 +805,7 @@ const TherapistAttendancePage = () => {
                 </svg>
                 Mark Today's Attendance
               </button>
-              
+
               <MonthSelector
                 currentDate={currentDate}
                 onPrevMonth={handlePrevMonth}
@@ -814,20 +813,20 @@ const TherapistAttendancePage = () => {
               />
             </div>
           </div>
-          
-          <AttendanceSummary 
-            summary={attendanceSummary} 
+
+          <AttendanceSummary
+            summary={attendanceSummary}
             loading={loading}
-            isMockData={isAttendanceMockData} 
+            isMockData={isAttendanceMockData}
           />
-          
-          <AttendanceCalendar 
-            days={attendanceDays} 
+
+          <AttendanceCalendar
+            days={attendanceDays}
             currentDate={currentDate}
             onAttendanceUpdated={handleAttendanceUpdated}
             isMockData={isAttendanceMockData}
           />
-          
+
           <div className="mt-6 p-4 bg-gray-50 rounded-md">
             <h3 className="text-lg font-medium text-gray-800 mb-2">Attendance Instructions</h3>
             <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
@@ -840,7 +839,7 @@ const TherapistAttendancePage = () => {
           </div>
         </div>
       )}
-      
+
       {/* Leave Applications Tab */}
       {activeTab === 'leave' && (
         <div className="space-y-6">
@@ -857,18 +856,18 @@ const TherapistAttendancePage = () => {
                 New Leave Application
               </button>
             </div>
-            
-            <LeaveApplicationsList 
+
+            <LeaveApplicationsList
               therapistId={user?.id}
               onRefresh={fetchAttendanceData}
             />
           </div>
-          
+
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Leave Policy</h2>
             <div className="prose prose-sm max-w-none text-gray-600">
               <p>Our leave policy is designed to ensure fair treatment of all therapists while maintaining high-quality service for our patients.</p>
-              
+
               <h3 className="text-lg font-medium text-gray-800 mt-4 mb-2">Types of Leave</h3>
               <ul>
                 <li><strong>Personal Leave:</strong> For personal matters requiring your absence.</li>
@@ -876,7 +875,7 @@ const TherapistAttendancePage = () => {
                 <li><strong>Vacation:</strong> For planned time off.</li>
                 <li><strong>Family Emergency:</strong> For urgent family matters.</li>
               </ul>
-              
+
               <h3 className="text-lg font-medium text-gray-800 mt-4 mb-2">Leave Application Process</h3>
               <ol>
                 <li>Submit your leave application through this portal.</li>
@@ -884,7 +883,7 @@ const TherapistAttendancePage = () => {
                 <li>Administration will review your request and approve or reject it.</li>
                 <li>You will be notified of the decision via email.</li>
               </ol>
-              
+
               <h3 className="text-lg font-medium text-gray-800 mt-4 mb-2">Important Notes</h3>
               <ul>
                 <li>You will not be paid for days on leave.</li>
@@ -895,7 +894,7 @@ const TherapistAttendancePage = () => {
           </div>
         </div>
       )}
-      
+
       {/* Attendance History Tab */}
       {activeTab === 'history' && (
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -906,7 +905,7 @@ const TherapistAttendancePage = () => {
                 View your complete attendance history, including present days, absences, leaves, and patient cancellations.
               </p>
             </div>
-            
+
             <button
               onClick={fetchAttendanceHistory}
               className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
@@ -927,18 +926,18 @@ const TherapistAttendancePage = () => {
               )}
             </button>
           </div>
-          
+
           <div className="mt-4">
-            <AttendanceHistoryTable 
-              attendanceData={attendanceHistory} 
-              isLoading={historyLoading} 
+            <AttendanceHistoryTable
+              attendanceData={attendanceHistory}
+              isLoading={historyLoading}
               error={historyError}
               onRefresh={fetchAttendanceHistory}
             />
           </div>
         </div>
       )}
-      
+
       {/* Leave Application Form Modal */}
       {showLeaveForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
@@ -954,8 +953,8 @@ const TherapistAttendancePage = () => {
                 </svg>
               </button>
             </div>
-            
-            <LeaveApplicationForm 
+
+            <LeaveApplicationForm
               initialStartDate={selectedDate}
               onSuccess={handleLeaveSubmitted}
               onCancel={() => setShowLeaveForm(false)}
@@ -963,7 +962,7 @@ const TherapistAttendancePage = () => {
           </div>
         </div>
       )}
-      
+
       {/* Attendance submission modal */}
       {showSubmitModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -971,16 +970,16 @@ const TherapistAttendancePage = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               Submit Attendance for {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Today'}
             </h3>
-            
+
             {/* Error message */}
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded-md">
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
-            
 
-            
+
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Status
@@ -996,7 +995,7 @@ const TherapistAttendancePage = () => {
                 <option value="half_day">Half Day</option>
               </select>
             </div>
-            
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Notes (Optional)
@@ -1010,7 +1009,7 @@ const TherapistAttendancePage = () => {
                 disabled={submitting}
               ></textarea>
             </div>
-            
+
             {selectedStatus === 'absent' && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <p className="text-sm text-yellow-700">
@@ -1018,7 +1017,7 @@ const TherapistAttendancePage = () => {
                 </p>
               </div>
             )}
-            
+
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
@@ -1067,8 +1066,8 @@ const TherapistAttendancePage = () => {
                 </svg>
               </button>
             </div>
-            
-            <PatientCancellationForm 
+
+            <PatientCancellationForm
               appointmentId={selectedAppointment.id}
               patientName={selectedAppointment.patient_name}
               appointmentDate={selectedAppointment.date}
@@ -1078,7 +1077,7 @@ const TherapistAttendancePage = () => {
           </div>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 };
 

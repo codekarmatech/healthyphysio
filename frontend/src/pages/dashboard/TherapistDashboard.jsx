@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import AttendanceSummary from '../../components/attendance/AttendanceSummary';
 import attendanceService from '../../services/attendanceService';
 import MonthSelector from '../../components/attendance/MonthSelector';
@@ -8,14 +9,15 @@ import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
 import EarningsChart from '../../components/earnings/EarningsChart';
 import EarningsSummary from '../../components/earnings/EarningsSummary';
 import EquipmentRequestsSummary from '../../components/equipment/EquipmentRequestsSummary';
+import { getTodayISOString } from '../../utils/dateUtils';
+import { tryApiCall } from '../../utils/apiErrorHandler';
 
 // Import your API services
 import api from '../../services/api';
 import earningsService from '../../services/earningsService';
 
 const TherapistDashboard = () => {
-  const { user, logout } = useAuth(); // Get user and logout function from context
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const { user } = useAuth(); // Get user from context
   const [stats, setStats] = useState({
     upcomingAppointments: 0,
     todayAppointments: 0,
@@ -25,38 +27,7 @@ const TherapistDashboard = () => {
     equipmentRequests: 0,
   });
 
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      // Use the logout function from AuthContext
-      await logout();
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-  };
 
-  // Create refs for the menu and button
-  const menuRef = useRef(null);
-  const buttonRef = useRef(null);
-
-  // Close profile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Only close if menu is open and click is outside both menu and button
-      if (showProfileMenu &&
-          menuRef.current &&
-          buttonRef.current &&
-          !menuRef.current.contains(event.target) &&
-          !buttonRef.current.contains(event.target)) {
-        setShowProfileMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showProfileMenu]);
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -145,7 +116,7 @@ const TherapistDashboard = () => {
         const upcomingResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&status=SCHEDULED,RESCHEDULED`);
 
         // Fetch today's appointments
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayISOString();
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
@@ -236,8 +207,29 @@ const TherapistDashboard = () => {
         setRecentAppointments(formattedAppointments);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        // Set some default data in case of error
+        // Use our error handler utility
+        tryApiCall(
+          () => { throw error; }, // Just to reuse the error handling logic
+          {
+            context: 'dashboard data',
+            setLoading: setLoading,
+            defaultData: {
+              stats: {
+                upcomingAppointments: 0,
+                todayAppointments: 0,
+                totalPatients: 0,
+                pendingAssessments: 0,
+                monthlyEarnings: '0.00',
+                equipmentAllocations: 0,
+                equipmentRequests: 0
+              },
+              appointments: []
+            },
+            onSuccess: null // No success handler needed here
+          }
+        );
+
+        // Set default data
         setStats({
           upcomingAppointments: 0,
           todayAppointments: 0,
@@ -538,88 +530,16 @@ const TherapistDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-2xl font-bold text-primary-600">PhysioWay</h1>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <Link to="/therapist/dashboard" className="border-primary-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Dashboard
-                </Link>
-                <Link to="/therapist/appointments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Appointments
-                </Link>
-                <Link to="/therapist/patients" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Patients
-                </Link>
-                <Link to="/therapist/earnings" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Earnings
-                </Link>
-                <Link to="/therapist/assessments" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Assessments
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
-                <div className="ml-3 relative">
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-700 mr-2">{user.first_name} {user.last_name}</span>
-                    <div className="relative">
-                      <button
-                        ref={buttonRef}
-                        onClick={() => setShowProfileMenu(!showProfileMenu)}
-                        className="rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                      >
-                        <span className="sr-only">Open user menu</span>
-                        <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                          {(user.first_name || '').charAt(0).toUpperCase()}
-                        </div>
-                      </button>
+    <DashboardLayout title="Therapist Dashboard">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">Welcome, {user?.firstName || 'Therapist'}!</h1>
+        <p className="text-sm text-gray-500 mt-1">Here's an overview of your practice and patient information</p>
+      </div>
 
-                      {/* Dropdown menu */}
-                      {showProfileMenu && (
-                        <div
-                          ref={menuRef}
-                          className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
-                        >
-                          <Link to="/therapist/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            View Therapist Profile
-                          </Link>
-                          <button
-                            onClick={handleLogout}
-                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          >
-                            Logout
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="py-10">
-        <header>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.firstName || 'Therapist'}!</h1>
-          </div>
-        </header>
-        <main>
-          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+      <div>
             {/* Stats */}
-            <div className="px-4 py-6 sm:px-0">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="py-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {/* Stat 1 */}
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
@@ -848,134 +768,139 @@ const TherapistDashboard = () => {
                             />
                           </div>
 
-                          {/* Weekly Schedule Table */}
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Patient
-                                  </th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Monday
-                                  </th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Tuesday
-                                  </th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Wednesday
-                                  </th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Thursday
-                                  </th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Friday
-                                  </th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Saturday
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {/* Mock data for patient schedules */}
-                                {[1, 2, 3, 4, 5].map((patientId) => {
-                                  // Generate weekly schedule based on patient ID
-                                  const weeklySchedule = [];
-
-                                  // Assign days based on patient ID (to make it consistent)
-                                  if (patientId % 5 === 0) {
-                                    weeklySchedule.push(1, 3, 5); // Mon, Wed, Fri
-                                  } else if (patientId % 5 === 1) {
-                                    weeklySchedule.push(2, 4, 6); // Tue, Thu, Sat
-                                  } else if (patientId % 5 === 2) {
-                                    weeklySchedule.push(1, 4, 6); // Mon, Thu, Sat
-                                  } else if (patientId % 5 === 3) {
-                                    weeklySchedule.push(2, 3, 5); // Tue, Wed, Fri
-                                  } else {
-                                    weeklySchedule.push(1, 3, 6); // Mon, Wed, Sat
-                                  }
-
-                                  // Generate random status for each day
-                                  const attendanceRate = 65 + (patientId % 30);
-                                  const getRandomStatus = () => {
-                                    const rand = Math.random() * 100;
-                                    if (rand < attendanceRate) {
-                                      return { status: 'attended', paid: true };
-                                    } else if (rand < attendanceRate + ((100 - attendanceRate) / 2)) {
-                                      return { status: 'cancelled', paid: false };
-                                    } else {
-                                      return { status: 'missed', paid: false };
-                                    }
-                                  };
-
-                                  // Create status for each day of the week
-                                  const dayStatus = {
-                                    1: weeklySchedule.includes(1) ? getRandomStatus() : null,
-                                    2: weeklySchedule.includes(2) ? getRandomStatus() : null,
-                                    3: weeklySchedule.includes(3) ? getRandomStatus() : null,
-                                    4: weeklySchedule.includes(4) ? getRandomStatus() : null,
-                                    5: weeklySchedule.includes(5) ? getRandomStatus() : null,
-                                    6: weeklySchedule.includes(6) ? getRandomStatus() : null,
-                                  };
-
-                                  return (
-                                    <tr key={patientId}>
-                                      <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center">
-                                          <div className="flex-shrink-0 h-10 w-10">
-                                            <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                                              {['J', 'S', 'M', 'E', 'R'][patientId % 5]}
-                                            </div>
-                                          </div>
-                                          <div className="ml-4">
-                                            <div className="text-sm font-medium text-gray-900">
-                                              {['John Doe', 'Sarah Johnson', 'Michael Chen', 'Emily Wilson', 'Robert Garcia'][patientId % 5]}
-                                            </div>
-                                            <div className="text-sm text-gray-500">
-                                              {['Lower back pain', 'Shoulder injury', 'Knee arthritis', 'Ankle sprain', 'Chronic back pain'][patientId % 5]}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      {[1, 2, 3, 4, 5, 6].map(day => (
-                                        <td key={`${patientId}-${day}`} className="px-6 py-4 whitespace-nowrap">
-                                          {dayStatus[day] ? (
-                                            <div className="flex flex-col items-center">
-                                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                                ${dayStatus[day].status === 'attended' ? 'bg-green-100 text-green-800' :
-                                                  dayStatus[day].status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                                  'bg-yellow-100 text-yellow-800'}`}>
-                                                {dayStatus[day].status.charAt(0).toUpperCase() + dayStatus[day].status.slice(1)}
-                                              </span>
-                                              <span className={`mt-1 text-xs ${dayStatus[day].paid ? 'text-green-600' : 'text-red-600'}`}>
-                                                {dayStatus[day].paid ? 'Paid' : 'Not Paid'}
-                                              </span>
-                                            </div>
-                                          ) : (
-                                            <span className="text-gray-400">-</span>
-                                          )}
-                                        </td>
-                                      ))}
+                          {/* Weekly Schedule Table - Responsive */}
+                          <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8">
+                            <div className="inline-block min-w-full py-2 align-middle px-4 sm:px-6 lg:px-8">
+                              <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      <th scope="col" className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sm:pl-6">
+                                        Patient
+                                      </th>
+                                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Mon
+                                      </th>
+                                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Tue
+                                      </th>
+                                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Wed
+                                      </th>
+                                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Thu
+                                      </th>
+                                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Fri
+                                      </th>
+                                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Sat
+                                      </th>
                                     </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {/* Mock data for patient schedules */}
+                                    {[1, 2, 3, 4, 5].map((patientId) => {
+                                      // Generate weekly schedule based on patient ID
+                                      const weeklySchedule = [];
+
+                                      // Assign days based on patient ID (to make it consistent)
+                                      if (patientId % 5 === 0) {
+                                        weeklySchedule.push(1, 3, 5); // Mon, Wed, Fri
+                                      } else if (patientId % 5 === 1) {
+                                        weeklySchedule.push(2, 4, 6); // Tue, Thu, Sat
+                                      } else if (patientId % 5 === 2) {
+                                        weeklySchedule.push(1, 4, 6); // Mon, Thu, Sat
+                                      } else if (patientId % 5 === 3) {
+                                        weeklySchedule.push(2, 3, 5); // Tue, Wed, Fri
+                                      } else {
+                                        weeklySchedule.push(1, 3, 6); // Mon, Wed, Sat
+                                      }
+
+                                      // Generate random status for each day
+                                      const attendanceRate = 65 + (patientId % 30);
+                                      const getRandomStatus = () => {
+                                        const rand = Math.random() * 100;
+                                        if (rand < attendanceRate) {
+                                          return { status: 'attended', paid: true };
+                                        } else if (rand < attendanceRate + ((100 - attendanceRate) / 2)) {
+                                          return { status: 'cancelled', paid: false };
+                                        } else {
+                                          return { status: 'missed', paid: false };
+                                        }
+                                      };
+
+                                      // Create status for each day of the week
+                                      const dayStatus = {
+                                        1: weeklySchedule.includes(1) ? getRandomStatus() : null,
+                                        2: weeklySchedule.includes(2) ? getRandomStatus() : null,
+                                        3: weeklySchedule.includes(3) ? getRandomStatus() : null,
+                                        4: weeklySchedule.includes(4) ? getRandomStatus() : null,
+                                        5: weeklySchedule.includes(5) ? getRandomStatus() : null,
+                                        6: weeklySchedule.includes(6) ? getRandomStatus() : null,
+                                      };
+
+                                      return (
+                                        <tr key={patientId}>
+                                          <td className="py-4 pl-4 pr-3 text-sm sm:pl-6">
+                                            <div className="flex items-center">
+                                              <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
+                                                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                                                  {['J', 'S', 'M', 'E', 'R'][patientId % 5]}
+                                                </div>
+                                              </div>
+                                              <div className="ml-3 sm:ml-4">
+                                                <div className="text-xs sm:text-sm font-medium text-gray-900">
+                                                  {['John Doe', 'Sarah Johnson', 'Michael Chen', 'Emily Wilson', 'Robert Garcia'][patientId % 5]}
+                                                </div>
+                                                <div className="text-xs sm:text-sm text-gray-500 hidden sm:block">
+                                                  {['Lower back pain', 'Shoulder injury', 'Knee arthritis', 'Ankle sprain', 'Chronic back pain'][patientId % 5]}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </td>
+                                          {[1, 2, 3, 4, 5, 6].map(day => (
+                                            <td key={`${patientId}-${day}`} className="px-3 py-4 text-sm text-center">
+                                              {dayStatus[day] ? (
+                                                <div className="flex flex-col items-center">
+                                                  <span className={`px-1.5 py-0.5 inline-flex text-xs leading-4 font-semibold rounded-full
+                                                    ${dayStatus[day].status === 'attended' ? 'bg-green-100 text-green-800' :
+                                                      dayStatus[day].status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                      'bg-yellow-100 text-yellow-800'}`}>
+                                                    {dayStatus[day].status === 'attended' ? 'A' :
+                                                     dayStatus[day].status === 'cancelled' ? 'C' : 'M'}
+                                                  </span>
+                                                  <span className={`mt-1 text-xs ${dayStatus[day].paid ? 'text-green-600' : 'text-red-600'} hidden sm:inline`}>
+                                                    {dayStatus[day].paid ? 'Paid' : 'Not Paid'}
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <span className="text-gray-400">-</span>
+                                              )}
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-                          <div className="flex flex-wrap gap-4 justify-center">
+                        <div className="border-t border-gray-200 px-4 py-4 sm:p-6">
+                          <div className="flex flex-wrap gap-3 justify-center text-xs">
                             <div className="flex items-center">
                               <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                              <span className="text-xs text-gray-600">Attended (Paid)</span>
+                              <span className="text-gray-600">A: Attended</span>
                             </div>
                             <div className="flex items-center">
                               <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
-                              <span className="text-xs text-gray-600">Cancelled (Not Paid)</span>
+                              <span className="text-gray-600">C: Cancelled</span>
                             </div>
                             <div className="flex items-center">
                               <div className="w-3 h-3 rounded-full bg-yellow-500 mr-1"></div>
-                              <span className="text-xs text-gray-600">Missed (Not Paid)</span>
+                              <span className="text-gray-600">M: Missed</span>
                             </div>
                           </div>
                         </div>
@@ -997,15 +922,15 @@ const TherapistDashboard = () => {
             </div>
 
             {/* Recent Appointments */}
-            <div className="px-4 py-6 sm:px-0">
-              <h2 className="text-lg font-medium text-gray-900">Recent Appointments</h2>
+            <div className="py-6">
+              <h2 className="text-lg font-medium text-gray-900 px-4 sm:px-0">Recent Appointments</h2>
               <div className="mt-4 bg-white shadow overflow-hidden sm:rounded-md">
                 <ul className="divide-y divide-gray-200">
                   {loading ? (
-                    <li className="px-6 py-4 flex items-center">
+                    <li className="px-4 py-4 sm:px-6 flex items-center">
                       <div className="animate-pulse flex space-x-4 w-full">
-                        <div className="rounded-full bg-gray-200 h-12 w-12"></div>
-                        <div className="flex-1 space-y-4 py-1">
+                        <div className="rounded-full bg-gray-200 h-10 w-10"></div>
+                        <div className="flex-1 space-y-3 py-1">
                           <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                           <div className="space-y-2">
                             <div className="h-4 bg-gray-200 rounded"></div>
@@ -1022,15 +947,15 @@ const TherapistDashboard = () => {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                  <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
                                     {appointment.patientName.charAt(0)}
                                   </div>
                                 </div>
-                                <div className="ml-4">
-                                  <p className="text-sm font-medium text-primary-600 truncate">
+                                <div className="ml-3 sm:ml-4">
+                                  <p className="text-xs sm:text-sm font-medium text-primary-600 truncate">
                                     {appointment.patientName}
                                   </p>
-                                  <p className="mt-1 flex items-center text-sm text-gray-500">
+                                  <p className="mt-1 flex items-center text-xs sm:text-sm text-gray-500">
                                     <span className="truncate">{appointment.type}</span>
                                   </p>
                                 </div>
@@ -1041,20 +966,22 @@ const TherapistDashboard = () => {
                                 </p>
                               </div>
                             </div>
-                            <div className="mt-2 sm:flex sm:justify-between">
-                              <div className="sm:flex">
-                                <p className="flex items-center text-sm text-gray-500">
-                                  <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                                  </svg>
+                            <div className="mt-2 flex flex-col sm:flex-row sm:justify-between">
+                              <div className="flex items-center">
+                                <svg className="flex-shrink-0 mr-1.5 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs sm:text-sm text-gray-500">
                                   {new Date(appointment.date).toLocaleDateString()}
-                                </p>
+                                </span>
                               </div>
-                              <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <div className="mt-1 sm:mt-0 flex items-center">
+                                <svg className="flex-shrink-0 mr-1.5 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                                 </svg>
-                                {new Date(appointment.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                <span className="text-xs sm:text-sm text-gray-500">
+                                  {new Date(appointment.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -1062,7 +989,7 @@ const TherapistDashboard = () => {
                       </li>
                     ))
                   ) : (
-                    <li className="px-6 py-4 text-center text-gray-500">
+                    <li className="px-4 py-4 sm:px-6 text-center text-gray-500 text-sm">
                       No recent appointments found.
                     </li>
                   )}
@@ -1078,8 +1005,8 @@ const TherapistDashboard = () => {
             </div>
 
             {/* Equipment Requests Section */}
-            <div className="px-4 py-6 sm:px-0">
-              <div className="flex justify-between items-center mb-4">
+            <div className="py-6">
+              <div className="flex justify-between items-center mb-4 px-4 sm:px-0">
                 <h2 className="text-lg font-medium text-gray-900">Equipment Requests</h2>
                 <Link to="/therapist/equipment/requests/new" className="text-sm font-medium text-primary-600 hover:text-primary-500 flex items-center">
                   New request
@@ -1099,8 +1026,8 @@ const TherapistDashboard = () => {
             </div>
 
             {/* Earnings Chart Section */}
-            <div className="px-4 py-6 sm:px-0">
-              <div className="flex justify-between items-center mb-4">
+            <div className="py-6">
+              <div className="flex justify-between items-center mb-4 px-4 sm:px-0">
                 <h2 className="text-lg font-medium text-gray-900">Earnings Overview</h2>
                 <Link to="/therapist/earnings" className="text-sm font-medium text-primary-600 hover:text-primary-500 flex items-center">
                   View detailed report
@@ -1109,11 +1036,11 @@ const TherapistDashboard = () => {
                   </svg>
                 </Link>
               </div>
-              <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 px-4 sm:px-0">
                 {/* Earnings Chart */}
                 <div className="bg-white overflow-hidden shadow-md rounded-lg border border-gray-100">
                   {renderFeature('earnings',
-                    <div className="px-4 py-5 sm:p-6 h-80">
+                    <div className="px-4 py-5 sm:p-6 h-60 sm:h-80">
                       <EarningsChart
                         therapistId={user?.therapist_id || user?.id}
                         year={currentYear}
@@ -1128,7 +1055,7 @@ const TherapistDashboard = () => {
                 {/* Earnings Summary */}
                 <div className="bg-white overflow-hidden shadow-md rounded-lg border border-gray-100">
                   {renderFeature('earnings',
-                    <div className="px-4 py-5 sm:p-6 h-80 flex items-center">
+                    <div className="px-4 py-5 sm:p-6 h-60 sm:h-80 flex items-center">
                       <EarningsSummary
                         summary={earningsData?.summary}
                         loading={earningsLoading}
@@ -1142,31 +1069,28 @@ const TherapistDashboard = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="px-4 py-6 sm:px-0">
-              <h2 className="text-lg font-medium text-gray-900">Quick Actions</h2>
-              <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="py-6">
+              <h2 className="text-lg font-medium text-gray-900 px-4 sm:px-0">Quick Actions</h2>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4 px-4 sm:px-0">
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-primary-100 rounded-md p-3">
-                        <svg className="h-6 w-6 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="flex-shrink-0 bg-primary-100 rounded-md p-2 sm:p-3">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                       </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">Appointment Scheduling</h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          View your upcoming appointments.
+                      <div className="ml-3 sm:ml-5 w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900">Appointments</h3>
+                        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+                          View your upcoming appointments
                         </p>
                       </div>
                     </div>
                     <div className="mt-4">
-                      <p className="text-sm text-gray-500 mb-2">
-                        Appointments are scheduled by administrators.
-                      </p>
                       <Link
                         to="/therapist/appointments"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                        className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-transparent text-xs sm:text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                       >
                         View Appointments
                       </Link>
@@ -1177,22 +1101,22 @@ const TherapistDashboard = () => {
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                        <svg className="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="flex-shrink-0 bg-purple-100 rounded-md p-2 sm:p-3">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">Attendance</h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          Mark your daily attendance, apply for leave, and record patient cancellations.
+                      <div className="ml-3 sm:ml-5 w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900">Attendance</h3>
+                        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+                          Mark attendance & leaves
                         </p>
                       </div>
                     </div>
                     <div className="mt-4">
                       <Link
                         to="/therapist/attendance"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                        className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-transparent text-xs sm:text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                       >
                         Manage Attendance
                       </Link>
@@ -1203,22 +1127,22 @@ const TherapistDashboard = () => {
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                        <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="flex-shrink-0 bg-blue-100 rounded-md p-2 sm:p-3">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">Sessions</h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          View your upcoming therapy sessions. Only administrators can start new sessions.
+                      <div className="ml-3 sm:ml-5 w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900">Sessions</h3>
+                        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+                          View therapy sessions
                         </p>
                       </div>
                     </div>
                     <div className="mt-4">
                       <Link
                         to="/therapist/appointments"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-transparent text-xs sm:text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
                         View Sessions
                       </Link>
@@ -1229,22 +1153,22 @@ const TherapistDashboard = () => {
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-                        <svg className="h-6 w-6 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2 sm:p-3">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">Create Assessment</h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          Create a new patient assessment.
+                      <div className="ml-3 sm:ml-5 w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900">Assessment</h3>
+                        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+                          Create patient assessment
                         </p>
                       </div>
                     </div>
                     <div className="mt-4">
                       <Link
                         to="/assessments/new"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                        className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-transparent text-xs sm:text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                       >
                         Create Assessment
                       </Link>
@@ -1255,15 +1179,15 @@ const TherapistDashboard = () => {
             </div>
 
             {/* Patient Referrals */}
-            <div className="px-4 py-6 sm:px-0">
-              <h2 className="text-lg font-medium text-gray-900">Recent Referrals</h2>
+            <div className="py-6">
+              <h2 className="text-lg font-medium text-gray-900 px-4 sm:px-0">Recent Referrals</h2>
               <div className="mt-4 bg-white shadow overflow-hidden sm:rounded-md">
                 <ul className="divide-y divide-gray-200">
                   {loading ? (
-                    <li className="px-6 py-4 flex items-center">
+                    <li className="px-4 py-4 sm:px-6 flex items-center">
                       <div className="animate-pulse flex space-x-4 w-full">
-                        <div className="rounded-full bg-gray-200 h-12 w-12"></div>
-                        <div className="flex-1 space-y-4 py-1">
+                        <div className="rounded-full bg-gray-200 h-8 w-8 sm:h-10 sm:w-10"></div>
+                        <div className="flex-1 space-y-3 py-1">
                           <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                           <div className="space-y-2">
                             <div className="h-4 bg-gray-200 rounded"></div>
@@ -1280,15 +1204,15 @@ const TherapistDashboard = () => {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                  <div className="h-10 w-10 rounded-full bg-green-200 flex items-center justify-center text-green-600 font-semibold">
+                                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-green-200 flex items-center justify-center text-green-600 font-semibold">
                                     J
                                   </div>
                                 </div>
-                                <div className="ml-4">
-                                  <p className="text-sm font-medium text-primary-600 truncate">
+                                <div className="ml-3 sm:ml-4">
+                                  <p className="text-xs sm:text-sm font-medium text-primary-600 truncate">
                                     John Smith
                                   </p>
-                                  <p className="mt-1 flex items-center text-sm text-gray-500">
+                                  <p className="mt-1 flex items-center text-xs sm:text-sm text-gray-500">
                                     <span className="truncate">Lower Back Pain</span>
                                   </p>
                                 </div>
@@ -1299,17 +1223,15 @@ const TherapistDashboard = () => {
                                 </p>
                               </div>
                             </div>
-                            <div className="mt-2 sm:flex sm:justify-between">
-                              <div className="sm:flex">
-                                <p className="flex items-center text-sm text-gray-500">
-                                  <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                                  </svg>
-                                  Referred on: June 15, 2023
-                                </p>
+                            <div className="mt-2 flex flex-col sm:flex-row sm:justify-between">
+                              <div className="flex items-center">
+                                <svg className="flex-shrink-0 mr-1.5 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs sm:text-sm text-gray-500">June 15, 2023</span>
                               </div>
-                              <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                <span className="text-gray-500 text-sm">Referred by: Doctor 1</span>
+                              <div className="mt-1 sm:mt-0 flex items-center">
+                                <span className="text-xs sm:text-sm text-gray-500">Dr. Smith</span>
                               </div>
                             </div>
                           </div>
@@ -1321,16 +1243,16 @@ const TherapistDashboard = () => {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <div className="flex-shrink-0">
-                                  <div className="h-10 w-10 rounded-full bg-blue-200 flex items-center justify-center text-blue-600 font-semibold">
+                                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-200 flex items-center justify-center text-blue-600 font-semibold">
                                     E
                                   </div>
                                 </div>
-                                <div className="ml-4">
-                                  <p className="text-sm font-medium text-primary-600 truncate">
+                                <div className="ml-3 sm:ml-4">
+                                  <p className="text-xs sm:text-sm font-medium text-primary-600 truncate">
                                     Emily Davis
                                   </p>
-                                  <p className="mt-1 flex items-center text-sm text-gray-500">
-                                    <span className="truncate">Shoulder Rehabilitation</span>
+                                  <p className="mt-1 flex items-center text-xs sm:text-sm text-gray-500">
+                                    <span className="truncate">Shoulder Rehab</span>
                                   </p>
                                 </div>
                               </div>
@@ -1340,17 +1262,15 @@ const TherapistDashboard = () => {
                                 </p>
                               </div>
                             </div>
-                            <div className="mt-2 sm:flex sm:justify-between">
-                              <div className="sm:flex">
-                                <p className="flex items-center text-sm text-gray-500">
-                                  <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                                  </svg>
-                                  Referred on: June 10, 2023
-                                </p>
+                            <div className="mt-2 flex flex-col sm:flex-row sm:justify-between">
+                              <div className="flex items-center">
+                                <svg className="flex-shrink-0 mr-1.5 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs sm:text-sm text-gray-500">June 10, 2023</span>
                               </div>
-                              <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                <span className="text-gray-500 text-sm">Referred by: Doctor 2</span>
+                              <div className="mt-1 sm:mt-0 flex items-center">
+                                <span className="text-xs sm:text-sm text-gray-500">Dr. Johnson</span>
                               </div>
                             </div>
                           </div>
@@ -1370,35 +1290,35 @@ const TherapistDashboard = () => {
             </div>
 
             {/* Treatment Progress */}
-            <div className="px-4 py-6 sm:px-0">
-              <h2 className="text-lg font-medium text-gray-900">Treatment Progress</h2>
-              <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="py-6">
+              <h2 className="text-lg font-medium text-gray-900 px-4 sm:px-0">Treatment Progress</h2>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 px-4 sm:px-0">
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">John Smith - Lower Back Pain</h3>
+                    <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900 truncate">John Smith - Lower Back Pain</h3>
                     <div className="mt-2">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-500">Progress</div>
-                        <div className="text-sm font-medium text-green-600">75%</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-500">Progress</div>
+                        <div className="text-xs sm:text-sm font-medium text-green-600">75%</div>
                       </div>
-                      <div className="mt-1 w-full bg-gray-200 rounded-full h-2.5">
-                        <div className="bg-green-600 h-2.5 rounded-full" style={{ width: '75%' }}></div>
+                      <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-green-600 h-2 rounded-full" style={{ width: '75%' }}></div>
                       </div>
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-3 sm:mt-4">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-500">Sessions Completed</div>
-                        <div className="text-sm font-medium text-gray-900">6 of 8</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-500">Sessions</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-900">6 of 8</div>
                       </div>
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-2 sm:mt-4">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-500">Next Session</div>
-                        <div className="text-sm font-medium text-gray-900">June 22, 2023</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-500">Next Session</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-900">June 22, 2023</div>
                       </div>
                     </div>
-                    <div className="mt-4">
-                      <Link to="/therapist/patients" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                    <div className="mt-3 sm:mt-4">
+                      <Link to="/therapist/patients" className="text-xs sm:text-sm font-medium text-primary-600 hover:text-primary-500">
                         View all patients
                       </Link>
                     </div>
@@ -1407,30 +1327,30 @@ const TherapistDashboard = () => {
 
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Emily Davis - Shoulder Rehabilitation</h3>
+                    <h3 className="text-base sm:text-lg leading-6 font-medium text-gray-900 truncate">Emily Davis - Shoulder Rehab</h3>
                     <div className="mt-2">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-500">Progress</div>
-                        <div className="text-sm font-medium text-blue-600">40%</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-500">Progress</div>
+                        <div className="text-xs sm:text-sm font-medium text-blue-600">40%</div>
                       </div>
-                      <div className="mt-1 w-full bg-gray-200 rounded-full h-2.5">
-                        <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '40%' }}></div>
+                      <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: '40%' }}></div>
                       </div>
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-3 sm:mt-4">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-500">Sessions Completed</div>
-                        <div className="text-sm font-medium text-gray-900">4 of 10</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-500">Sessions</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-900">4 of 10</div>
                       </div>
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-2 sm:mt-4">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-500">Next Session</div>
-                        <div className="text-sm font-medium text-gray-900">June 20, 2023</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-500">Next Session</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-900">June 20, 2023</div>
                       </div>
                     </div>
-                    <div className="mt-4">
-                      <Link to="/therapist/patients" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                    <div className="mt-3 sm:mt-4">
+                      <Link to="/therapist/patients" className="text-xs sm:text-sm font-medium text-primary-600 hover:text-primary-500">
                         View all patients
                       </Link>
                     </div>
@@ -1439,9 +1359,7 @@ const TherapistDashboard = () => {
               </div>
             </div>
           </div>
-        </main>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

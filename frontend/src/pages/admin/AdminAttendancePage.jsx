@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import MonthSelector from '../../components/attendance/MonthSelector';
 import AttendanceApproval from '../../components/attendance/AttendanceApproval';
 import api from '../../services/api';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 
 /**
  * Admin page for managing attendance
@@ -21,11 +22,11 @@ const AdminAttendancePage = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Get all therapists
         const response = await api.get('/users/therapists/');
         setTherapists(response.data.results || response.data);
-        
+
         // Select the first therapist by default
         if (response.data.results?.length > 0 || response.data?.length > 0) {
           setSelectedTherapist((response.data.results || response.data)[0].id);
@@ -37,7 +38,7 @@ const AdminAttendancePage = () => {
         setLoading(false);
       }
     };
-    
+
     fetchTherapists();
   }, []);
 
@@ -67,28 +68,26 @@ const AdminAttendancePage = () => {
   // Check if user has admin role
   if (user?.role !== 'admin') {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <DashboardLayout title="Access Denied">
         <div className="bg-red-50 border border-red-300 rounded-md p-4">
           <h2 className="text-lg font-medium text-red-800">Access Denied</h2>
           <p className="mt-2 text-sm text-red-700">
             You do not have permission to access this page. This page is only available to administrators.
           </p>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Attendance Management</h1>
-      
+    <DashboardLayout title="Attendance Management">
       {/* Error message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-300 rounded-md">
           <p className="text-red-700">{error}</p>
         </div>
       )}
-      
+
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           {/* Therapist selector */}
@@ -116,7 +115,7 @@ const AdminAttendancePage = () => {
               )}
             </select>
           </div>
-          
+
           {/* Month selector */}
           <MonthSelector
             currentDate={currentDate}
@@ -124,7 +123,7 @@ const AdminAttendancePage = () => {
             onNextMonth={handleNextMonth}
           />
         </div>
-        
+
         {/* Attendance approval component */}
         {selectedTherapist && (
           <AttendanceApproval
@@ -135,7 +134,7 @@ const AdminAttendancePage = () => {
           />
         )}
       </div>
-    </div>
+    </DashboardLayout>
   );
 };
 

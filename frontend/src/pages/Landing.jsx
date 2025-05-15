@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import Footer from '../components/layout/Footer';
 
 const Landing = () => {
   return (
@@ -50,10 +51,10 @@ const Landing = () => {
           </div>
           <div className="mt-12 lg:mt-0">
             <div className="bg-white rounded-lg shadow-xl overflow-hidden">
-              <img 
-                className="w-full object-cover" 
-                src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" 
-                alt="Physical therapy session" 
+              <img
+                className="w-full object-cover"
+                src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+                alt="Physical therapy session"
               />
             </div>
           </div>
@@ -116,36 +117,7 @@ const Landing = () => {
       </div>
 
       {/* Footer */}
-      <footer className="bg-gray-800 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="text-xl font-bold">PhysioWay</h3>
-              <p className="mt-4 text-gray-300">
-                Transforming physical therapy management with modern technology.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold">Quick Links</h3>
-              <ul className="mt-4 space-y-2">
-                <li><Link to="/" className="text-gray-300 hover:text-white">Home</Link></li>
-                <li><Link to="/login" className="text-gray-300 hover:text-white">Login</Link></li>
-                <li><Link to="/register" className="text-gray-300 hover:text-white">Register</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold">Contact</h3>
-              <p className="mt-4 text-gray-300">
-                Email: contact@physioway.com<br />
-                Phone: +91 6353202177
-              </p>
-            </div>
-          </div>
-          <div className="mt-8 border-t border-gray-700 pt-8 text-center">
-            <p className="text-gray-300">© 2025 PhysioWay. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };

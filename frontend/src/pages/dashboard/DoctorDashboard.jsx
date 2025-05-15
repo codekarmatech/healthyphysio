@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import Sidebar from '../../components/layout/Sidebar';
-import Header from '../../components/layout/Header';
+import DashboardLayout from '../../components/layout/DashboardLayout';
+import { formatLocalDate } from '../../utils/dateUtils';
+import { tryApiCall } from '../../utils/apiErrorHandler';
 
 const DoctorDashboard = () => {
   const [stats, setStats] = useState({
@@ -16,61 +17,82 @@ const DoctorDashboard = () => {
   useEffect(() => {
     // Fetch dashboard data
     const fetchDashboardData = async () => {
-      try {
-        // This would be replaced with actual API calls
+      // Mock API call function
+      const mockApiCall = async () => {
+        // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data
-        setStats({
-          totalPatients: 48,
-          activeReferrals: 12,
-          pendingReports: 5,
-          completedTreatments: 23
-        });
-        
-        // Using placeholder names for therapists as per privacy requirements
-        setRecentReferrals([
-          {
-            id: 1,
-            patientName: 'John Smith',
-            condition: 'Lower Back Pain',
-            date: '2023-06-15',
-            status: 'active',
-            therapistId: 1,
-            therapistPlaceholder: 'Therapist 1'
+
+        // Return mock data
+        return {
+          stats: {
+            totalPatients: 48,
+            activeReferrals: 12,
+            pendingReports: 5,
+            completedTreatments: 23
           },
-          {
-            id: 2,
-            patientName: 'Emily Davis',
-            condition: 'Shoulder Rehabilitation',
-            date: '2023-06-12',
-            status: 'active',
-            therapistId: 2,
-            therapistPlaceholder: 'Therapist 2'
+          referrals: [
+            {
+              id: 1,
+              patientName: 'John Smith',
+              condition: 'Lower Back Pain',
+              date: '2023-06-15',
+              status: 'active',
+              therapistId: 1,
+              therapistPlaceholder: 'Therapist 1'
+            },
+            {
+              id: 2,
+              patientName: 'Emily Davis',
+              condition: 'Shoulder Rehabilitation',
+              date: '2023-06-12',
+              status: 'active',
+              therapistId: 2,
+              therapistPlaceholder: 'Therapist 2'
+            },
+            {
+              id: 3,
+              patientName: 'Robert Wilson',
+              condition: 'Knee Replacement Recovery',
+              date: '2023-06-10',
+              status: 'completed',
+              therapistId: 1,
+              therapistPlaceholder: 'Therapist 1'
+            },
+            {
+              id: 4,
+              patientName: 'Lisa Thompson',
+              condition: 'Tennis Elbow',
+              date: '2023-06-08',
+              status: 'active',
+              therapistId: 3,
+              therapistPlaceholder: 'Therapist 3'
+            }
+          ]
+        };
+      };
+
+      // Use our tryApiCall utility for consistent error handling
+      const result = await tryApiCall(mockApiCall, {
+        context: 'dashboard data',
+        setLoading: setLoading,
+        defaultData: {
+          stats: {
+            totalPatients: 0,
+            activeReferrals: 0,
+            pendingReports: 0,
+            completedTreatments: 0
           },
-          {
-            id: 3,
-            patientName: 'Robert Wilson',
-            condition: 'Knee Replacement Recovery',
-            date: '2023-06-10',
-            status: 'completed',
-            therapistId: 1,
-            therapistPlaceholder: 'Therapist 1'
-          },
-          {
-            id: 4,
-            patientName: 'Lisa Thompson',
-            condition: 'Tennis Elbow',
-            date: '2023-06-08',
-            status: 'active',
-            therapistId: 3,
-            therapistPlaceholder: 'Therapist 3'
-          }
-        ]);
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+          referrals: []
+        },
+        onSuccess: (data) => {
+          setStats(data.stats);
+          setRecentReferrals(data.referrals);
+          setLoading(false);
+        }
+      });
+
+      // If onSuccess wasn't called (e.g., due to an error), set the data here
+      if (!result) {
         setLoading(false);
       }
     };
@@ -79,18 +101,11 @@ const DoctorDashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Sidebar />
-      
-      <div className="md:pl-64 flex flex-col">
-        <Header title="Doctor Dashboard" />
-        
-        <main className="flex-1">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-            </div>
-            
+    <DashboardLayout title="Doctor Dashboard">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+      </div>
+
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
               {/* Stats */}
               <div className="mt-8">
@@ -276,15 +291,15 @@ const DoctorDashboard = () => {
                                   <div className="text-sm text-gray-900">{referral.condition}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-gray-900">{new Date(referral.date).toLocaleDateString()}</div>
+                                  <div className="text-sm text-gray-900">{formatLocalDate(referral.date)}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-gray-900">{referral.therapistPlaceholder}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    referral.status === 'active' ? 'bg-green-100 text-green-800' : 
-                                    referral.status === 'completed' ? 'bg-blue-100 text-blue-800' : 
+                                    referral.status === 'active' ? 'bg-green-100 text-green-800' :
+                                    referral.status === 'completed' ? 'bg-blue-100 text-blue-800' :
                                     'bg-gray-100 text-gray-800'
                                   }`}>
                                     {referral.status.charAt(0).toUpperCase() + referral.status.slice(1)}
@@ -364,7 +379,7 @@ const DoctorDashboard = () => {
                             </Link>
                           </div>
                         </div>
-                        
+
                         <div className="bg-gray-50 p-4 rounded-lg">
                           <div className="flex justify-between">
                             <div>
@@ -397,10 +412,7 @@ const DoctorDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
-        </main>
-      </div>
-    </div>
+    </DashboardLayout>
   );
 };
 
