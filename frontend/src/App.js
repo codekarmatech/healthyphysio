@@ -2,6 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
+import ApprovedTherapistRoute from './components/ApprovedTherapistRoute';
+import TreatmentPlansApprovedRoute from './components/TreatmentPlansApprovedRoute';
+import ReportsApprovedRoute from './components/ReportsApprovedRoute';
+import AttendanceApprovedRoute from './components/AttendanceApprovedRoute';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -29,9 +33,9 @@ import RescheduleRequestPage from './pages/appointments/RescheduleRequestPage';
 import PatientRescheduleRequestPage from './pages/appointments/PatientRescheduleRequestPage';
 
 // Equipment Pages
-import { 
-  EquipmentListPage, 
-  EquipmentDetailPage, 
+import {
+  EquipmentListPage,
+  EquipmentDetailPage,
   EquipmentFormPage,
   AllocationRequestPage,
   AllocationRequestsPage,
@@ -54,10 +58,20 @@ import PatientAssessmentPage from './pages/assessments/PatientAssessmentPage';
 
 // Admin Pages
 import AdminAttendancePage from './pages/admin/AdminAttendancePage';
+import SubmittedReportsPage from './pages/admin/SubmittedReportsPage';
+import AdminReportViewPage from './pages/admin/AdminReportViewPage';
+import TherapistApprovalsPage from './pages/admin/TherapistApprovalsPage';
 
 // Therapist Pages
 import TherapistAttendancePage from './pages/therapist/TherapistAttendancePage';
 import TherapistProfilePage from './pages/therapist/TherapistProfilePage';
+import TherapistReportPage from './pages/therapist/TherapistReportPage';
+import PendingReportsPage from './pages/therapist/PendingReportsPage';
+import TreatmentPlansPage from './pages/therapist/TreatmentPlansPage';
+import TreatmentPlanDetailPage from './pages/therapist/TreatmentPlanDetailPage';
+import ReportsPage from './pages/therapist/ReportsPage';
+import PendingApprovalPage from './pages/therapist/PendingApprovalPage';
+import FeatureNotApprovedPage from './pages/therapist/FeatureNotApprovedPage';
 
 // Other Pages
 import Landing from './pages/Landing';
@@ -75,17 +89,17 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
-          
+
           {/* Protected Routes - Common for all roles */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            
+
             {/* Common Appointment Routes - These will redirect to role-specific routes */}
             <Route path="/appointments" element={<AppointmentsPage />} />
             <Route path="/appointments/today" element={<TodayAppointmentsPage />} />
             <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
             <Route path="/appointments/:id/reschedule-request" element={<PatientRescheduleRequestPage />} />
-            
+
             {/* Assessment Routes */}
             <Route path="/assessments" element={<AssessmentsPage />} />
             <Route path="/assessments/new" element={<NewAssessmentPage />} />
@@ -93,13 +107,13 @@ function App() {
             <Route path="/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/assessments/:id" element={<AssessmentDetailPage />} />
             <Route path="/assessments/:id/edit" element={<EditAssessmentPage />} />
-            
+
             {/* Equipment Routes - Common for all roles */}
             <Route path="/equipment" element={<EquipmentListPage />} />
             <Route path="/equipment/allocations" element={<AllocationsPage />} />
             <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
           </Route>
-          
+
           {/* Admin-only Routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/appointments/new" element={<NewAppointmentPage />} />
@@ -111,10 +125,23 @@ function App() {
             <Route path="/equipment/requests" element={<AllocationRequestsPage />} />
             <Route path="/equipment/:id/edit" element={<EquipmentFormPage />} />
             <Route path="/admin/attendance" element={<AdminAttendancePage />} />
+            {/* New Report Routes for Admin */}
+            <Route path="/admin/submitted-reports" element={<SubmittedReportsPage />} />
+            <Route path="/admin/report/:id" element={<AdminReportViewPage />} />
+            {/* Therapist Approvals */}
+            <Route path="/admin/therapist-approvals" element={<TherapistApprovalsPage />} />
           </Route>
-          
-          {/* Therapist Routes */}
+
+          {/* Basic Therapist Routes - Accessible to all therapists */}
           <Route element={<ProtectedRoute allowedRoles={['therapist']} />}>
+            {/* These routes are accessible to all therapists, even those pending approval */}
+            <Route path="/therapist/pending-approval" element={<PendingApprovalPage />} />
+            <Route path="/therapist/feature-not-approved/:feature" element={<FeatureNotApprovedPage />} />
+            <Route path="/therapist/profile" element={<TherapistProfilePage />} />
+          </Route>
+
+          {/* Approved Therapist Routes - Requires general therapist approval */}
+          <Route element={<ApprovedTherapistRoute />}>
             <Route path="/therapist/dashboard" element={<TherapistDashboard />} />
             <Route path="/therapist/appointments" element={<AppointmentsPage />} />
             <Route path="/therapist/appointments/today" element={<TodayAppointmentsPage />} />
@@ -123,8 +150,6 @@ function App() {
             <Route path="/therapist/patients" element={<TherapistPatientsPage />} />
             <Route path="/therapist/patients/:id" element={<TherapistPatientDetailPage />} />
             <Route path="/therapist/earnings" element={<EarningsPage />} />
-            <Route path="/therapist/attendance" element={<TherapistAttendancePage />} />
-            <Route path="/therapist/profile" element={<TherapistProfilePage />} />
             <Route path="/therapist/assessments" element={<AssessmentsPage />} />
             <Route path="/therapist/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/therapist/referrals" element={<NotFound />} />
@@ -132,22 +157,40 @@ function App() {
             <Route path="/therapist/equipment/requests" element={<AllocationRequestsPage />} />
             <Route path="/therapist/equipment/requests/new" element={<AllocationRequestPage />} />
           </Route>
-          
+
+          {/* Attendance Routes - Requires attendance approval */}
+          <Route element={<AttendanceApprovedRoute />}>
+            <Route path="/therapist/attendance" element={<TherapistAttendancePage />} />
+          </Route>
+
+          {/* Reports Routes - Requires reports approval */}
+          <Route element={<ReportsApprovedRoute />}>
+            <Route path="/therapist/pending-reports" element={<PendingReportsPage />} />
+            <Route path="/therapist/report/:id" element={<TherapistReportPage />} />
+            <Route path="/therapist/reports" element={<ReportsPage />} />
+          </Route>
+
+          {/* Treatment Plans Routes - Requires treatment plans approval */}
+          <Route element={<TreatmentPlansApprovedRoute />}>
+            <Route path="/therapist/treatment-plans" element={<TreatmentPlansPage />} />
+            <Route path="/therapist/treatment-plans/:id" element={<TreatmentPlanDetailPage />} />
+          </Route>
+
           {/* Patient Routes */}
           <Route element={<ProtectedRoute allowedRoles={['patient']} />}>
             <Route path="/patient/*" element={<PatientDashboard />} />
           </Route>
-          
+
           {/* Doctor Routes */}
           <Route element={<ProtectedRoute allowedRoles={['doctor']} />}>
             <Route path="/doctor/*" element={<DoctorDashboard />} />
           </Route>
-          
+
           {/* Admin Routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin/*" element={<AdminDashboard />} />
           </Route>
-          
+
           {/* Error Pages */}
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="*" element={<NotFound />} />

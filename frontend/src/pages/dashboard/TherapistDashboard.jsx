@@ -275,10 +275,21 @@ const TherapistDashboard = () => {
             // Update approval status
             setIsApproved(response.data.is_approved);
 
-            // Update feature access based on approval status
+            // Update feature access based on specific approval fields
+            // Use attendance_approved if available, otherwise fall back to is_approved
+            const attendanceApproved =
+              response.data.attendance_approved === true ||
+              (response.data.attendance_approved === undefined && response.data.is_approved === true);
+
+            console.log('Attendance approval status:', {
+              attendance_approved: response.data.attendance_approved,
+              is_approved: response.data.is_approved,
+              attendanceApproved
+            });
+
             setFeatureAccess(prevAccess => ({
               ...prevAccess,
-              attendance: response.data.is_approved,
+              attendance: attendanceApproved,
               earnings: response.data.is_approved,
               equipment: response.data.is_approved,
               // Update other features as needed based on response data
@@ -433,10 +444,15 @@ const TherapistDashboard = () => {
                 // Update approval status
                 setIsApproved(response.data.is_approved);
 
-                // Update feature access based on approval status
+                // Update feature access based on specific approval fields
+                // Use attendance_approved if available, otherwise fall back to is_approved
+                const attendanceApproved =
+                  response.data.attendance_approved === true ||
+                  (response.data.attendance_approved === undefined && response.data.is_approved === true);
+
                 setFeatureAccess(prevAccess => ({
                   ...prevAccess,
-                  attendance: response.data.is_approved,
+                  attendance: attendanceApproved,
                   earnings: response.data.is_approved,
                 }));
 

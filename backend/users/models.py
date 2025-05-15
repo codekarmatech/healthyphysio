@@ -32,7 +32,7 @@ class EncryptedFileField(models.FileField):
     # Simple implementation - we'll enhance this later
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    
+
     # We'll implement the actual encryption in the storage class
 
 # Now define the User model
@@ -42,31 +42,31 @@ class User(AbstractUser):
         PATIENT = 'patient', _('Patient')
         THERAPIST = 'therapist', _('Therapist')
         DOCTOR = 'doctor', _('Doctor')
-    
+
     role = models.CharField(
         max_length=10,
         choices=Role.choices,
         default=Role.PATIENT,
     )
-    
+
     # Common fields for all users
     phone = models.CharField(max_length=15, blank=True)
-    
+
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
-    
+
     @property
     def is_admin(self):
         return self.role == self.Role.ADMIN
-    
+
     @property
     def is_patient(self):
         return self.role == self.Role.PATIENT
-    
+
     @property
     def is_therapist(self):
         return self.role == self.Role.THERAPIST
-    
+
     @property
     def is_doctor(self):
         return self.role == self.Role.DOCTOR
@@ -87,7 +87,7 @@ class Patient(models.Model):
     reference_detail = models.TextField(blank=True)
     treatment_location = models.CharField(max_length=50, blank=True)
     disease = models.CharField(max_length=255, blank=True)
-    
+
     def __str__(self):
         return f"{self.user.username}'s Patient Profile"
 
@@ -95,8 +95,22 @@ class Patient(models.Model):
 # Update the Therapist model to include all fields referenced in serializers
 class Therapist(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='therapist_profile')
+
+    # General account approval
     is_approved = models.BooleanField(default=False)
     approval_date = models.DateTimeField(null=True, blank=True)
+
+    # Feature-specific approvals
+    treatment_plans_approved = models.BooleanField(default=False, help_text='Whether the therapist is approved to access treatment plans')
+    treatment_plans_approval_date = models.DateTimeField(null=True, blank=True)
+
+    reports_approved = models.BooleanField(default=False, help_text='Whether the therapist is approved to access and submit reports')
+    reports_approval_date = models.DateTimeField(null=True, blank=True)
+
+    attendance_approved = models.BooleanField(default=False, help_text='Whether the therapist is approved to mark attendance')
+    attendance_approval_date = models.DateTimeField(null=True, blank=True)
+
+    # Other profile fields
     photo = EncryptedFileField(upload_to='therapists/', blank=True, null=True)
     license_number = models.CharField(max_length=50)
     specialization = models.CharField(max_length=100, blank=True)
@@ -104,9 +118,20 @@ class Therapist(models.Model):
     experience = models.TextField(blank=True)  # Additional field for detailed experience
     residential_address = models.TextField(blank=True)
     preferred_areas = models.TextField(blank=True)
-    
+
     def __str__(self):
         return f"Therapist: {self.user.username}"
+
+    # Backward compatibility properties
+    @property
+    def account_approved(self):
+        """Alias for is_approved for backward compatibility"""
+        return self.is_approved
+
+    @property
+    def account_approval_date(self):
+        """Alias for approval_date for backward compatibility"""
+        return self.approval_date
 
 
 # Update the Doctor model to include all fields referenced in serializers
@@ -117,7 +142,7 @@ class Doctor(models.Model):
     hospital_affiliation = models.CharField(max_length=200, blank=True)
     years_of_experience = models.PositiveIntegerField(default=0)
     area = models.CharField(max_length=100, blank=True)
-    
+
     def __str__(self):
         return f"Doctor: {self.user.username}"
 
@@ -131,7 +156,7 @@ class ProfileChangeRequest(models.Model):
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     )
-    
+
     therapist = models.ForeignKey(Therapist, on_delete=models.CASCADE, related_name='change_requests')
     requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='requested_profile_changes')
     current_data = models.TextField(help_text="JSON representation of current profile data")
@@ -140,16 +165,16 @@ class ProfileChangeRequest(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
-    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, 
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name='resolved_profile_changes')
     rejection_reason = models.TextField(blank=True, help_text="Reason for rejection if applicable")
-    
+
     class Meta:
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"Profile change request for {self.therapist.user.username} ({self.status})"
-    
+
     def save(self, *args, **kwargs):
         # Convert dictionaries to JSON strings if they're not already strings
         if isinstance(self.current_data, dict):
@@ -157,39 +182,39 @@ class ProfileChangeRequest(models.Model):
         if isinstance(self.requested_data, dict):
             self.requested_data = json.dumps(self.requested_data)
         super().save(*args, **kwargs)
-    
+
     def get_current_data(self):
         """Get the current data as a dictionary"""
         if isinstance(self.current_data, str):
             return json.loads(self.current_data)
         return self.current_data
-    
+
     def get_requested_data(self):
         """Get the requested data as a dictionary"""
         if isinstance(self.requested_data, str):
             return json.loads(self.requested_data)
         return self.requested_data
-    
+
     def approve(self, admin_user):
         """Approve the change request and apply changes"""
         self.status = 'approved'
         self.resolved_at = timezone.now()
         self.resolved_by = admin_user
-        
+
         # Apply the requested changes to the therapist profile
         requested_data = self.get_requested_data()
-        
+
         # Update each field in the therapist profile
         for field, value in requested_data.items():
             if hasattr(self.therapist, field):
                 setattr(self.therapist, field, value)
-        
+
         # Save the therapist profile
         self.therapist.save()
-        
+
         # Save the change request
         self.save()
-    
+
     def reject(self, admin_user, reason):
         """Reject the change request"""
         self.status = 'rejected'

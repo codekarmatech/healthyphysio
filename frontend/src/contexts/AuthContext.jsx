@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import axios from 'axios';
@@ -20,47 +20,65 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
   // Function to fetch therapist profile
-  const fetchTherapistProfile = async (userId) => {
+  const fetchTherapistProfile = useCallback(async (userId) => {
+    console.log('Fetching therapist profile for user ID:', userId);
     try {
-      // Try to get the current user's profile first
-      try {
-        // First try the profile endpoint
-        const response = await api.get('/users/therapists/profile/');
-        if (response.data) {
-          setTherapistProfile(response.data);
-          // Store therapist profile in localStorage for persistence
-          localStorage.setItem('therapistProfile', JSON.stringify(response.data));
-          return response.data;
-        }
-      } catch (profileError) {
-        console.log('Could not fetch current user profile, trying by ID');
-        // If that fails, try to get by user ID
+      // Try multiple endpoints in sequence until one succeeds
+      const endpoints = [
+        '/users/therapists/profile/',
+        userId ? `/users/therapists/${userId}/` : null,
+        userId ? `/users/therapist-profile/${userId}/` : null,
+        '/users/therapist-status/'
+      ].filter(Boolean); // Remove null entries
+
+      let profileData = null;
+
+      // Try each endpoint until one succeeds
+      for (const endpoint of endpoints) {
         try {
-          const response = await api.get(`/users/therapists/${userId}/`);
+          console.log(`Trying to fetch therapist profile from: ${endpoint}`);
+          const response = await api.get(endpoint);
           if (response.data) {
-            setTherapistProfile(response.data);
-            // Store therapist profile in localStorage for persistence
-            localStorage.setItem('therapistProfile', JSON.stringify(response.data));
-            return response.data;
+            profileData = response.data;
+            console.log('Successfully fetched therapist profile:', profileData);
+            break;
           }
-        } catch (idError) {
-          console.log('Could not fetch by ID, trying therapist-profile endpoint');
-          // Try one more endpoint
-          const response = await api.get(`/users/therapist-profile/${userId}/`);
-          if (response.data) {
-            setTherapistProfile(response.data);
-            // Store therapist profile in localStorage for persistence
-            localStorage.setItem('therapistProfile', JSON.stringify(response.data));
-            return response.data;
-          }
+        } catch (endpointError) {
+          console.log(`Failed to fetch from ${endpoint}:`, endpointError.message);
+          // Continue to next endpoint
         }
       }
+
+      if (profileData) {
+        // Check if the profile data has changed before updating state and localStorage
+        const currentProfile = JSON.parse(localStorage.getItem('therapistProfile') || '{}');
+        const hasChanged = JSON.stringify(currentProfile) !== JSON.stringify(profileData);
+
+        if (hasChanged) {
+          console.log('Therapist profile has changed, updating state and localStorage');
+          setTherapistProfile(profileData);
+          localStorage.setItem('therapistProfile', JSON.stringify(profileData));
+
+          // Log approval status changes for debugging
+          if (currentProfile.attendance_approved !== profileData.attendance_approved) {
+            console.log(`Attendance approval changed from ${currentProfile.attendance_approved} to ${profileData.attendance_approved}`);
+          }
+        } else {
+          console.log('Therapist profile unchanged');
+        }
+
+        return profileData;
+      }
+
+      console.log('No therapist profile data found from any endpoint');
+      return null;
     } catch (error) {
       console.error('Error fetching therapist profile:', error);
       return null;
     }
-  };
+  }, []);
 
+  // Effect for initial auth check
   useEffect(() => {
     // Check if user is already logged in
     const checkAuthStatus = async () => {
@@ -81,8 +99,10 @@ export function AuthProvider({ children }) {
           // Use stored therapist profile if available
           if (storedTherapistProfile) {
             setTherapistProfile(JSON.parse(storedTherapistProfile));
-          } else if (user.role === 'therapist') {
-            // Fetch therapist profile if not in localStorage
+          }
+
+          // Always fetch fresh therapist profile if user is a therapist
+          if (user.role === 'therapist') {
             fetchTherapistProfile(user.id);
           }
 
@@ -111,7 +131,29 @@ export function AuthProvider({ children }) {
     };
 
     checkAuthStatus();
-  }, []);
+  }, [fetchTherapistProfile]);
+
+  // Effect for periodic refresh of therapist profile
+  useEffect(() => {
+    // Only set up refresh interval if user is a therapist
+    if (!currentUser || currentUser.role !== 'therapist') {
+      return;
+    }
+
+    console.log('Setting up periodic therapist profile refresh');
+
+    // Refresh therapist profile every 30 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('Periodic refresh of therapist profile');
+      fetchTherapistProfile(currentUser.id);
+    }, 30000); // 30 seconds
+
+    // Clean up interval on unmount
+    return () => {
+      console.log('Clearing therapist profile refresh interval');
+      clearInterval(refreshInterval);
+    };
+  }, [currentUser, fetchTherapistProfile]);
 
   const login = async (identifier, password) => {
     try {

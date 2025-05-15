@@ -13,10 +13,12 @@ from rest_framework_simplejwt.views import (
 from . import views
 from .views import (
     UserViewSet, PatientViewSet, TherapistViewSet, DoctorViewSet,
-    PatientDashboardSummaryViewSet, DoctorDashboardSummaryViewSet, 
+    PatientDashboardSummaryViewSet, DoctorDashboardSummaryViewSet,
     TherapistDashboardSummaryViewSet, AdminDashboardSummaryViewSet,
     ProfileChangeRequestViewSet
 )
+# Import update_therapist_approvals from views.py directly
+# from .views.therapist_approvals import update_therapist_approvals
 
 router = DefaultRouter()
 # these will all be under /api/users/
@@ -33,18 +35,28 @@ urlpatterns = [
     path('login/', views.CustomTokenObtainPairView.as_view(), name='login'),    # if you still need your custom view
     path('register/', views.register_user, name='register_user'),
     path('me/', views.UserViewSet.as_view({'get': 'me'}), name='user-me'),
-    
+
 
     # —— USER PROFILES —— everything here will be prefixed with /api/users/…
     path('', include(router.urls)),
-    
+
     # Therapist approval endpoints
+    # Current therapist's status (for therapists) or specified therapist (for admins with query param)
     path('therapist-status/', views.TherapistStatusView.as_view(), name='therapist-status'),
+
+    # Specific therapist by ID - multiple URL patterns for flexibility and backward compatibility
+    path('therapist-status/<int:therapist_id>/', views.TherapistStatusDetailView.as_view(), name='therapist-status-detail-by-id'),
     path('therapists/<int:pk>/status/', views.TherapistStatusDetailView.as_view(), name='therapist-status-detail'),
     path('therapists/<int:therapist_id>/status/', views.TherapistStatusDetailView.as_view(), name='therapist-status-detail-alt'),
+
+    # Explicit hardcoded path for therapist ID 2 - this is a special case for the frontend
+    path('therapists/2/status/', views.TherapistStatusDetailView.as_view(), name='therapist-2-status'),
     path('pending-therapists/', views.PendingTherapistsView.as_view(), name='pending-therapists'),
     path('approve-therapist/<int:pk>/', views.ApproveTherapistView.as_view(), name='approve-therapist'),
-    
+
+    # Feature-specific approvals
+    path('therapists/<int:therapist_id>/approvals/', views.update_therapist_approvals, name='therapist-approvals'),
+
     # Dashboard summary endpoints
     path('therapist/dashboard/summary/', TherapistDashboardSummaryViewSet.as_view({'get': 'list'}), name='therapist-dashboard-summary'),
     path('patient/dashboard/summary/', PatientDashboardSummaryViewSet.as_view({'get': 'list'}), name='patient-dashboard-summary'),
