@@ -61,6 +61,7 @@ import AdminAttendancePage from './pages/admin/AdminAttendancePage';
 import SubmittedReportsPage from './pages/admin/SubmittedReportsPage';
 import AdminReportViewPage from './pages/admin/AdminReportViewPage';
 import TherapistApprovalsPage from './pages/admin/TherapistApprovalsPage';
+import LocationMonitoringPage from './pages/admin/LocationMonitoringPage';
 
 // Therapist Pages
 import TherapistAttendancePage from './pages/therapist/TherapistAttendancePage';
@@ -73,6 +74,8 @@ import ReportsPage from './pages/therapist/ReportsPage';
 import PendingApprovalPage from './pages/therapist/PendingApprovalPage';
 import FeatureNotApprovedPage from './pages/therapist/FeatureNotApprovedPage';
 import RequestSessionPage from './pages/therapist/RequestSessionPage';
+import VisitsListPage from './pages/therapist/VisitsListPage';
+import VisitTrackingPage from './pages/therapist/VisitTrackingPage';
 
 // Other Pages
 import Landing from './pages/Landing';
@@ -131,6 +134,8 @@ function App() {
             <Route path="/admin/report/:id" element={<AdminReportViewPage />} />
             {/* Therapist Approvals */}
             <Route path="/admin/therapist-approvals" element={<TherapistApprovalsPage />} />
+            {/* Location Monitoring */}
+            <Route path="/admin/location-monitoring" element={<LocationMonitoringPage />} />
           </Route>
 
           {/* Basic Therapist Routes - Accessible to all therapists */}
@@ -157,6 +162,10 @@ function App() {
             <Route path="/therapist/equipment" element={<EquipmentListPage />} />
             <Route path="/therapist/equipment/requests" element={<AllocationRequestsPage />} />
             <Route path="/therapist/equipment/requests/new" element={<AllocationRequestPage />} />
+
+            {/* Visit Tracking Routes */}
+            <Route path="/therapist/visits" element={<VisitsListPage />} />
+            <Route path="/therapist/visits/:id" element={<VisitTrackingPage />} />
           </Route>
 
           {/* Attendance Routes - Requires attendance approval */}

@@ -38,6 +38,15 @@ class VisitsService extends BaseService {
   }
 
   /**
+   * Mark arrival at visit location
+   * @param {string|number} id - Visit ID
+   * @returns {Promise} API response
+   */
+  arriveAtVisit(id) {
+    return this.performAction(id, 'arrive_at_visit');
+  }
+
+  /**
    * Start a session for a visit
    * @param {string|number} id - Visit ID
    * @returns {Promise} API response
@@ -58,10 +67,29 @@ class VisitsService extends BaseService {
   /**
    * Cancel a visit
    * @param {string|number} id - Visit ID
+   * @param {string} reason - Cancellation reason
    * @returns {Promise} API response
    */
-  cancelVisit(id) {
-    return this.performAction(id, 'cancel_visit');
+  cancelVisit(id, reason = '') {
+    return this.performAction(id, 'cancel_visit', { reason });
+  }
+
+  /**
+   * Get upcoming visits
+   * @returns {Promise} API response
+   */
+  getUpcoming() {
+    const now = new Date().toISOString();
+    return api.get(`${this.basePath}?scheduled_start__gte=${now}`);
+  }
+
+  /**
+   * Get past visits
+   * @returns {Promise} API response
+   */
+  getPast() {
+    const now = new Date().toISOString();
+    return api.get(`${this.basePath}?scheduled_start__lt=${now}`);
   }
 }
 
@@ -214,9 +242,9 @@ const locationService = new LocationService();
 const therapistReportService = new TherapistReportService();
 const alertService = new AlertService();
 
-export { 
-  visitsService, 
-  locationService, 
-  therapistReportService, 
-  alertService 
+export {
+  visitsService,
+  locationService,
+  therapistReportService,
+  alertService
 };

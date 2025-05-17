@@ -69,8 +69,10 @@ class EarningsService extends BaseService {
         }
       }
 
-      // If all formats fail, throw a 404 error
-      throw { response: { status: 404 }, message: 'All URL formats returned 404' };
+      // If all formats fail, throw a proper error object
+      const error = new Error('All URL formats returned 404');
+      error.response = { status: 404 };
+      throw error;
 
     } catch (error) {
       // If all API endpoints fail, generate mock data as a fallback
@@ -138,10 +140,10 @@ class EarningsService extends BaseService {
 
       // If all formats fail, return mock data
       console.log('All URL formats failed, returning mock data');
-      return this.getMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
+      return this.getDetailedMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
     } catch (error) {
       console.error('Error fetching earnings by patient:', error);
-      return this.getMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
+      return this.getDetailedMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
     }
   }
 
@@ -155,17 +157,17 @@ class EarningsService extends BaseService {
   async getPatientEarnings(patientId, year, month) {
     console.log('Patient earnings endpoint not available in backend, using mock data');
     // Return mock data directly since the backend doesn't support this endpoint yet
-    return this.getMockPatientEarnings(patientId, year, month);
+    return this.getDetailedMockPatientEarnings(patientId, year, month);
   }
 
   /**
-   * Get mock patient earnings data
+   * Get simple mock patient earnings data
    * @param {string|number} patientId - Patient ID
    * @param {number} year - Year
    * @param {number} month - Month (1-12)
-   * @returns {Object} Mock earnings data
+   * @returns {Object} Basic mock earnings data with minimal information
    */
-  getMockPatientEarnings(patientId, year, month) {
+  getSimpleMockPatientEarnings(patientId, year, month) {
     return {
       data: {
         isMockData: true,
@@ -245,13 +247,13 @@ class EarningsService extends BaseService {
 
   /**
    * @deprecated - This method is kept for reference only. The backend now provides sample data for new patients.
-   * Mock function to get patient-specific earnings data
+   * Mock function to get detailed patient-specific earnings data
    * @param {string|number} patientId - Patient ID
    * @param {number} year - Year
    * @param {number} month - Month (1-12)
-   * @returns {Object} Mock patient earnings data
+   * @returns {Object} Mock patient earnings data with detailed information
    */
-  getMockPatientEarnings(patientId, year, month) {
+  getDetailedMockPatientEarnings(patientId, year, month) {
     // Session types with realistic names
     const sessionTypes = [
       'Initial Assessment', 'Follow-up Consultation', 'Physical Therapy',

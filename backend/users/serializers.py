@@ -42,7 +42,8 @@ class PatientSerializer(serializers.ModelSerializer):
         model = Patient
         fields = ['id', 'user', 'date_of_birth', 'medical_history', 'gender', 'age',
                  'address', 'city', 'state', 'zip_code', 'referred_by',
-                 'reference_detail', 'treatment_location', 'disease']
+                 'reference_detail', 'treatment_location', 'disease',
+                 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship']
         read_only_fields = ['id']
 
     def create(self, validated_data):

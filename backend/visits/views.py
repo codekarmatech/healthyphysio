@@ -168,15 +168,21 @@ class LocationUpdateViewSet(viewsets.ModelViewSet):
         queryset = LocationUpdate.objects.all()
 
         if user.is_admin:
+            # Admins can see all location updates for safety monitoring
             return queryset
         elif user.is_therapist:
-            # Therapists can see their own location updates and their patients'
+            # Therapists can only see their own location updates
             try:
-                therapist = Therapist.objects.get(user=user)
-                patient_ids = Visit.objects.filter(therapist=therapist).values_list('patient_id', flat=True)
-                patient_user_ids = Patient.objects.filter(id__in=patient_ids).values_list('user_id', flat=True)
-                return queryset.filter(Q(user=user) | Q(user_id__in=patient_user_ids))
+                # Strictly filter to only show the therapist's own locations
+                return queryset.filter(user=user)
             except Therapist.DoesNotExist:
+                return LocationUpdate.objects.none()
+        elif user.is_patient:
+            # Patients can only see their own location updates
+            try:
+                # Strictly filter to only show the patient's own locations
+                return queryset.filter(user=user)
+            except Patient.DoesNotExist:
                 return LocationUpdate.objects.none()
         else:
             # Other users can only see their own location updates

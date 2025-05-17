@@ -230,7 +230,15 @@ class AttendanceService extends BaseService {
         // If the response is empty or doesn't have the expected structure, use mock data
         console.log('API returned empty data, using mock monthly attendance data');
 
-        // Generate mock monthly attendance data
+        // Check if we have patient-specific data to generate
+        // This is where we use the generateMockPatientTherapistAttendance function
+        const patientId = response.data?.patient_id;
+        if (patientId) {
+          console.log(`Generating patient-specific attendance data for patient ${patientId} and therapist ${therapistId}`);
+          return generateMockPatientTherapistAttendance(therapistId, patientId, year, month);
+        }
+
+        // Generate mock monthly attendance data for general therapist attendance
         const mockData = {
           data: {
             summary: {

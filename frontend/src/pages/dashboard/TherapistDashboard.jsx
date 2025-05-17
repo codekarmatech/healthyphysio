@@ -11,10 +11,12 @@ import EarningsSummary from '../../components/earnings/EarningsSummary';
 import EquipmentRequestsSummary from '../../components/equipment/EquipmentRequestsSummary';
 import { getTodayISOString } from '../../utils/dateUtils';
 import { tryApiCall } from '../../utils/apiErrorHandler';
+import ProximityAlertComponent from '../../components/visits/ProximityAlertComponent';
 
 // Import your API services
 import api from '../../services/api';
 import earningsService from '../../services/earningsService';
+import { visitsService, alertService } from '../../services/visitsService';
 
 const TherapistDashboard = () => {
   const { user } = useAuth(); // Get user from context
@@ -25,11 +27,16 @@ const TherapistDashboard = () => {
     pendingAssessments: 0,
     equipmentAllocations: 0,
     equipmentRequests: 0,
+    activeVisits: 0,
+    pendingReports: 0,
   });
 
 
   const [recentAppointments, setRecentAppointments] = useState([]);
+  const [activeVisits, setActiveVisits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [visitsLoading, setVisitsLoading] = useState(true);
+  const [visitsError, setVisitsError] = useState(null);
 
   // Add attendance state variables
   const [attendanceSummary, setAttendanceSummary] = useState(null);
@@ -53,6 +60,7 @@ const TherapistDashboard = () => {
     attendance: true, // Set to true for development/testing
     earnings: true,   // Set to true for development/testing
     equipment: true,  // Set to true for development/testing
+    visits: true,     // Set to true for development/testing
     // Add more features here as needed
     // example: patientManagement: false,
     // example: reportGeneration: false,
@@ -103,6 +111,59 @@ const TherapistDashboard = () => {
     }
   }, [currentYear, currentMonth, user]);
 
+  // Fetch active visits and check for proximity alerts
+  const fetchActiveVisits = useCallback(async () => {
+    if (!user) return;
+
+    setVisitsLoading(true);
+    setVisitsError(null);
+
+    try {
+      // Get therapist ID from user object
+      const therapistId = user.therapist_id || user.id;
+
+      // Fetch active visits (scheduled, en_route, arrived, in_session)
+      const response = await visitsService.getAll({
+        therapist: therapistId,
+        status: 'scheduled,en_route,arrived,in_session'
+      });
+
+      // Sort visits by scheduled_start
+      const sortedVisits = response.data.sort((a, b) =>
+        new Date(a.scheduled_start) - new Date(b.scheduled_start)
+      );
+
+      setActiveVisits(sortedVisits);
+
+      // Check for any active proximity alerts
+      try {
+        const alertsResponse = await alertService.getAll({ status: 'active,acknowledged' });
+        if (alertsResponse.data && alertsResponse.data.length > 0) {
+          console.log(`Found ${alertsResponse.data.length} active proximity alerts`);
+          // We're now using the alertService, so this variable is properly utilized
+        }
+      } catch (alertError) {
+        console.error('Error checking proximity alerts:', alertError);
+      }
+
+      setVisitsLoading(false);
+    } catch (error) {
+      console.error('Error fetching active visits:', error);
+      setVisitsError('Failed to load active visits. Please try again.');
+      setVisitsLoading(false);
+
+      // Set empty array as fallback
+      setActiveVisits([]);
+    }
+  }, [user]);
+
+  // Fetch active visits when component mounts
+  useEffect(() => {
+    if (featureAccess.visits) {
+      fetchActiveVisits();
+    }
+  }, [fetchActiveVisits, featureAccess.visits]);
+
   // Fetch dashboard data from backend
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -140,6 +201,23 @@ const TherapistDashboard = () => {
           equipmentRequests = requestsResponse.data.count || requestsResponse.data.length || 0;
         } catch (equipmentError) {
           console.error('Error fetching equipment data:', equipmentError);
+        }
+
+        // Fetch active visits count
+        let activeVisitsCount = 0;
+        let pendingReportsCount = 0;
+        try {
+          const visitsResponse = await visitsService.getAll({
+            therapist: therapistId,
+            status: 'scheduled,en_route,arrived,in_session'
+          });
+          activeVisitsCount = visitsResponse.data.length || 0;
+
+          // Fetch pending reports count
+          const reportsResponse = await api.get(`/visits/reports/?therapist=${therapistId}&status=draft`);
+          pendingReportsCount = reportsResponse.data.count || reportsResponse.data.length || 0;
+        } catch (visitsError) {
+          console.error('Error fetching visits data:', visitsError);
         }
 
         // Fetch recent appointments (limit to 5)
@@ -190,7 +268,9 @@ const TherapistDashboard = () => {
           pendingAssessments: assessmentsResponse.data.count || assessmentsResponse.data.length || 0,
           monthlyEarnings: monthlyEarnings.toFixed(2),
           equipmentAllocations: equipmentAllocations,
-          equipmentRequests: equipmentRequests
+          equipmentRequests: equipmentRequests,
+          activeVisits: activeVisitsCount,
+          pendingReports: pendingReportsCount
         });
 
         // Format recent appointments
@@ -287,11 +367,17 @@ const TherapistDashboard = () => {
               attendanceApproved
             });
 
+            // Check if visits_approved is available, otherwise fall back to is_approved
+            const visitsApproved =
+              response.data.visits_approved === true ||
+              (response.data.visits_approved === undefined && response.data.is_approved === true);
+
             setFeatureAccess(prevAccess => ({
               ...prevAccess,
               attendance: attendanceApproved,
               earnings: response.data.is_approved,
               equipment: response.data.is_approved,
+              visits: visitsApproved,
               // Update other features as needed based on response data
             }));
 
@@ -313,6 +399,7 @@ const TherapistDashboard = () => {
             attendance: false,
             earnings: false,
             equipment: false,
+            visits: false,
             // Reset other features as needed
           }));
         }
@@ -325,6 +412,7 @@ const TherapistDashboard = () => {
           attendance: false,
           earnings: false,
           equipment: false,
+          visits: false,
           // Reset other features as needed
         }));
       }
@@ -450,10 +538,16 @@ const TherapistDashboard = () => {
                   response.data.attendance_approved === true ||
                   (response.data.attendance_approved === undefined && response.data.is_approved === true);
 
+                // Check if visits_approved is available, otherwise fall back to is_approved
+                const visitsApproved =
+                  response.data.visits_approved === true ||
+                  (response.data.visits_approved === undefined && response.data.is_approved === true);
+
                 setFeatureAccess(prevAccess => ({
                   ...prevAccess,
                   attendance: attendanceApproved,
                   earnings: response.data.is_approved,
+                  visits: visitsApproved,
                 }));
 
                 // Log status change if it changed
@@ -715,6 +809,39 @@ const TherapistDashboard = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Stat 6 - Active Visits */}
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
+                        <svg className="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">
+                            Active Visits
+                          </dt>
+                          <dd>
+                            <div className="text-lg font-medium text-gray-900">
+                              {stats.activeVisits}
+                            </div>
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/therapist/visits" className="font-medium text-primary-600 hover:text-primary-500">
+                        Track visits
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -931,6 +1058,188 @@ const TherapistDashboard = () => {
                       </svg>
                       <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
                       <p className="text-gray-600">Your account is pending approval from an administrator. Patient scheduling will be available once your account is approved.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Active Visits Section */}
+            <div className="mt-8">
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Active Visits</h3>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                      Track your current and upcoming visits
+                    </p>
+                  </div>
+                  <Link to="/therapist/visits" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                    View All Visits
+                  </Link>
+                </div>
+
+                {featureAccess.visits ? (
+                  <div className="border-t border-gray-200">
+                    {visitsLoading ? (
+                      <div className="px-4 py-5 sm:p-6 text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+                        <p className="mt-3 text-gray-700">Loading active visits...</p>
+                      </div>
+                    ) : visitsError ? (
+                      <div className="px-4 py-5 sm:p-6">
+                        <div className="rounded-md bg-red-50 p-4">
+                          <div className="flex">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <h3 className="text-sm font-medium text-red-800">Error loading active visits</h3>
+                              <div className="mt-2 text-sm text-red-700">
+                                <p>{visitsError}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : activeVisits.length === 0 ? (
+                      <div className="px-4 py-5 sm:p-6 text-center">
+                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No active visits</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          You don't have any active or upcoming visits at the moment.
+                        </p>
+                        <div className="mt-6">
+                          <Link to="/therapist/appointments" className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                            <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                            </svg>
+                            View Appointments
+                          </Link>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Patient
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Scheduled Time
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Location
+                              </th>
+                              <th scope="col" className="relative px-6 py-3">
+                                <span className="sr-only">Actions</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {activeVisits.slice(0, 5).map((visit) => (
+                              <tr key={visit.id}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="flex-shrink-0 h-10 w-10">
+                                      <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                                        {visit.patient_details?.user?.first_name?.charAt(0) || '?'}
+                                      </div>
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {visit.patient_details?.user?.first_name} {visit.patient_details?.user?.last_name}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {visit.appointment_details?.issue || 'Regular visit'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">
+                                    {new Date(visit.scheduled_start).toLocaleDateString()}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {new Date(visit.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    ${visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                                      visit.status === 'en_route' ? 'bg-purple-100 text-purple-800' :
+                                      visit.status === 'arrived' ? 'bg-indigo-100 text-indigo-800' :
+                                      visit.status === 'in_session' ? 'bg-green-100 text-green-800' :
+                                      'bg-gray-100 text-gray-800'}`}>
+                                    {visit.status.charAt(0).toUpperCase() + visit.status.slice(1).replace('_', ' ')}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {visit.patient_details?.address || 'No address provided'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <Link to={`/therapist/visits/${visit.id}`} className="text-primary-600 hover:text-primary-900">
+                                    Track
+                                  </Link>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {activeVisits.length > 5 && (
+                          <div className="bg-gray-50 px-6 py-3 text-right">
+                            <Link to="/therapist/visits" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                              View all {activeVisits.length} visits <span aria-hidden="true">→</span>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-6 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+                      <p className="text-gray-600">Your account is pending approval from an administrator. Visit tracking will be available once your account is approved.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Proximity Alerts Section */}
+            <div className="mt-8">
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Proximity Alerts</h3>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                    Safety monitoring alerts that require your attention
+                  </p>
+                </div>
+
+                {featureAccess.visits ? (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+                    <ProximityAlertComponent />
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-6 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+                      <p className="text-gray-600">Your account is pending approval from an administrator. Proximity alerts will be available once your account is approved.</p>
                     </div>
                   </div>
                 )}

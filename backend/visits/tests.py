@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from users.models import Therapist, Patient
 from scheduling.models import Appointment
-from .models import Visit, LocationUpdate, TherapistReport
+from .models import Visit, LocationUpdate, TherapistReport, ProximityAlert
 import datetime
 
 User = get_user_model()
@@ -129,6 +129,93 @@ class LocationUpdateModelTestCase(TestCase):
         self.assertEqual(float(location.longitude), -122.4194)
         self.assertEqual(location.accuracy, 10.0)
         self.assertIsNotNone(location.timestamp)
+
+
+class ProximityAlertModelTestCase(TestCase):
+    """Test the ProximityAlert model"""
+
+    def setUp(self):
+        # Create users
+        self.admin_user = User.objects.create_user(
+            username='admin_alert',
+            email='admin_alert@example.com',
+            password='password123',
+            role='admin'
+        )
+
+        self.therapist_user = User.objects.create_user(
+            username='therapist_alert',
+            email='therapist_alert@example.com',
+            password='password123',
+            role='therapist'
+        )
+
+        self.patient_user = User.objects.create_user(
+            username='patient_alert',
+            email='patient_alert@example.com',
+            password='password123',
+            role='patient'
+        )
+
+        # Create therapist and patient profiles
+        self.therapist = Therapist.objects.create(
+            user=self.therapist_user,
+            specialization='Physical Therapy',
+            years_of_experience=5
+        )
+
+        self.patient = Patient.objects.create(
+            user=self.patient_user,
+            date_of_birth=timezone.now().date() - datetime.timedelta(days=365*30),
+            emergency_contact_name='Emergency Contact',
+            emergency_contact_phone='1234567890'
+        )
+
+        # Create a proximity alert
+        self.alert = ProximityAlert.objects.create(
+            therapist=self.therapist,
+            patient=self.patient,
+            distance=50.0,
+            therapist_latitude=37.7749,
+            therapist_longitude=-122.4194,
+            patient_latitude=37.7750,
+            patient_longitude=-122.4195,
+            severity='medium',
+            status='active'
+        )
+
+    def test_alert_creation(self):
+        """Test that a proximity alert can be created"""
+        self.assertEqual(self.alert.therapist, self.therapist)
+        self.assertEqual(self.alert.patient, self.patient)
+        self.assertEqual(float(self.alert.distance), 50.0)
+        self.assertEqual(float(self.alert.therapist_latitude), 37.7749)
+        self.assertEqual(float(self.alert.therapist_longitude), -122.4194)
+        self.assertEqual(float(self.alert.patient_latitude), 37.7750)
+        self.assertEqual(float(self.alert.patient_longitude), -122.4195)
+        self.assertEqual(self.alert.severity, 'medium')
+        self.assertEqual(self.alert.status, 'active')
+
+    def test_alert_workflow(self):
+        """Test the alert workflow"""
+        # Acknowledge alert
+        self.alert.acknowledge(self.admin_user)
+        self.assertEqual(self.alert.status, 'acknowledged')
+        self.assertEqual(self.alert.acknowledged_by, self.admin_user)
+        self.assertIsNotNone(self.alert.acknowledged_at)
+
+        # Resolve alert
+        self.alert.resolve('Issue resolved')
+        self.assertEqual(self.alert.status, 'resolved')
+        self.assertEqual(self.alert.resolution_notes, 'Issue resolved')
+        self.assertIsNotNone(self.alert.resolved_at)
+
+    def test_false_alarm(self):
+        """Test marking an alert as a false alarm"""
+        self.alert.mark_false_alarm('False alarm test')
+        self.assertEqual(self.alert.status, 'false_alarm')
+        self.assertEqual(self.alert.resolution_notes, 'False alarm test')
+        self.assertIsNotNone(self.alert.resolved_at)
 
 
 class TherapistReportModelTestCase(TestCase):
@@ -314,3 +401,69 @@ class VisitAPITestCase(APITestCase):
         self.assertEqual(visit.therapist, self.therapist)
         self.assertEqual(visit.patient, self.patient)
         self.assertEqual(visit.status, Visit.Status.SCHEDULED)
+
+    def test_visit_actions(self):
+        """Test visit action endpoints"""
+        # Create a visit first
+        self.client.force_authenticate(user=self.admin_user)
+
+        data = {
+            'appointment': self.appointment.id,
+            'therapist': self.therapist.id,
+            'patient': self.patient.id,
+            'scheduled_start': (timezone.now() + datetime.timedelta(days=1)).isoformat(),
+            'scheduled_end': (timezone.now() + datetime.timedelta(days=1, hours=1)).isoformat()
+        }
+
+        response = self.client.post('/api/visits/visits/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        visit_id = response.data['id']
+
+        # Test start visit action
+        response = self.client.post(f'/api/visits/visits/{visit_id}/start_visit/', {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'arrived')
+
+        # Test start session action
+        response = self.client.post(f'/api/visits/visits/{visit_id}/start_session/', {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'in_session')
+
+        # Test complete visit action
+        response = self.client.post(f'/api/visits/visits/{visit_id}/complete_visit/', {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'completed')
+
+    def test_location_updates(self):
+        """Test location update endpoints"""
+        # Create a visit first
+        self.client.force_authenticate(user=self.therapist_user)
+
+        data = {
+            'appointment': self.appointment.id,
+            'therapist': self.therapist.id,
+            'patient': self.patient.id,
+            'scheduled_start': (timezone.now() + datetime.timedelta(days=1)).isoformat(),
+            'scheduled_end': (timezone.now() + datetime.timedelta(days=1, hours=1)).isoformat()
+        }
+
+        response = self.client.post('/api/visits/visits/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        visit_id = response.data['id']
+
+        # Test creating a location update
+        location_data = {
+            'visit': visit_id,
+            'latitude': 37.7749,
+            'longitude': -122.4194,
+            'accuracy': 10.0
+        }
+
+        response = self.client.post('/api/visits/locations/', location_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(LocationUpdate.objects.count(), 1)
+
+        # Test getting location updates for a visit
+        response = self.client.get(f'/api/visits/visits/{visit_id}/locations/', format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
