@@ -9,8 +9,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 from rest_framework import status
 from users.models import Therapist, Patient
-from scheduling.models import Appointment, Session
-from .models import Visit, LocationUpdate, ProximityAlert, TherapistReport
+from scheduling.models import Appointment
+from .models import Visit, LocationUpdate, TherapistReport
 import datetime
 
 User = get_user_model()
@@ -210,6 +210,36 @@ class TherapistReportModelTestCase(TestCase):
         self.assertTrue(self.report.flag(self.admin_user, 'Needs further review'))
         self.assertEqual(self.report.status, TherapistReport.Status.FLAGGED)
         self.assertEqual(self.report.review_notes, 'Needs further review')
+
+    def test_create_test_report_utility(self):
+        """Test the create_test_report utility function"""
+        from visits.utils import create_test_report
+
+        # Create a test report with the utility function
+        test_report = create_test_report(
+            therapist=self.therapist,
+            patient=self.patient,
+            status='draft',
+            content='Test utility function'
+        )
+
+        # Verify the report was created correctly
+        self.assertIsNotNone(test_report)
+        self.assertEqual(test_report.therapist, self.therapist)
+        self.assertEqual(test_report.patient, self.patient)
+        self.assertEqual(test_report.content, 'Test utility function')
+        self.assertEqual(test_report.status, TherapistReport.Status.DRAFT)
+
+        # Test creating a report with different status
+        submitted_report = create_test_report(
+            therapist=self.therapist,
+            patient=self.patient,
+            status='submitted',
+            content='Submitted report'
+        )
+
+        self.assertEqual(submitted_report.status, TherapistReport.Status.SUBMITTED)
+        self.assertIsNotNone(submitted_report.submitted_at)
 
 
 class VisitAPITestCase(APITestCase):

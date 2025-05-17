@@ -192,6 +192,8 @@ export function AuthProvider({ children }) {
         navigate('/dashboard');
       } else if (user.role === 'therapist') {
         navigate('/therapist/dashboard');
+      } else if (user.role === 'patient') {
+        navigate('/patient/dashboard');
       }
 
       return user;

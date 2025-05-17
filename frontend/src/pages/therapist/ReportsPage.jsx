@@ -108,6 +108,13 @@ const ReportsPage = () => {
           <div className="bg-white shadow-md rounded-lg p-6">
             <h1 className="text-2xl font-bold mb-6">Session Reports</h1>
 
+            {/* Warning for mock data */}
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+              <p className="font-bold">⚠️ Mock Data Warning</p>
+              <p>The data displayed below is sample mock data for demonstration purposes only and does not reflect actual database records.
+              Clicking on actions may result in 404 errors as these records don't exist in the database.</p>
+            </div>
+
             {/* Tabs */}
             <div className="flex border-b mb-6">
               <button

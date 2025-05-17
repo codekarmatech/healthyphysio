@@ -72,6 +72,7 @@ import TreatmentPlanDetailPage from './pages/therapist/TreatmentPlanDetailPage';
 import ReportsPage from './pages/therapist/ReportsPage';
 import PendingApprovalPage from './pages/therapist/PendingApprovalPage';
 import FeatureNotApprovedPage from './pages/therapist/FeatureNotApprovedPage';
+import RequestSessionPage from './pages/therapist/RequestSessionPage';
 
 // Other Pages
 import Landing from './pages/Landing';
@@ -168,6 +169,7 @@ function App() {
             <Route path="/therapist/pending-reports" element={<PendingReportsPage />} />
             <Route path="/therapist/report/:id" element={<TherapistReportPage />} />
             <Route path="/therapist/reports" element={<ReportsPage />} />
+            <Route path="/therapist/request-session" element={<RequestSessionPage />} />
           </Route>
 
           {/* Treatment Plans Routes - Requires treatment plans approval */}

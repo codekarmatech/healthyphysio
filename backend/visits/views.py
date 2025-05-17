@@ -451,6 +451,75 @@ class TherapistReportViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=['post'])
+    def update_report(self, request, pk=None):
+        """Update a report with new data"""
+        report = self.get_object()
+
+        # Check if user is the report's therapist
+        if self.request.user.is_therapist:
+            try:
+                therapist = Therapist.objects.get(user=self.request.user)
+                if report.therapist != therapist:
+                    return Response(
+                        {"error": "You can only update your own reports"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            except Therapist.DoesNotExist:
+                return Response(
+                    {"error": "Therapist profile not found"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            return Response(
+                {"error": "Only therapists can update reports"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Only allow updates if report is in draft status
+        if report.status != TherapistReport.Status.DRAFT:
+            return Response(
+                {"error": "Cannot update a report that has already been submitted"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update the report content
+        report_data = request.data
+
+        # Store current content in history before updating
+        if not report.history:
+            report.history = []
+
+        report.history.append({
+            'therapist_notes': report.content,
+            'timestamp': timezone.now().isoformat(),
+            'user': report.therapist.user.username
+        })
+
+        # Update the report content with structured fields
+        report.content = report_data.get('therapist_notes', report.content)
+
+        # Save additional fields in the content JSON if provided
+        report_content = {
+            'therapist_notes': report_data.get('therapist_notes', ''),
+            'treatment_provided': report_data.get('treatment_provided', ''),
+            'patient_progress': report_data.get('patient_progress', ''),
+            'pain_level_before': report_data.get('pain_level_before', ''),
+            'pain_level_after': report_data.get('pain_level_after', ''),
+            'mobility_assessment': report_data.get('mobility_assessment', ''),
+            'recommendations': report_data.get('recommendations', ''),
+            'next_session_goals': report_data.get('next_session_goals', '')
+        }
+
+        # Update the report content with the JSON data
+        report.content = str(report_content)
+        report.save()
+
+        return Response({
+            "message": "Report updated successfully",
+            "report": self.get_serializer(report).data
+        })
+
+    @action(detail=True, methods=['post'])
     def submit(self, request, pk=None):
         """Submit a report"""
         report = self.get_object()
@@ -542,3 +611,38 @@ class TherapistReportViewSet(viewsets.ModelViewSet):
                 {"error": "Cannot flag this report"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        """Get pending reports for the current therapist"""
+        if not request.user.is_therapist:
+            return Response(
+                {"error": "Only therapists can access pending reports"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            therapist = request.user.therapist_profile
+            reports = TherapistReport.objects.filter(
+                therapist=therapist,
+                status=TherapistReport.Status.DRAFT
+            )
+            serializer = self.get_serializer(reports, many=True)
+            return Response(serializer.data)
+        except:
+            return Response([])
+
+    @action(detail=False, methods=['get'])
+    def submitted(self, request):
+        """Get submitted reports for admin review"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can access submitted reports"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        reports = TherapistReport.objects.filter(
+            status=TherapistReport.Status.SUBMITTED
+        )
+        serializer = self.get_serializer(reports, many=True)
+        return Response(serializer.data)

@@ -1,12 +1,9 @@
-// React is needed for JSX
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import sessionService from '../../services/sessionService';
 import { toast } from 'react-toastify';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import Header from '../../components/layout/Header';
-import Footer from '../../components/layout/Footer';
 import Spinner from '../../components/common/Spinner';
 import { formatDate } from '../../utils/dateUtils';
 
@@ -143,8 +140,19 @@ const TherapistReportPage = () => {
 
     return history.map(entry => {
       // Format timestamp
-      const timestamp = entry.timestamp ? new Date(entry.timestamp) : null;
-      const formattedTimestamp = timestamp ? formatDate(timestamp, 'MMM dd, yyyy HH:mm') : 'Unknown date';
+      let formattedTimestamp = 'Unknown date';
+
+      try {
+        if (entry.timestamp) {
+          const timestamp = new Date(entry.timestamp);
+          // Check if timestamp is valid
+          if (!isNaN(timestamp.getTime())) {
+            formattedTimestamp = formatDate(timestamp, 'MMM dd, yyyy HH:mm');
+          }
+        }
+      } catch (error) {
+        console.error('Error formatting history timestamp:', error);
+      }
 
       // Determine entry type (report update or review)
       const isReview = entry.action === 'reviewed' || entry.action === 'flagged';
@@ -159,20 +167,17 @@ const TherapistReportPage = () => {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <Header title="Therapist Daily Report" />
+      <DashboardLayout title="Therapist Daily Report">
         <div className="flex justify-center items-center h-64">
           <Spinner size="lg" />
         </div>
-        <Footer />
       </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout>
-        <Header title="Therapist Daily Report" />
+      <DashboardLayout title="Therapist Daily Report">
         <div className="container mx-auto px-4 py-8">
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
@@ -184,27 +189,43 @@ const TherapistReportPage = () => {
             Back to Pending Reports
           </button>
         </div>
-        <Footer />
       </DashboardLayout>
     );
   }
 
-  if (!session) {
+  if (!session || session.error === 'not_found') {
     return (
-      <DashboardLayout>
-        <Header title="Therapist Daily Report" />
+      <DashboardLayout title="Therapist Daily Report">
         <div className="container mx-auto px-4 py-8">
           <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-            Session not found
+            <h2 className="text-xl font-bold mb-2">Session Not Found</h2>
+            <p className="mb-2">The session you're looking for doesn't exist or hasn't been created yet.</p>
+            <p className="mb-4">If you have a scheduled appointment that should have a session, please contact your administrator to create one for you.</p>
           </div>
-          <button
-            onClick={() => navigate('/therapist/pending-reports')}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Back to Pending Reports
-          </button>
+
+          <div className="flex flex-col md:flex-row gap-4 mt-6">
+            <button
+              onClick={() => navigate('/therapist/pending-reports')}
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+              View Pending Reports
+            </button>
+
+            <button
+              onClick={() => navigate('/therapist/appointments')}
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+            >
+              View My Appointments
+            </button>
+
+            <button
+              onClick={() => navigate('/therapist/request-session')}
+              className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Request New Session
+            </button>
+          </div>
         </div>
-        <Footer />
       </DashboardLayout>
     );
   }
@@ -215,28 +236,37 @@ const TherapistReportPage = () => {
   const formattedHistory = formatReportHistory(session.report_history);
 
   return (
-    <React.Fragment>
-      <DashboardLayout>
-        <Header title={`Therapist Daily Report - ${user.firstName} ${user.lastName}`} />
+    <DashboardLayout title={`Therapist Daily Report - ${user.firstName} ${user.lastName}`}>
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-white shadow-md rounded-lg p-6">
+          {/* Mock Data Warning */}
+          {session.mock_data && (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+              <p className="font-bold">⚠️ Mock Data Warning</p>
+              <p>{session.mock_warning || 'This is mock data for demonstration purposes only. In a real application, this would be fetched from the database.'}</p>
+            </div>
+          )}
 
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white shadow-md rounded-lg p-6">
-            {/* Session Information */}
-            <div className="mb-6 border-b pb-4">
-              <h1 className="text-2xl font-bold mb-2">
-                Session Report
-              </h1>
+          {/* Session Information */}
+          <div className="mb-6 border-b pb-4">
+            <h1 className="text-2xl font-bold mb-2">
+              Session Report
+            </h1>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p><span className="font-semibold">Patient:</span> {session.appointment_details?.patient_details?.user?.first_name} {session.appointment_details?.patient_details?.user?.last_name}</p>
-                <p><span className="font-semibold">Date:</span> {formatDate(new Date(session.local_datetime), 'MMMM dd, yyyy')}</p>
+                <p><span className="font-semibold">Date:</span> {session.local_datetime ? formatDate(new Date(session.local_datetime), 'MMMM dd, yyyy') : 'N/A'}</p>
                 <p><span className="font-semibold">Session Code:</span> {session.appointment_details?.session_code}</p>
               </div>
               <div>
                 <p><span className="font-semibold">Status:</span> {session.status}</p>
                 <p><span className="font-semibold">Report Status:</span> {session.report_status}</p>
                 {session.report_submitted_at && (
-                  <p><span className="font-semibold">Submitted:</span> {formatDate(new Date(session.report_submitted_at), 'MMM dd, yyyy HH:mm')}</p>
+                  <p><span className="font-semibold">Submitted:</span> {
+                    session.report_submitted_at ?
+                    formatDate(new Date(session.report_submitted_at), 'MMM dd, yyyy HH:mm') :
+                    'N/A'
+                  }</p>
                 )}
               </div>
             </div>
@@ -448,10 +478,7 @@ const TherapistReportPage = () => {
           )}
         </div>
       </div>
-
-      <Footer />
     </DashboardLayout>
-    </React.Fragment>
   );
 };
 
