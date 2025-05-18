@@ -7,16 +7,128 @@ Connected to: User authentication and profile management
 from rest_framework import serializers
 from .models import User, Patient, Therapist, Doctor, ProfileChangeRequest
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import json
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Custom JWT token serializer that supports authentication with:
+    - Username
+    - Email
+    - Phone number
+
+    This serializer also adds custom claims to the token and includes
+    user data in the response.
+    """
+    username_field = 'username'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make username field optional to allow email/phone authentication
+        self.fields[self.username_field].required = False
+        # Add email and phone fields
+        self.fields['email'] = serializers.EmailField(required=False)
+        self.fields['phone'] = serializers.CharField(required=False)
+
+    def validate(self, attrs):
+        """
+        Validate the authentication credentials and generate tokens
+
+        This method:
+        1. Checks if any identifier is provided (username, email, phone)
+        2. Finds the user based on the provided identifier
+        3. Validates the password
+        4. Generates the token pair
+        5. Adds user data to the response
+        """
+        # Check if any identifier is provided
+        username = attrs.get('username')
+        email = attrs.get('email')
+        phone = attrs.get('phone')
+        password = attrs.get('password')
+
+        # Log validation attempt (without password)
+        import logging
+        logger = logging.getLogger('auth')
+        logger.info(f"Validation attempt with: username={username}, email={email}, phone={phone}")
+
+        # Validate required fields
+        if not password:
+            raise serializers.ValidationError({'password': 'Password is required'})
+
+        if not any([username, email, phone]):
+            raise serializers.ValidationError(
+                {'username': ['Must include either username, email or phone number']}
+            )
+
+        # Try to find the user
+        user = None
+        User = get_user_model()
+
+        # Try each identifier in order
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                logger.info(f"Found user by username: {username}")
+            except User.DoesNotExist:
+                logger.info(f"No user found with username: {username}")
+                pass
+
+        if not user and email:
+            try:
+                user = User.objects.get(email=email)
+                logger.info(f"Found user by email: {email}")
+            except User.DoesNotExist:
+                logger.info(f"No user found with email: {email}")
+                pass
+
+        if not user and phone:
+            try:
+                user = User.objects.get(phone=phone)
+                logger.info(f"Found user by phone: {phone}")
+            except User.DoesNotExist:
+                logger.info(f"No user found with phone: {phone}")
+                pass
+
+        # Validate user and password
+        if not user:
+            logger.warning(f"Authentication failed: No user found with provided credentials")
+            raise serializers.ValidationError(
+                {'username': ['No active account found with the given credentials']}
+            )
+
+        if not user.check_password(password):
+            logger.warning(f"Authentication failed: Invalid password for user {user.username}")
+            raise serializers.ValidationError(
+                {'username': ['No active account found with the given credentials']}
+            )
+
+        # Use the found user for token generation
+        attrs[self.username_field] = user.username
+        data = super().validate(attrs)
+
+        # Add user data to response
+        data['user'] = {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'firstName': user.first_name,
+            'lastName': user.last_name,
+            'role': getattr(user, 'role', 'user'),
+        }
+
+        return data
+
     @classmethod
     def get_token(cls, user):
+        """
+        Add custom claims to the token
+        """
         token = super().get_token(user)
 
         # Add custom claims
-        token['role'] = user.role
+        token['role'] = getattr(user, 'role', 'user')
         token['email'] = user.email
         token['name'] = user.get_full_name() or user.username
 

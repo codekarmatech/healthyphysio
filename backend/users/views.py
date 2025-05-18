@@ -341,7 +341,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         if not any([username, email, phone]):
             raise serializers.ValidationError(
-                {'error': 'Must include either username, email or phone number'}
+                {'username': ['Must include either username, email or phone number']}
             )
 
         # Try to find the user
@@ -399,22 +399,146 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 # Assuming you have a TokenObtainPairView subclass
 class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Custom token view that extends the standard JWT token view to:
+    1. Support authentication with username, email, or phone
+    2. Return user data along with the token
+    3. Handle errors gracefully
+    4. Properly log authentication attempts
+
+    This implementation follows security best practices and avoids the RawPostDataException
+    by not accessing request.body multiple times.
+    """
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
-        # Call the parent class method to get the token
-        response = super().post(request, *args, **kwargs)
-
-        # Get the user from the credentials
-        username = request.data.get('username')
         try:
-            user = User.objects.get(username=username)
-            # Add user data to the response
-            response.data['user'] = UserSerializer(user).data
-        except User.DoesNotExist:
-            pass
+            # Call the parent class method to get the token
+            response = super().post(request, *args, **kwargs)
 
-        return response
+            # If we get here, authentication was successful
+            # Find the authenticated user to include in the response
+            User = get_user_model()
+            user = None
+
+            # Try to identify the user from the provided credentials
+            username = request.data.get('username')
+            email = request.data.get('email')
+            phone = request.data.get('phone')
+
+            # Try each identifier in order
+            if username:
+                try:
+                    user = User.objects.get(username=username)
+                except User.DoesNotExist:
+                    pass
+
+            if not user and email:
+                try:
+                    user = User.objects.get(email=email)
+                except User.DoesNotExist:
+                    pass
+
+            if not user and phone:
+                try:
+                    user = User.objects.get(phone=phone)
+                except User.DoesNotExist:
+                    pass
+
+            # Add user data to the response if user was found
+            if user:
+                response.data['user'] = UserSerializer(user).data
+
+            return response
+
+        except Exception as e:
+            # Log the error
+            import logging
+            logger = logging.getLogger('auth')
+            logger.error(f"Authentication error: {str(e)}")
+
+            # Re-raise the exception to let DRF handle the response
+            raise
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def test_login(request):
+    """
+    Test login endpoint for debugging authentication issues
+    """
+    try:
+        # Extract credentials from request
+        username = request.data.get('username')
+        email = request.data.get('email')
+        phone = request.data.get('phone')
+        password = request.data.get('password')
+
+        # Log the request (without password)
+        print(f"Test login attempt with: username={username}, email={email}, phone={phone}")
+
+        # Validate required fields
+        if not password:
+            return Response({'password': ['Password is required']}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not any([username, email, phone]):
+            return Response({'username': ['Must include either username, email or phone number']}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Try to find the user
+        user = None
+        User = get_user_model()
+
+        # Try each identifier in order
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                print(f"Found user by username: {username}")
+            except User.DoesNotExist:
+                print(f"No user found with username: {username}")
+                pass
+
+        if not user and email:
+            try:
+                user = User.objects.get(email=email)
+                print(f"Found user by email: {email}")
+            except User.DoesNotExist:
+                print(f"No user found with email: {email}")
+                pass
+
+        if not user and phone:
+            try:
+                user = User.objects.get(phone=phone)
+                print(f"Found user by phone: {phone}")
+            except User.DoesNotExist:
+                print(f"No user found with phone: {phone}")
+                pass
+
+        # Validate user and password
+        if not user:
+            print(f"Authentication failed: No user found with provided credentials")
+            return Response({'username': ['No active account found with the given credentials']}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.check_password(password):
+            print(f"Authentication failed: Invalid password for user {user.username}")
+            return Response({'username': ['No active account found with the given credentials']}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Authentication successful
+        print(f"Authentication successful for user: {user.username}")
+
+        # Return user data
+        return Response({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'firstName': user.first_name,
+                'lastName': user.last_name,
+                'role': getattr(user, 'role', 'user'),
+            }
+        })
+    except Exception as e:
+        print(f"Test login error: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -785,6 +909,27 @@ class TherapistStatusDetailView(APIView):
 
 class PendingTherapistsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        """GET to list pending therapists"""
+        therapists = Therapist.objects.filter(is_approved=False)
+
+        # Get the user data for each therapist
+        pending_therapists = []
+        for therapist in therapists:
+            user_data = {
+                'id': therapist.id,
+                'first_name': therapist.user.first_name,
+                'last_name': therapist.user.last_name,
+                'email': therapist.user.email,
+                'phone': therapist.user.phone,
+                'license_number': therapist.license_number,
+                'specialization': therapist.specialization,
+                'years_of_experience': therapist.years_of_experience
+            }
+            pending_therapists.append(user_data)
+
+        return Response(pending_therapists)
 
 class ApproveTherapistView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]

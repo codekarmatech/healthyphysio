@@ -81,7 +81,7 @@ class AuthService {
       const response = await api.post('/auth/token/refresh/', {
         refresh: refreshToken
       });
-      
+
       if (response.data.access) {
         localStorage.setItem('token', response.data.access);
         return response.data;
@@ -125,6 +125,49 @@ class AuthService {
       old_password: oldPassword,
       new_password: newPassword
     });
+  }
+
+  /**
+   * Get the full API URL for a specific endpoint
+   * @param {string} endpoint - API endpoint path
+   * @returns {string} Full API URL
+   */
+  getFullApiUrl(endpoint) {
+    // Remove leading slash if present
+    const path = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    return `${API_BASE_URL}/${path}`;
+  }
+
+  /**
+   * Make a direct API call using the full URL
+   * Useful for special cases where we need to bypass the API instance
+   * @param {string} endpoint - API endpoint path
+   * @param {Object} options - Axios request options
+   * @returns {Promise} API response
+   */
+  async directApiCall(endpoint, options = {}) {
+    const url = this.getFullApiUrl(endpoint);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          } : {}),
+          ...(options.headers || {})
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error calling ${url}:`, error);
+      throw error;
+    }
   }
 }
 

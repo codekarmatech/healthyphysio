@@ -22,7 +22,7 @@ const PatientDashboard = () => {
         pendingExercises: 3,
         progressPercentage: 65,
       });
-      
+
       setAppointments([
         {
           id: 1,
@@ -39,7 +39,7 @@ const PatientDashboard = () => {
           type: 'Assessment',
         },
       ]);
-      
+
       setLoading(false);
     }, 1000);
   }, []);
@@ -73,11 +73,11 @@ const PatientDashboard = () => {
               <div className="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
                 <div className="ml-3 relative">
                   <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-700 mr-2">{user.firstName} {user.lastName}</span>
+                    <span className="text-sm font-medium text-gray-700 mr-2">{user?.firstName || 'User'} {user?.lastName || ''}</span>
                     <button className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                       <span className="sr-only">Open user menu</span>
                       <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                        {user.firstName.charAt(0)}
+                        {user?.firstName ? user.firstName.charAt(0) : 'U'}
                       </div>
                     </button>
                   </div>
@@ -92,7 +92,7 @@ const PatientDashboard = () => {
       <div className="py-10">
         <header>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold text-gray-900">Welcome, {user.firstName}!</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.firstName || 'User'}!</h1>
           </div>
         </header>
         <main>
@@ -446,8 +446,8 @@ const PatientDashboard = () => {
                       <h3 className="text-sm font-medium text-gray-500">Overall Recovery</h3>
                       <div className="mt-2">
                         <div className="bg-gray-200 rounded-full h-4">
-                          <div 
-                            className="bg-primary-600 h-4 rounded-full" 
+                          <div
+                            className="bg-primary-600 h-4 rounded-full"
                             style={{ width: `${stats.progressPercentage}%` }}
                           ></div>
                         </div>
@@ -456,7 +456,7 @@ const PatientDashboard = () => {
                         <div>Started treatment</div>
                         <div>{stats.progressPercentage}% complete</div>
                       </div>
-                      
+
                       <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
                         <div className="bg-gray-50 rounded-lg p-4">
                           <h4 className="text-sm font-medium text-gray-500">Pain Level</h4>
@@ -466,7 +466,7 @@ const PatientDashboard = () => {
                           </div>
                           <p className="mt-1 text-sm text-gray-500">Decreased from initial assessment</p>
                         </div>
-                        
+
                         <div className="bg-gray-50 rounded-lg p-4">
                           <h4 className="text-sm font-medium text-gray-500">Mobility</h4>
                           <div className="mt-2 flex items-baseline">
