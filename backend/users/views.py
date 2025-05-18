@@ -19,7 +19,7 @@ from django.contrib.auth import get_user_model  # Add this import for get_user_m
 from .models import Therapist, Doctor, ProfileChangeRequest
 from .serializers import UserSerializer, PatientSerializer, TherapistSerializer, DoctorSerializer, ProfileChangeRequestSerializer
 from .permissions import IsAdminUser, IsTherapistUser, IsDoctorUser, IsPatientUser
-
+import traceback
 # Add these imports for timezone and timedelta
 from django.utils import timezone
 from datetime import timedelta
@@ -87,19 +87,26 @@ class TherapistViewSet(viewsets.ModelViewSet):
         Get the approval status of a specific therapist
         """
         try:
-            # Get the therapist object using the ViewSet's get_object method
-            therapist = self.get_object()
-            print(f"TherapistViewSet.status called for therapist ID: {therapist.id}")
+            print(f"TherapistViewSet.status called for therapist ID: {pk}")
+
+            # Try to get the therapist directly instead of using get_object
+            # This gives us more control over error handling
+            try:
+                therapist = Therapist.objects.get(id=pk)
+                print(f"Found therapist with ID {pk}: {therapist.user.username}")
+            except Therapist.DoesNotExist:
+                print(f"No therapist found with ID {pk}")
+                # Return a 404 with a clear error message
+                return Response(
+                    {"error": f"Therapist with ID {pk} not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
             # Use the same helper method as TherapistStatusView for consistency
             return TherapistStatusView()._get_therapist_status_response(therapist)
-        except Therapist.DoesNotExist:
-            return Response(
-                {"error": "Therapist not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
         except Exception as e:
             print(f"Error in TherapistViewSet.status: {str(e)}")
+            print(traceback.format_exc())
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -652,7 +659,6 @@ def register_user(request):
 
         except Exception as e:
             # Improved error handling
-            import traceback
             print(f"Registration error: {str(e)}")
             print(traceback.format_exc())
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -791,6 +797,9 @@ class TherapistStatusView(APIView):
         Helper method to create a consistent response for therapist status
         """
         try:
+            # Debug logging
+            print(f"Creating status response for therapist ID: {therapist.id}")
+
             # Create a simple response with standard fields
             response_data = {
                 # General approval
@@ -811,20 +820,45 @@ class TherapistStatusView(APIView):
                 ('attendance_approval_date', None)
             ]
 
+            # Add visits_approved field for frontend compatibility
+            # This is not a real field in the model, but the frontend expects it
+            response_data['visits_approved'] = therapist.is_approved
+
             for field_name, default_value in feature_fields:
                 if hasattr(therapist, field_name):
-                    response_data[field_name] = getattr(therapist, field_name)
+                    field_value = getattr(therapist, field_name)
+                    response_data[field_name] = field_value
                 else:
                     response_data[field_name] = default_value
 
+            print(f"Returning therapist status: {response_data}")
             return Response(response_data)
         except Exception as e:
             print(f"Error creating therapist status response: {str(e)}")
+            print(traceback.format_exc())
+
             # Fallback to a simpler response if there's an error
-            return Response({
-                'is_approved': getattr(therapist, 'is_approved', False),
-                'account_approved': getattr(therapist, 'is_approved', False)
-            })
+            try:
+                is_approved = getattr(therapist, 'is_approved', False)
+                return Response({
+                    'is_approved': is_approved,
+                    'account_approved': is_approved,
+                    'treatment_plans_approved': is_approved,
+                    'reports_approved': is_approved,
+                    'attendance_approved': is_approved,
+                    'visits_approved': is_approved  # For frontend compatibility
+                })
+            except Exception as inner_e:
+                print(f"Error in fallback response: {str(inner_e)}")
+                # Ultimate fallback - all permissions denied
+                return Response({
+                    'is_approved': False,
+                    'account_approved': False,
+                    'treatment_plans_approved': False,
+                    'reports_approved': False,
+                    'attendance_approved': False,
+                    'visits_approved': False  # For frontend compatibility
+                }, status=status.HTTP_200_OK)  # Return 200 instead of 500 for better frontend handling
 
 class TherapistStatusDetailView(APIView):
     """
@@ -841,26 +875,27 @@ class TherapistStatusDetailView(APIView):
             # Debug print
             print(f"TherapistStatusDetailView called with pk={pk}, therapist_id={therapist_id}, kwargs={kwargs}, path={request.path}")
 
-            # Special case for the hardcoded URL pattern
-            if '/api/users/therapists/2/status/' in request.path:
-                print("Using hardcoded therapist_id=2 for specific path")
-                final_therapist_id = 2
             # Get the therapist ID from either pk or therapist_id parameter
-            elif pk:
+            if pk is not None:
                 final_therapist_id = pk
-            elif therapist_id:
+                print(f"Using pk parameter: {final_therapist_id}")
+            elif therapist_id is not None:
                 final_therapist_id = therapist_id
+                print(f"Using therapist_id parameter: {final_therapist_id}")
             # Check kwargs (for path parameters defined in urls.py)
             elif 'therapist_id' in kwargs:
                 final_therapist_id = kwargs.get('therapist_id')
+                print(f"Using kwargs therapist_id: {final_therapist_id}")
             else:
                 # Extract from path if it matches a pattern like /therapists/123/status/
                 import re
-                match = re.search(r'/therapists/(\d+)/status/', request.path)
+                match = re.search(r'/therapists/(\d+)(?:/status/?)?', request.path)
                 if match:
                     final_therapist_id = match.group(1)
+                    print(f"Extracted therapist_id from URL path: {final_therapist_id}")
                 else:
                     final_therapist_id = None
+                    print("Could not extract therapist_id from URL path")
 
             if not final_therapist_id:
                 return Response(
@@ -1000,46 +1035,165 @@ class ApproveTherapistView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-# If you already have a TherapistDashboardSummaryView (APIView), convert it to a ViewSet
 class TherapistDashboardSummaryViewSet(viewsets.ViewSet):
-    permission_classes = [permissions.IsAuthenticated, IsTherapistUser]
+    """
+    API endpoint for consolidated therapist dashboard data.
+    This endpoint combines multiple API calls into a single request to improve performance.
+    It can be used by both therapists to view their own dashboard and by admins to view a specific therapist's dashboard.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
+        # Get the therapist - either the current user or a specified therapist (for admins)
+        therapist_id = request.query_params.get('therapist_id')
+        user = request.user
 
         try:
-            therapist = request.user.therapist_profile
-        except:
-            return Response({"error": "Therapist profile not found"}, status=status.HTTP_404_NOT_FOUND)
+            # If therapist_id is provided and user is admin, get that therapist
+            if therapist_id and user.is_admin:
+                therapist = Therapist.objects.get(id=therapist_id)
+                print(f"Admin viewing dashboard for therapist ID: {therapist_id}")
+            # Otherwise, get the current user's therapist profile
+            elif user.is_therapist:
+                therapist = Therapist.objects.get(user=user)
+                print(f"Therapist viewing own dashboard, ID: {therapist.id}")
+            else:
+                return Response(
+                    {"error": "You must be a therapist or an admin viewing a specific therapist"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         # Get current date and time
         now = timezone.now()
         today = now.date()
+        current_month = now.month
+        current_year = now.year
 
         # Get upcoming appointments
         upcoming_appointments = Appointment.objects.filter(
             therapist=therapist,
             datetime__gt=now,
-            status='scheduled'
-        ).count()
+            status__in=['scheduled', 'rescheduled']
+        )
+        upcoming_appointments_count = upcoming_appointments.count()
 
         # Get today's appointments
         today_appointments = Appointment.objects.filter(
             therapist=therapist,
             datetime__date=today,
-            status='scheduled'
-        ).count()
+            status__in=['scheduled', 'rescheduled']
+        )
+        today_appointments_count = today_appointments.count()
 
-        # Get completed sessions
-        completed_sessions = Appointment.objects.filter(
+        # Get total patients assigned to this therapist
+        total_patients = Patient.objects.filter(
+            appointments__therapist=therapist
+        ).distinct().count()
+
+        # Get pending assessments
+        from assessments.models import Assessment
+        pending_assessments = Assessment.objects.filter(
+            created_by=therapist.user,
+            pending_admin_approval=True
+        )
+        pending_assessments_count = pending_assessments.count()
+
+        # Get monthly earnings
+        from earnings.models import EarningRecord
+        monthly_earnings = 0
+        try:
+            # Get earnings for the current month
+            earnings_records = EarningRecord.objects.filter(
+                therapist=therapist,
+                date__year=current_year,
+                date__month=current_month
+            )
+            monthly_earnings = sum(record.amount for record in earnings_records)
+        except Exception as e:
+            print(f"Error fetching earnings data: {str(e)}")
+
+        # Get equipment allocations and requests
+        from equipment.models import EquipmentAllocation, AllocationRequest
+        equipment_allocations = EquipmentAllocation.objects.filter(
             therapist=therapist,
-            status='completed'
-        ).count()
+            status__in=['approved', 'overdue']
+        )
+        equipment_allocations_count = equipment_allocations.count()
+
+        equipment_requests = AllocationRequest.objects.filter(
+            therapist=therapist,
+            status='pending'
+        )
+        equipment_requests_count = equipment_requests.count()
+
+        # Get active visits
+        from visits.models import Visit
+        active_visits = Visit.objects.filter(
+            therapist=therapist,
+            status__in=['scheduled', 'en_route', 'arrived', 'in_session']
+        )
+        active_visits_count = active_visits.count()
+
+        # Get pending reports
+        from visits.models import TherapistReport
+        pending_reports = TherapistReport.objects.filter(
+            therapist=therapist,
+            status='draft'
+        )
+        pending_reports_count = pending_reports.count()
+
+        # Get treatment plan change requests
+        from treatment_plans.models import TreatmentPlanChangeRequest
+        treatment_plan_change_requests = TreatmentPlanChangeRequest.objects.filter(
+            requested_by=therapist.user,
+            status='pending'
+        )
+        pending_treatment_plan_change_requests_count = treatment_plan_change_requests.count()
+
+        # Get recent appointments (limit to 5)
+        recent_appointments = Appointment.objects.filter(
+            therapist=therapist
+        ).order_by('-datetime')[:5]
+
+        # Format recent appointments
+        formatted_appointments = []
+        for appointment in recent_appointments:
+            formatted_appointments.append({
+                'id': appointment.id,
+                'patient_name': f"{appointment.patient.user.first_name} {appointment.patient.user.last_name}",
+                'datetime': appointment.datetime,
+                'status': appointment.status.lower(),
+                'issue': appointment.issue or 'Consultation',
+            })
 
         # Prepare response data
         response_data = {
-            "upcoming_appointments": upcoming_appointments,
-            "today_appointments": today_appointments,
-            "completed_sessions": completed_sessions
+            "upcoming_appointments_count": upcoming_appointments_count,
+            "today_appointments_count": today_appointments_count,
+            "total_patients": total_patients,
+            "pending_assessments_count": pending_assessments_count,
+            "monthly_earnings": monthly_earnings,
+            "equipment_allocations_count": equipment_allocations_count,
+            "equipment_requests_count": equipment_requests_count,
+            "active_visits_count": active_visits_count,
+            "pending_reports_count": pending_reports_count,
+            "pending_treatment_plan_change_requests_count": pending_treatment_plan_change_requests_count,
+            "recent_appointments": formatted_appointments,
+            "treatment_plan_change_requests": [
+                {
+                    "id": request.id,
+                    "treatment_plan_id": request.treatment_plan.id,
+                    "treatment_plan_title": request.treatment_plan.title,
+                    "reason": request.reason,
+                    "urgency": request.urgency,
+                    "created_at": request.created_at
+                } for request in treatment_plan_change_requests
+            ]
         }
 
         return Response(response_data)
@@ -1207,49 +1361,70 @@ def update_therapist_approvals(request, therapist_id):
     Update the approval status for a therapist's features.
     Only admins can update approval statuses.
     """
-    therapist = get_object_or_404(Therapist, id=therapist_id)
+    try:
+        print(f"Updating approvals for therapist ID: {therapist_id}")
+        print(f"Request data: {request.data}")
 
-    # Get approval data from request
-    # Use the field names that exist in the database
-    is_approved = request.data.get('account_approved', therapist.is_approved)
-    treatment_plans_approved = request.data.get('treatment_plans_approved', therapist.treatment_plans_approved)
-    reports_approved = request.data.get('reports_approved', therapist.reports_approved)
-    attendance_approved = request.data.get('attendance_approved', therapist.attendance_approved)
+        therapist = get_object_or_404(Therapist, id=therapist_id)
+        print(f"Found therapist: {therapist.user.username} (ID: {therapist.id})")
 
-    # Update account approval using the field names that exist in the database
-    if is_approved != therapist.is_approved:
-        therapist.is_approved = is_approved
-        if is_approved:
-            therapist.approval_date = timezone.now()
-        else:
-            therapist.approval_date = None
+        # Get approval data from request
+        # Use the field names that exist in the database
+        is_approved = request.data.get('account_approved', therapist.is_approved)
+        treatment_plans_approved = request.data.get('treatment_plans_approved', therapist.treatment_plans_approved)
+        reports_approved = request.data.get('reports_approved', therapist.reports_approved)
+        attendance_approved = request.data.get('attendance_approved', therapist.attendance_approved)
 
-    # Update feature-specific approvals
-    if treatment_plans_approved != therapist.treatment_plans_approved:
-        therapist.treatment_plans_approved = treatment_plans_approved
-        if treatment_plans_approved:
-            therapist.treatment_plans_approval_date = timezone.now()
-        else:
-            therapist.treatment_plans_approval_date = None
+        print(f"Approval values from request: account={is_approved}, treatment_plans={treatment_plans_approved}, "
+              f"reports={reports_approved}, attendance={attendance_approved}")
 
-    if reports_approved != therapist.reports_approved:
-        therapist.reports_approved = reports_approved
-        if reports_approved:
-            therapist.reports_approval_date = timezone.now()
-        else:
-            therapist.reports_approval_date = None
+        # Update account approval using the field names that exist in the database
+        if is_approved != therapist.is_approved:
+            print(f"Updating is_approved: {therapist.is_approved} -> {is_approved}")
+            therapist.is_approved = is_approved
+            if is_approved:
+                therapist.approval_date = timezone.now()
+            else:
+                therapist.approval_date = None
 
-    if attendance_approved != therapist.attendance_approved:
-        therapist.attendance_approved = attendance_approved
-        if attendance_approved:
-            therapist.attendance_approval_date = timezone.now()
-        else:
-            therapist.attendance_approval_date = None
+        # Update feature-specific approvals
+        if treatment_plans_approved != therapist.treatment_plans_approved:
+            print(f"Updating treatment_plans_approved: {therapist.treatment_plans_approved} -> {treatment_plans_approved}")
+            therapist.treatment_plans_approved = treatment_plans_approved
+            if treatment_plans_approved:
+                therapist.treatment_plans_approval_date = timezone.now()
+            else:
+                therapist.treatment_plans_approval_date = None
 
-    # Save changes
-    therapist.save()
+        if reports_approved != therapist.reports_approved:
+            print(f"Updating reports_approved: {therapist.reports_approved} -> {reports_approved}")
+            therapist.reports_approved = reports_approved
+            if reports_approved:
+                therapist.reports_approval_date = timezone.now()
+            else:
+                therapist.reports_approval_date = None
 
-    # Return updated therapist data
-    serializer = TherapistSerializer(therapist)
+        if attendance_approved != therapist.attendance_approved:
+            print(f"Updating attendance_approved: {therapist.attendance_approved} -> {attendance_approved}")
+            therapist.attendance_approved = attendance_approved
+            if attendance_approved:
+                therapist.attendance_approval_date = timezone.now()
+            else:
+                therapist.attendance_approval_date = None
 
-    return Response(serializer.data, status=status.HTTP_200_OK)
+        # Save changes
+        therapist.save()
+        print(f"Therapist approvals updated successfully")
+
+        # Return updated therapist data
+        serializer = TherapistSerializer(therapist)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+
+        print(f"Error updating therapist approvals: {str(e)}")
+        print(traceback.format_exc())
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

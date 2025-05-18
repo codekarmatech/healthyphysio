@@ -125,7 +125,7 @@ class LocationService extends BaseService {
  * Service for managing therapist reports
  * Extends BaseService to inherit common CRUD operations
  */
-class TherapistReportService extends BaseService {
+class ReportsService extends BaseService {
   constructor() {
     super('/visits/reports/');
   }
@@ -133,10 +133,13 @@ class TherapistReportService extends BaseService {
   /**
    * Get reports by therapist
    * @param {string|number} therapistId - Therapist ID
+   * @param {Object} filters - Additional filters like status
    * @returns {Promise} API response
    */
-  getByTherapist(therapistId) {
-    return this.getByField('therapist', therapistId);
+  getByTherapist(therapistId, filters = {}) {
+    // Combine therapist ID with additional filters
+    const params = { therapist: therapistId, ...filters };
+    return this.getAll(params);
   }
 
   /**
@@ -239,12 +242,12 @@ class AlertService extends BaseService {
 // Create and export singleton instances
 const visitsService = new VisitsService();
 const locationService = new LocationService();
-const therapistReportService = new TherapistReportService();
+const reportsService = new ReportsService();
 const alertService = new AlertService();
 
 export {
   visitsService,
   locationService,
-  therapistReportService,
+  reportsService,
   alertService
 };

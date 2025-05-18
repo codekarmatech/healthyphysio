@@ -36,7 +36,7 @@ class AppointmentService extends BaseService {
   getToday() {
     const today = getToday();
     const tomorrow = getTomorrow();
-    
+
     return api.get(`${this.basePath}?datetime__gte=${today}&datetime__lt=${tomorrow}`);
   }
 
@@ -62,10 +62,25 @@ class AppointmentService extends BaseService {
   /**
    * Get appointments by therapist
    * @param {string|number} therapistId - Therapist ID
+   * @param {Object} filters - Additional filters like status, date ranges, etc.
    * @returns {Promise} API response
    */
-  getByTherapist(therapistId) {
-    return this.getByField('therapist', therapistId);
+  getByTherapist(therapistId, filters = {}) {
+    // Combine therapist ID with additional filters
+    const params = { therapist: therapistId, ...filters };
+    return this.getAll(params);
+  }
+
+  /**
+   * Get today's appointments for a specific therapist
+   * @param {string|number} therapistId - Therapist ID
+   * @returns {Promise} API response
+   */
+  getTherapistTodayAppointments(therapistId) {
+    const today = getToday();
+    const tomorrow = getTomorrow();
+
+    return api.get(`${this.basePath}?therapist=${therapistId}&datetime__gte=${today}&datetime__lt=${tomorrow}`);
   }
 
   /**

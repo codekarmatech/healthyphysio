@@ -36,47 +36,25 @@ class EarningsService extends BaseService {
       // Ensure basePath ends with a slash for consistent URL construction
       const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
 
-      // Try multiple URL formats to find the correct one
-      const urlFormats = [
-        // Format 1: Original format
-        `${basePath}therapist/${therapistId}/monthly/?year=${year}&month=${month}`,
+      // Use a single, consistent URL format
+      const url = `${basePath}monthly/${therapistId}/?year=${year}&month=${month}`;
 
-        // Format 2: Legacy format
-        `${basePath}monthly/${therapistId}/?year=${year}&month=${month}`,
-
-        // Format 3: Without trailing slash in query
-        `${basePath}therapist/${therapistId}/monthly?year=${year}&month=${month}`,
-
-        // Format 4: Without trailing slash in query for legacy
-        `${basePath}monthly/${therapistId}?year=${year}&month=${month}`
-      ];
-
-      // Try each URL format
-      for (const url of urlFormats) {
-        try {
-          console.log(`Trying URL format: ${url}`);
-          const response = await api.get(url);
-          console.log('Success with URL format:', url);
-          return response;
-        } catch (error) {
-          // Continue to next format if this one fails
-          if (error.response && error.response.status === 404) {
-            console.log(`404 Not Found for URL format: ${url}`);
-            continue;
-          }
-          // For other errors, throw immediately
-          throw error;
-        }
+      console.log(`Fetching monthly earnings from: ${url}`);
+      const response = await api.get(url);
+      console.log('Monthly earnings fetched successfully');
+      return response;
+    } catch (error) {
+      // If the endpoint returns 404, log and use mock data
+      if (error.response && error.response.status === 404) {
+        console.log(`404 Not Found for earnings endpoint: ${error.config?.url}`);
+        // Fall through to mock data generation
+      } else {
+        // For other errors, log the error
+        console.error('Error fetching monthly earnings:', error);
       }
 
-      // If all formats fail, throw a proper error object
-      const error = new Error('All URL formats returned 404');
-      error.response = { status: 404 };
-      throw error;
-
-    } catch (error) {
-      // If all API endpoints fail, generate mock data as a fallback
-      console.log('All earnings endpoints failed, using mock data as fallback');
+      // Generate mock data as fallback
+      console.log('Using mock earnings data as fallback');
       const mockData = await this.getMockEarnings(therapistId, year, month);
       // Add a flag to indicate this is mock data
       mockData.data.isMockData = true;

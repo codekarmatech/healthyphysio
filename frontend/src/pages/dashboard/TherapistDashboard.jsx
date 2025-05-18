@@ -9,17 +9,25 @@ import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
 import EarningsChart from '../../components/earnings/EarningsChart';
 import EarningsSummary from '../../components/earnings/EarningsSummary';
 import EquipmentRequestsSummary from '../../components/equipment/EquipmentRequestsSummary';
-import { getTodayISOString } from '../../utils/dateUtils';
 import { tryApiCall } from '../../utils/apiErrorHandler';
 import ProximityAlertComponent from '../../components/visits/ProximityAlertComponent';
 
 // Import your API services
 import api from '../../services/api';
 import earningsService from '../../services/earningsService';
-import { visitsService, alertService } from '../../services/visitsService';
+import { visitsService, alertService, reportsService } from '../../services/visitsService';
+import appointmentService from '../../services/appointmentService';
+import patientService from '../../services/patientService';
+import therapistService from '../../services/therapistService';
+import useFeatureAccess from '../../hooks/useFeatureAccess';
+import FeatureGuard from '../../components/common/FeatureGuard';
+import { isMockData } from '../../utils/responseNormalizer';
 
 const TherapistDashboard = () => {
   const { user } = useAuth(); // Get user from context
+  // Use the feature access hook
+  const { featureAccess, refreshAccess } = useFeatureAccess();
+
   const [stats, setStats] = useState({
     upcomingAppointments: 0,
     todayAppointments: 0,
@@ -29,8 +37,8 @@ const TherapistDashboard = () => {
     equipmentRequests: 0,
     activeVisits: 0,
     pendingReports: 0,
+    pendingTreatmentPlanChangeRequests: 0,
   });
-
 
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [activeVisits, setActiveVisits] = useState([]);
@@ -47,68 +55,63 @@ const TherapistDashboard = () => {
   const [attendanceDays, setAttendanceDays] = useState([]);
   const [isAttendanceMockData, setIsAttendanceMockData] = useState(false);
 
-  // State to track if therapist is approved
-  const [isApproved, setIsApproved] = useState(false);
+  // We don't need isApproved state anymore since we're using featureAccess
 
   // State for earnings data
   const [earningsData, setEarningsData] = useState(null);
   const [earningsLoading, setEarningsLoading] = useState(true);
   const [earningsError, setEarningsError] = useState(null);
 
-  // Object to store feature access permissions
-  const [featureAccess, setFeatureAccess] = useState({
-    attendance: true, // Set to true for development/testing
-    earnings: true,   // Set to true for development/testing
-    equipment: true,  // Set to true for development/testing
-    visits: true,     // Set to true for development/testing
-    // Add more features here as needed
-    // example: patientManagement: false,
-    // example: reportGeneration: false,
-  });
-
   // Memoized fetch function to satisfy hook dependency requirements
   const fetchAttendanceSummary = useCallback(async () => {
     setAttendanceLoading(true);
-    setAttendanceError(null);
-    try {
-      // Check if the user is authenticated
-      if (!user) {
-        console.warn('User not authenticated or token missing');
-        setAttendanceError('Authentication required. Please log in again.');
-        setAttendanceLoading(false);
-        return;
+
+    await tryApiCall(
+      async () => {
+        // Check if the user is authenticated
+        if (!user) {
+          throw new Error('User not authenticated or token missing');
+        }
+
+        // Use therapist_id from user object if available
+        const therapistId = user.therapist_id || user.id;
+
+        // The updated getMonthlyAttendance method will return real data or mock data
+        const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
+
+        // Check if we got mock data (for logging purposes)
+        if (response.isMockData) {
+          console.log('Using mock attendance data for display');
+          setIsAttendanceMockData(true);
+        } else {
+          setIsAttendanceMockData(false);
+        }
+
+        setAttendanceSummary(response.data);
+        setAttendanceDays(response.data?.days || []);
+
+        // Clear any previous errors since we got data (real or mock)
+        setAttendanceError(null);
+
+        return response;
+      },
+      {
+        context: 'attendance data',
+        setLoading: setAttendanceLoading,
+        onError: (error) => {
+          console.error('Error fetching attendance summary:', error);
+
+          // Set an appropriate error message
+          if (error.response?.status === 401) {
+            setAttendanceError('Authentication failed. Please log in again.');
+          } else if (error.message === 'User not authenticated or token missing') {
+            setAttendanceError('Authentication required. Please log in again.');
+          } else {
+            setAttendanceError(error.response?.data?.message || 'Failed to load attendance data');
+          }
+        }
       }
-
-      // Use therapist_id from user object if available
-      const therapistId = user.therapist_id || user.id;
-
-      // The updated getMonthlyAttendance method will return real data or mock data
-      const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
-
-      // Check if we got mock data (for logging purposes)
-      if (response.isMockData) {
-        console.log('Using mock attendance data for display');
-        setIsAttendanceMockData(true);
-      } else {
-        setIsAttendanceMockData(false);
-      }
-
-      setAttendanceSummary(response.data);
-      setAttendanceDays(response.data?.days || []);
-
-      // Clear any previous errors since we got data (real or mock)
-      setAttendanceError(null);
-    } catch (error) {
-      console.error('Error fetching attendance summary:', error);
-      // This should not happen since getMonthlyAttendance now handles errors internally
-      // and returns mock data instead of throwing, but we'll keep this as a fallback
-      const errorMessage = error.response?.status === 401
-        ? 'Authentication failed. Please log in again.'
-        : error.response?.data?.message || 'Failed to load attendance data';
-      setAttendanceError(errorMessage);
-    } finally {
-      setAttendanceLoading(false);
-    }
+    );
   }, [currentYear, currentMonth, user]);
 
   // Fetch active visits and check for proximity alerts
@@ -167,161 +170,222 @@ const TherapistDashboard = () => {
   // Fetch dashboard data from backend
   useEffect(() => {
     const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
+      setLoading(true);
 
-        // Get therapist ID from user object
-        const therapistId = user.therapist_id || user.id;
+      // Use our tryApiCall utility directly
+      await tryApiCall(
+        async () => {
+          // Try the consolidated dashboard summary endpoint first
+          console.log('Attempting to fetch dashboard summary from consolidated endpoint');
+          const summaryResponse = await therapistService.getDashboardSummary();
 
-        // Fetch upcoming appointments
-        const upcomingResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&status=SCHEDULED,RESCHEDULED`);
+          // Check if the endpoint returned data
+          if (summaryResponse && summaryResponse.data) {
+            console.log('Successfully fetched dashboard summary from consolidated endpoint');
 
-        // Fetch today's appointments
-        const today = getTodayISOString();
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        const todayResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&datetime__gte=${today}&datetime__lt=${tomorrowStr}`);
+            // Extract data from the summary response
+            const summary = summaryResponse.data;
 
-        // Fetch assigned patients count
-        const patientsResponse = await api.get(`/users/patients/?therapist=${therapistId}`);
-        const patientCount = patientsResponse.data.count || patientsResponse.data.length || 0;
+            // Update stats with data from summary
+            setStats({
+              upcomingAppointments: summary.upcoming_appointments_count || 0,
+              todayAppointments: summary.today_appointments_count || 0,
+              totalPatients: summary.total_patients || 0,
+              pendingAssessments: summary.pending_assessments_count || 0,
+              monthlyEarnings: (summary.monthly_earnings || 0).toFixed(2),
+              equipmentAllocations: summary.equipment_allocations_count || 0,
+              equipmentRequests: summary.equipment_requests_count || 0,
+              activeVisits: summary.active_visits_count || 0,
+              pendingReports: summary.pending_reports_count || 0,
+              pendingTreatmentPlanChangeRequests: summary.pending_treatment_plan_change_requests_count || 0
+            });
 
-        // Fetch pending assessments
-        const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
+            // Format recent appointments from summary
+            if (summary.recent_appointments && Array.isArray(summary.recent_appointments)) {
+              const formattedAppointments = summary.recent_appointments.map(appointment => ({
+                id: appointment.id,
+                patientName: appointment.patient_name || 'Unknown Patient',
+                date: appointment.datetime,
+                status: appointment.status.toLowerCase(),
+                type: appointment.issue || 'Consultation',
+              }));
 
-        // Fetch equipment allocations
-        let equipmentAllocations = 0;
-        let equipmentRequests = 0;
-        try {
-          const allocationsResponse = await api.get(`/equipment/allocations/`);
-          equipmentAllocations = allocationsResponse.data.count || allocationsResponse.data.length || 0;
+              setRecentAppointments(formattedAppointments);
+            }
 
-          const requestsResponse = await api.get(`/equipment/requests/`);
-          equipmentRequests = requestsResponse.data.count || requestsResponse.data.length || 0;
-        } catch (equipmentError) {
-          console.error('Error fetching equipment data:', equipmentError);
-        }
+            // If we have treatment plan change requests, we can use them later
+            if (summary.treatment_plan_change_requests && Array.isArray(summary.treatment_plan_change_requests)) {
+              // Store them for use in notifications or indicators
+              console.log(`Found ${summary.treatment_plan_change_requests.length} treatment plan change requests`);
+            }
 
-        // Fetch active visits count
-        let activeVisitsCount = 0;
-        let pendingReportsCount = 0;
-        try {
-          const visitsResponse = await visitsService.getAll({
-            therapist: therapistId,
-            status: 'scheduled,en_route,arrived,in_session'
+            return { success: true };
+          }
+
+          // If we reach here, the summary endpoint didn't work, so we fall back to individual API calls
+          console.log('Dashboard summary endpoint not available, using individual API calls');
+
+          // Get therapist ID from user object
+          const therapistId = user.therapist_id || user.id;
+
+          // Fetch upcoming appointments using the service
+          const upcomingResponse = await appointmentService.getByTherapist(therapistId, {
+            status: 'SCHEDULED,RESCHEDULED'
           });
-          activeVisitsCount = visitsResponse.data.length || 0;
 
-          // Fetch pending reports count
-          const reportsResponse = await api.get(`/visits/reports/?therapist=${therapistId}&status=draft`);
-          pendingReportsCount = reportsResponse.data.count || reportsResponse.data.length || 0;
-        } catch (visitsError) {
-          console.error('Error fetching visits data:', visitsError);
-        }
+          // Fetch today's appointments using the service
+          const todayResponse = await appointmentService.getTherapistTodayAppointments(therapistId);
 
-        // Fetch recent appointments (limit to 5)
-        const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
+          // Fetch assigned patients count using the service
+          const patientsResponse = await patientService.getByTherapist(therapistId);
+          const patientCount = patientsResponse.data.count || patientsResponse.data.length || 0;
 
-        // Fetch monthly earnings
-        let monthlyEarnings = 0;
-        try {
-          // Get real earnings data from API
-          const currentMonth = new Date().getMonth() + 1;
-          const currentYear = new Date().getFullYear();
+          // Fetch pending assessments
+          const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
 
-          console.log(`Fetching earnings data for therapist ${therapistId}, ${currentYear}-${currentMonth}`);
+          // Fetch equipment allocations
+          let equipmentAllocations = 0;
+          let equipmentRequests = 0;
+          try {
+            const allocationsResponse = await api.get(`/equipment/allocations/`);
+            equipmentAllocations = allocationsResponse.data.count || allocationsResponse.data.length || 0;
 
-          // Use the earnings service instead of direct API call
-          // Use the earnings service to get monthly earnings
-          const earningsService = (await import('../../services/earningsService')).default;
-          const earningsResponse = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
+            const requestsResponse = await api.get(`/equipment/requests/`);
+            equipmentRequests = requestsResponse.data.count || requestsResponse.data.length || 0;
+          } catch (equipmentError) {
+            console.error('Error fetching equipment data:', equipmentError);
+          }
 
-          // Check if we have a valid response
-          if (earningsResponse && earningsResponse.data) {
-            // The API will return either real data or sample data for new therapists
-            if (earningsResponse.data.summary) {
-              monthlyEarnings = earningsResponse.data.summary.totalEarned || 0;
+          // Fetch active visits count
+          let activeVisitsCount = 0;
+          let pendingReportsCount = 0;
+          try {
+            const visitsResponse = await visitsService.getAll({
+              therapist: therapistId,
+              status: 'scheduled,en_route,arrived,in_session'
+            });
+            activeVisitsCount = visitsResponse.data?.length || 0;
 
-              // If this is sample data, log it (but still use it)
-              if (earningsResponse.data.isMockData) {
-                console.info('Using sample earnings data for new therapist');
+            // Fetch pending reports count using the service
+            const reportsResponse = await reportsService.getByTherapist(therapistId, { status: 'draft' });
+            pendingReportsCount = reportsResponse.data?.count || reportsResponse.data?.length || 0;
+          } catch (visitsError) {
+            console.error('Error fetching visits data:', visitsError);
+          }
+
+          // Fetch recent appointments (limit to 5)
+          const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
+
+          // Fetch monthly earnings
+          let monthlyEarnings = 0;
+          try {
+            // Get real earnings data from API
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+
+            console.log(`Fetching earnings data for therapist ${therapistId}, ${currentYear}-${currentMonth}`);
+
+            // Use the earnings service that's already imported at the top of the file
+            const earningsResponse = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
+
+            // Check if we have a valid response
+            if (earningsResponse && earningsResponse.data) {
+              // The API will return either real data or sample data for new therapists
+              if (earningsResponse.data.summary) {
+                monthlyEarnings = earningsResponse.data.summary.totalEarned || 0;
+
+                // If this is sample data, log it (but still use it)
+                if (earningsResponse.data.isMockData) {
+                  console.info('Using sample earnings data for new therapist');
+                }
+              } else {
+                console.log('Response received but no summary data:', earningsResponse.data);
+                // Set a default value
+                monthlyEarnings = 0;
               }
             } else {
-              console.log('Response received but no summary data:', earningsResponse.data);
-              // Set a default value
-              monthlyEarnings = 0;
+              console.warn('Invalid earnings response format:', earningsResponse);
             }
-          } else {
-            console.warn('Invalid earnings response format:', earningsResponse);
+          } catch (earningsError) {
+            console.error('Error fetching earnings data:', earningsError);
+            monthlyEarnings = 0;
           }
-        } catch (earningsError) {
-          console.error('Error fetching earnings data:', earningsError);
-          monthlyEarnings = 0;
-        }
 
-        // Update stats
-        setStats({
-          upcomingAppointments: upcomingResponse.data.count || upcomingResponse.data.length || 0,
-          todayAppointments: todayResponse.data.count || todayResponse.data.length || 0,
-          totalPatients: patientCount,
-          pendingAssessments: assessmentsResponse.data.count || assessmentsResponse.data.length || 0,
-          monthlyEarnings: monthlyEarnings.toFixed(2),
-          equipmentAllocations: equipmentAllocations,
-          equipmentRequests: equipmentRequests,
-          activeVisits: activeVisitsCount,
-          pendingReports: pendingReportsCount
-        });
+          // Try to fetch treatment plan change requests
+          let pendingTreatmentPlanChangeRequests = 0;
+          try {
+            const changeRequestsResponse = await therapistService.getTreatmentPlanChangeRequests('pending');
+            pendingTreatmentPlanChangeRequests = changeRequestsResponse.data?.length || 0;
+          } catch (changeRequestsError) {
+            console.error('Error fetching treatment plan change requests:', changeRequestsError);
+          }
 
-        // Format recent appointments
-        const formattedAppointments = (recentResponse.data.results || recentResponse.data).map(appointment => ({
-          id: appointment.id,
-          patientName: appointment.patient_details ?
-            `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` :
-            'Unknown Patient',
-          date: appointment.datetime,
-          status: appointment.status.toLowerCase(),
-          type: appointment.issue || 'Consultation',
-        }));
+          // Update stats
+          setStats({
+            upcomingAppointments: upcomingResponse.data?.count || upcomingResponse.data?.length || 0,
+            todayAppointments: todayResponse.data?.count || todayResponse.data?.length || 0,
+            totalPatients: patientCount,
+            pendingAssessments: assessmentsResponse.data?.count || assessmentsResponse.data?.length || 0,
+            monthlyEarnings: monthlyEarnings.toFixed(2),
+            equipmentAllocations: equipmentAllocations,
+            equipmentRequests: equipmentRequests,
+            activeVisits: activeVisitsCount,
+            pendingReports: pendingReportsCount,
+            pendingTreatmentPlanChangeRequests: pendingTreatmentPlanChangeRequests
+          });
 
-        setRecentAppointments(formattedAppointments);
-        setLoading(false);
-      } catch (error) {
-        // Use our error handler utility
-        tryApiCall(
-          () => { throw error; }, // Just to reuse the error handling logic
-          {
-            context: 'dashboard data',
-            setLoading: setLoading,
-            defaultData: {
-              stats: {
-                upcomingAppointments: 0,
-                todayAppointments: 0,
-                totalPatients: 0,
-                pendingAssessments: 0,
-                monthlyEarnings: '0.00',
-                equipmentAllocations: 0,
-                equipmentRequests: 0
-              },
-              appointments: []
+          // Format recent appointments
+          const formattedAppointments = (recentResponse.data?.results || recentResponse.data || []).map(appointment => ({
+            id: appointment.id,
+            patientName: appointment.patient_details ?
+              `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` :
+              'Unknown Patient',
+            date: appointment.datetime,
+            status: appointment.status.toLowerCase(),
+            type: appointment.issue || 'Consultation',
+          }));
+
+          setRecentAppointments(formattedAppointments);
+
+          return { success: true };
+        },
+        {
+          context: 'dashboard data',
+          setLoading: setLoading,
+          defaultData: {
+            stats: {
+              upcomingAppointments: 0,
+              todayAppointments: 0,
+              totalPatients: 0,
+              pendingAssessments: 0,
+              monthlyEarnings: '0.00',
+              equipmentAllocations: 0,
+              equipmentRequests: 0,
+              activeVisits: 0,
+              pendingReports: 0,
+              pendingTreatmentPlanChangeRequests: 0
             },
-            onSuccess: null // No success handler needed here
+            appointments: []
+          },
+          onError: (error) => {
+            console.error('Error fetching dashboard data:', error);
+            // Set default data
+            setStats({
+              upcomingAppointments: 0,
+              todayAppointments: 0,
+              totalPatients: 0,
+              pendingAssessments: 0,
+              monthlyEarnings: '0.00',
+              equipmentAllocations: 0,
+              equipmentRequests: 0,
+              activeVisits: 0,
+              pendingReports: 0,
+              pendingTreatmentPlanChangeRequests: 0
+            });
+            setRecentAppointments([]);
           }
-        );
-
-        // Set default data
-        setStats({
-          upcomingAppointments: 0,
-          todayAppointments: 0,
-          totalPatients: 0,
-          pendingAssessments: 0,
-          monthlyEarnings: '0.00',
-          equipmentAllocations: 0,
-          equipmentRequests: 0
-        });
-        setRecentAppointments([]);
-        setLoading(false);
-      }
+        }
+      );
     };
 
     if (user) {
@@ -329,116 +393,24 @@ const TherapistDashboard = () => {
     }
   }, [user]);
 
-  // Check therapist approval status and update feature access
-  useEffect(() => {
-    const checkApprovalStatus = async () => {
-      try {
-        if (!user) return;
-
-        // Get therapist ID from user object
-        const therapistId = user.therapist_id || user.id;
-
-        // Define all possible endpoints to try
-        const endpoints = [
-          `/users/therapist-status/`,
-          `/users/therapists/${therapistId}/status/`
-        ];
-
-        let success = false;
-
-        // Try each endpoint until one succeeds
-        for (const endpoint of endpoints) {
-          try {
-            console.log(`Trying endpoint: ${endpoint}`);
-            const response = await api.get(endpoint);
-
-            // Update approval status
-            setIsApproved(response.data.is_approved);
-
-            // Update feature access based on specific approval fields
-            // Use attendance_approved if available, otherwise fall back to is_approved
-            const attendanceApproved =
-              response.data.attendance_approved === true ||
-              (response.data.attendance_approved === undefined && response.data.is_approved === true);
-
-            console.log('Attendance approval status:', {
-              attendance_approved: response.data.attendance_approved,
-              is_approved: response.data.is_approved,
-              attendanceApproved
-            });
-
-            // Check if visits_approved is available, otherwise fall back to is_approved
-            const visitsApproved =
-              response.data.visits_approved === true ||
-              (response.data.visits_approved === undefined && response.data.is_approved === true);
-
-            setFeatureAccess(prevAccess => ({
-              ...prevAccess,
-              attendance: attendanceApproved,
-              earnings: response.data.is_approved,
-              equipment: response.data.is_approved,
-              visits: visitsApproved,
-              // Update other features as needed based on response data
-            }));
-
-            console.log(`Approval status: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
-            success = true;
-            break; // Exit the loop if successful
-          } catch (endpointError) {
-            console.log(`Endpoint ${endpoint} failed: ${endpointError.message}`);
-            // Continue to the next endpoint
-          }
-        }
-
-        // If all endpoints failed, set default values
-        if (!success) {
-          console.error('All approval status endpoints failed');
-          setIsApproved(false);
-          setFeatureAccess(prevAccess => ({
-            ...prevAccess,
-            attendance: false,
-            earnings: false,
-            equipment: false,
-            visits: false,
-            // Reset other features as needed
-          }));
-        }
-
-      } catch (error) {
-        console.error('Error checking approval status:', error);
-        setIsApproved(false);
-        setFeatureAccess(prevAccess => ({
-          ...prevAccess,
-          attendance: false,
-          earnings: false,
-          equipment: false,
-          visits: false,
-          // Reset other features as needed
-        }));
-      }
-    };
-
-    checkApprovalStatus();
-  }, [user]);
+  // We don't need to track approval status separately anymore
+  // since we're using featureAccess directly
 
   // Memoized function to fetch earnings data
   const fetchEarningsData = useCallback(async () => {
     setEarningsLoading(true);
-    setEarningsError(null);
-    try {
-      // Check if the user is authenticated
-      if (!user) {
-        console.warn('User not authenticated or token missing');
-        setEarningsError('Authentication required. Please log in again.');
-        setEarningsLoading(false);
-        return;
-      }
 
-      // Use therapist_id from user object if available
-      const therapistId = user.therapist_id || user.id;
+    await tryApiCall(
+      async () => {
+        // Check if the user is authenticated
+        if (!user) {
+          throw new Error('User not authenticated or token missing');
+        }
 
-      try {
-        // Use earningsService instead of direct API call
+        // Use therapist_id from user object if available
+        const therapistId = user.therapist_id || user.id;
+
+        // Use earningsService
         const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
 
         // Check if we have a valid response
@@ -456,38 +428,33 @@ const TherapistDashboard = () => {
           // Log success for debugging
           console.log('Successfully loaded earnings data:', response.data);
         } else {
-          console.warn('Invalid response format:', response);
-          setEarningsError('Received an invalid response format from the server.');
+          throw new Error('Invalid response format from earnings API');
         }
-      } catch (apiError) {
-        console.error('Error fetching earnings data:', apiError);
-        setEarningsData(null);
 
-        // Set an appropriate error message
-        if (apiError.response?.status === 404) {
-          setEarningsError('Earnings data not found for this period.');
-        } else if (apiError.response?.status === 403) {
-          setEarningsError('You don\'t have permission to view these earnings.');
-        } else {
-          setEarningsError('Failed to load earnings data. Please try again later.');
+        return response;
+      },
+      {
+        context: 'earnings data',
+        setLoading: setEarningsLoading,
+        onError: (error) => {
+          console.error('Error fetching earnings data:', error);
+          setEarningsData(null);
+
+          // Set an appropriate error message
+          if (error.response?.status === 404) {
+            setEarningsError('Earnings data not found for this period.');
+          } else if (error.response?.status === 403) {
+            setEarningsError('You don\'t have permission to view these earnings.');
+          } else if (error.response?.status === 401) {
+            setEarningsError('Authentication failed. Please log in again.');
+          } else if (error.message === 'User not authenticated or token missing') {
+            setEarningsError('Authentication required. Please log in again.');
+          } else {
+            setEarningsError('Failed to load earnings data. Please try again later.');
+          }
         }
       }
-    } catch (error) {
-      console.error('Error fetching earnings data:', error);
-      const errorMessage = error.response?.status === 401
-        ? 'Authentication failed. Please log in again.'
-        : error.response?.data?.message || 'Failed to load earnings data';
-      setEarningsError(errorMessage);
-
-      // Set a user-friendly error message
-      if (error.response?.status === 404) {
-        setEarningsError('The earnings data endpoint is not available yet. Using mock data instead.');
-      } else {
-        setEarningsError('There was a problem loading your earnings data. Please try again later.');
-      }
-    } finally {
-      setEarningsLoading(false);
-    }
+    );
   }, [currentYear, currentMonth, user]);
 
   // Add useEffect for attendance data
@@ -506,80 +473,20 @@ const TherapistDashboard = () => {
     }
   }, [fetchEarningsData, featureAccess.earnings]);
 
-  // Add an effect to check approval status periodically
+  // Add an effect to refresh feature access periodically
   // This ensures that if admin revokes approval, the UI updates
   useEffect(() => {
-    // Check approval status every 30 seconds
+    // Refresh feature access every 60 seconds
     const intervalId = setInterval(() => {
       if (user) {
-        const checkApprovalStatus = async () => {
-          try {
-            const therapistId = user.therapist_id || user.id;
-
-            // Define all possible endpoints to try
-            const endpoints = [
-              `/users/therapist-status/`,
-              `/users/therapists/${therapistId}/status/`
-            ];
-
-            let success = false;
-
-            // Try each endpoint until one succeeds
-            for (const endpoint of endpoints) {
-              try {
-                const response = await api.get(endpoint);
-
-                // Update approval status
-                setIsApproved(response.data.is_approved);
-
-                // Update feature access based on specific approval fields
-                // Use attendance_approved if available, otherwise fall back to is_approved
-                const attendanceApproved =
-                  response.data.attendance_approved === true ||
-                  (response.data.attendance_approved === undefined && response.data.is_approved === true);
-
-                // Check if visits_approved is available, otherwise fall back to is_approved
-                const visitsApproved =
-                  response.data.visits_approved === true ||
-                  (response.data.visits_approved === undefined && response.data.is_approved === true);
-
-                setFeatureAccess(prevAccess => ({
-                  ...prevAccess,
-                  attendance: attendanceApproved,
-                  earnings: response.data.is_approved,
-                  visits: visitsApproved,
-                }));
-
-                // Log status change if it changed
-                if (response.data.is_approved !== isApproved) {
-                  console.log(`Approval status changed to: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
-                }
-
-                success = true;
-                break; // Exit the loop if successful
-              } catch (endpointError) {
-                // Continue to the next endpoint silently in periodic check
-              }
-            }
-
-            // If all endpoints failed, set default values
-            if (!success) {
-              console.log('Periodic check: All approval status endpoints failed');
-              // Don't reset values here to avoid flickering if it's just a temporary network issue
-            }
-
-          } catch (error) {
-            console.error('Error in periodic approval status check:', error);
-          }
-        };
-
-        checkApprovalStatus();
+        console.log('Performing periodic refresh of feature access');
+        refreshAccess();
       }
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds - reduced frequency to avoid excessive API calls
 
     // Clean up interval on component unmount
     return () => clearInterval(intervalId);
-  }, [user, isApproved]);
+  }, [user, refreshAccess]);
 
   // Add handlers for month navigation
   const handlePrevMonth = () => {
@@ -620,22 +527,24 @@ const TherapistDashboard = () => {
       );
     }
 
-    // If user has access to the feature, show the component
-    if (featureAccess[featureName]) {
-      return component;
-    }
-
-    // Otherwise show the waiting message
+    // Use the FeatureGuard component to handle access control
     return (
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
-        <div className="flex flex-col items-center justify-center">
-          <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
-          <p className="text-gray-600">{waitingMessage || "This feature requires admin approval before you can access it."}</p>
-        </div>
-      </div>
+      <FeatureGuard
+        feature={featureName}
+        fallback={
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
+            <div className="flex flex-col items-center justify-center">
+              <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+              <p className="text-gray-600">{waitingMessage || "This feature requires admin approval before you can access it."}</p>
+            </div>
+          </div>
+        }
+      >
+        {component}
+      </FeatureGuard>
     );
   };
 
@@ -1384,6 +1293,7 @@ const TherapistDashboard = () => {
                       <EarningsSummary
                         summary={earningsData?.summary}
                         loading={earningsLoading}
+                        isMockData={isMockData(earningsData)}
                       />
                     </div>,
                     "Earnings summary requires admin approval.",
@@ -1689,4 +1599,6 @@ const TherapistDashboard = () => {
 };
 
 export default TherapistDashboard;
+
+
 

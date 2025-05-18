@@ -49,8 +49,7 @@ urlpatterns = [
     path('therapists/<int:pk>/status/', views.TherapistStatusDetailView.as_view(), name='therapist-status-detail'),
     path('therapists/<int:therapist_id>/status/', views.TherapistStatusDetailView.as_view(), name='therapist-status-detail-alt'),
 
-    # Explicit hardcoded path for therapist ID 2 - this is a special case for the frontend
-    path('therapists/2/status/', views.TherapistStatusDetailView.as_view(), name='therapist-2-status'),
+    # No more hardcoded paths - all therapist status requests should use the dynamic paths above
     path('pending-therapists/', views.PendingTherapistsView.as_view(), name='pending-therapists'),
     path('approve-therapist/<int:pk>/', views.ApproveTherapistView.as_view(), name='approve-therapist'),
 
@@ -59,6 +58,8 @@ urlpatterns = [
 
     # Dashboard summary endpoints
     path('therapist/dashboard/summary/', TherapistDashboardSummaryViewSet.as_view({'get': 'list'}), name='therapist-dashboard-summary'),
+    # Add an additional URL pattern with hyphen instead of slash for consistency
+    path('therapist-dashboard-summary/', TherapistDashboardSummaryViewSet.as_view({'get': 'list'}), name='therapist-dashboard-summary-alt'),
     path('patient/dashboard/summary/', PatientDashboardSummaryViewSet.as_view({'get': 'list'}), name='patient-dashboard-summary'),
     path('doctor/dashboard/summary/', DoctorDashboardSummaryViewSet.as_view({'get': 'list'}), name='doctor-dashboard-summary'),
     path('admin/dashboard/summary/', AdminDashboardSummaryViewSet.as_view({'get': 'list'}), name='admin-dashboard-summary'),
