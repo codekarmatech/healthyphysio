@@ -9,15 +9,25 @@ import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
 import EarningsChart from '../../components/earnings/EarningsChart';
 import EarningsSummary from '../../components/earnings/EarningsSummary';
 import EquipmentRequestsSummary from '../../components/equipment/EquipmentRequestsSummary';
-import { getTodayISOString } from '../../utils/dateUtils';
 import { tryApiCall } from '../../utils/apiErrorHandler';
+import ProximityAlertComponent from '../../components/visits/ProximityAlertComponent';
 
 // Import your API services
 import api from '../../services/api';
 import earningsService from '../../services/earningsService';
+import { visitsService, alertService, reportsService } from '../../services/visitsService';
+import appointmentService from '../../services/appointmentService';
+import patientService from '../../services/patientService';
+import therapistService from '../../services/therapistService';
+import useFeatureAccess from '../../hooks/useFeatureAccess';
+import FeatureGuard from '../../components/common/FeatureGuard';
+import { isMockData } from '../../utils/responseNormalizer';
 
 const TherapistDashboard = () => {
   const { user } = useAuth(); // Get user from context
+  // Use the feature access hook
+  const { featureAccess, refreshAccess } = useFeatureAccess();
+
   const [stats, setStats] = useState({
     upcomingAppointments: 0,
     todayAppointments: 0,
@@ -25,11 +35,16 @@ const TherapistDashboard = () => {
     pendingAssessments: 0,
     equipmentAllocations: 0,
     equipmentRequests: 0,
+    activeVisits: 0,
+    pendingReports: 0,
+    pendingTreatmentPlanChangeRequests: 0,
   });
 
-
   const [recentAppointments, setRecentAppointments] = useState([]);
+  const [activeVisits, setActiveVisits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [visitsLoading, setVisitsLoading] = useState(true);
+  const [visitsError, setVisitsError] = useState(null);
 
   // Add attendance state variables
   const [attendanceSummary, setAttendanceSummary] = useState(null);
@@ -40,208 +55,337 @@ const TherapistDashboard = () => {
   const [attendanceDays, setAttendanceDays] = useState([]);
   const [isAttendanceMockData, setIsAttendanceMockData] = useState(false);
 
-  // State to track if therapist is approved
-  const [isApproved, setIsApproved] = useState(false);
+  // We don't need isApproved state anymore since we're using featureAccess
 
   // State for earnings data
   const [earningsData, setEarningsData] = useState(null);
   const [earningsLoading, setEarningsLoading] = useState(true);
   const [earningsError, setEarningsError] = useState(null);
 
-  // Object to store feature access permissions
-  const [featureAccess, setFeatureAccess] = useState({
-    attendance: true, // Set to true for development/testing
-    earnings: true,   // Set to true for development/testing
-    equipment: true,  // Set to true for development/testing
-    // Add more features here as needed
-    // example: patientManagement: false,
-    // example: reportGeneration: false,
-  });
-
   // Memoized fetch function to satisfy hook dependency requirements
   const fetchAttendanceSummary = useCallback(async () => {
     setAttendanceLoading(true);
-    setAttendanceError(null);
-    try {
-      // Check if the user is authenticated
-      if (!user) {
-        console.warn('User not authenticated or token missing');
-        setAttendanceError('Authentication required. Please log in again.');
-        setAttendanceLoading(false);
-        return;
-      }
 
-      // Use therapist_id from user object if available
+    await tryApiCall(
+      async () => {
+        // Check if the user is authenticated
+        if (!user) {
+          throw new Error('User not authenticated or token missing');
+        }
+
+        // Use therapist_id from user object if available
+        const therapistId = user.therapist_id || user.id;
+
+        // The updated getMonthlyAttendance method will return real data or mock data
+        const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
+
+        // Check if we got mock data (for logging purposes)
+        if (response.isMockData) {
+          console.log('Using mock attendance data for display');
+          setIsAttendanceMockData(true);
+        } else {
+          setIsAttendanceMockData(false);
+        }
+
+        setAttendanceSummary(response.data);
+        setAttendanceDays(response.data?.days || []);
+
+        // Clear any previous errors since we got data (real or mock)
+        setAttendanceError(null);
+
+        return response;
+      },
+      {
+        context: 'attendance data',
+        setLoading: setAttendanceLoading,
+        onError: (error) => {
+          console.error('Error fetching attendance summary:', error);
+
+          // Set an appropriate error message
+          if (error.response?.status === 401) {
+            setAttendanceError('Authentication failed. Please log in again.');
+          } else if (error.message === 'User not authenticated or token missing') {
+            setAttendanceError('Authentication required. Please log in again.');
+          } else {
+            setAttendanceError(error.response?.data?.message || 'Failed to load attendance data');
+          }
+        }
+      }
+    );
+  }, [currentYear, currentMonth, user]);
+
+  // Fetch active visits and check for proximity alerts
+  const fetchActiveVisits = useCallback(async () => {
+    if (!user) return;
+
+    setVisitsLoading(true);
+    setVisitsError(null);
+
+    try {
+      // Get therapist ID from user object
       const therapistId = user.therapist_id || user.id;
 
-      // The updated getMonthlyAttendance method will return real data or mock data
-      const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
+      // Fetch active visits (scheduled, en_route, arrived, in_session)
+      const response = await visitsService.getAll({
+        therapist: therapistId,
+        status: 'scheduled,en_route,arrived,in_session'
+      });
 
-      // Check if we got mock data (for logging purposes)
-      if (response.isMockData) {
-        console.log('Using mock attendance data for display');
-        setIsAttendanceMockData(true);
-      } else {
-        setIsAttendanceMockData(false);
+      // Sort visits by scheduled_start
+      const sortedVisits = response.data.sort((a, b) =>
+        new Date(a.scheduled_start) - new Date(b.scheduled_start)
+      );
+
+      setActiveVisits(sortedVisits);
+
+      // Check for any active proximity alerts
+      try {
+        const alertsResponse = await alertService.getAll({ status: 'active,acknowledged' });
+        if (alertsResponse.data && alertsResponse.data.length > 0) {
+          console.log(`Found ${alertsResponse.data.length} active proximity alerts`);
+          // We're now using the alertService, so this variable is properly utilized
+        }
+      } catch (alertError) {
+        console.error('Error checking proximity alerts:', alertError);
       }
 
-      setAttendanceSummary(response.data);
-      setAttendanceDays(response.data?.days || []);
-
-      // Clear any previous errors since we got data (real or mock)
-      setAttendanceError(null);
+      setVisitsLoading(false);
     } catch (error) {
-      console.error('Error fetching attendance summary:', error);
-      // This should not happen since getMonthlyAttendance now handles errors internally
-      // and returns mock data instead of throwing, but we'll keep this as a fallback
-      const errorMessage = error.response?.status === 401
-        ? 'Authentication failed. Please log in again.'
-        : error.response?.data?.message || 'Failed to load attendance data';
-      setAttendanceError(errorMessage);
-    } finally {
-      setAttendanceLoading(false);
+      console.error('Error fetching active visits:', error);
+      setVisitsError('Failed to load active visits. Please try again.');
+      setVisitsLoading(false);
+
+      // Set empty array as fallback
+      setActiveVisits([]);
     }
-  }, [currentYear, currentMonth, user]);
+  }, [user]);
+
+  // Fetch active visits when component mounts
+  useEffect(() => {
+    if (featureAccess.visits) {
+      fetchActiveVisits();
+    }
+  }, [fetchActiveVisits, featureAccess.visits]);
 
   // Fetch dashboard data from backend
   useEffect(() => {
     const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
+      setLoading(true);
 
-        // Get therapist ID from user object
-        const therapistId = user.therapist_id || user.id;
+      // Use our tryApiCall utility directly
+      await tryApiCall(
+        async () => {
+          // Try the consolidated dashboard summary endpoint first
+          console.log('Attempting to fetch dashboard summary from consolidated endpoint');
+          const summaryResponse = await therapistService.getDashboardSummary();
 
-        // Fetch upcoming appointments
-        const upcomingResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&status=SCHEDULED,RESCHEDULED`);
+          // Check if the endpoint returned data
+          if (summaryResponse && summaryResponse.data) {
+            console.log('Successfully fetched dashboard summary from consolidated endpoint');
 
-        // Fetch today's appointments
-        const today = getTodayISOString();
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        const todayResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&datetime__gte=${today}&datetime__lt=${tomorrowStr}`);
+            // Extract data from the summary response
+            const summary = summaryResponse.data;
 
-        // Fetch assigned patients count
-        const patientsResponse = await api.get(`/users/patients/?therapist=${therapistId}`);
-        const patientCount = patientsResponse.data.count || patientsResponse.data.length || 0;
+            // Update stats with data from summary
+            setStats({
+              upcomingAppointments: summary.upcoming_appointments_count || 0,
+              todayAppointments: summary.today_appointments_count || 0,
+              totalPatients: summary.total_patients || 0,
+              pendingAssessments: summary.pending_assessments_count || 0,
+              monthlyEarnings: (summary.monthly_earnings || 0).toFixed(2),
+              equipmentAllocations: summary.equipment_allocations_count || 0,
+              equipmentRequests: summary.equipment_requests_count || 0,
+              activeVisits: summary.active_visits_count || 0,
+              pendingReports: summary.pending_reports_count || 0,
+              pendingTreatmentPlanChangeRequests: summary.pending_treatment_plan_change_requests_count || 0
+            });
 
-        // Fetch pending assessments
-        const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
+            // Format recent appointments from summary
+            if (summary.recent_appointments && Array.isArray(summary.recent_appointments)) {
+              const formattedAppointments = summary.recent_appointments.map(appointment => ({
+                id: appointment.id,
+                patientName: appointment.patient_name || 'Unknown Patient',
+                date: appointment.datetime,
+                status: appointment.status.toLowerCase(),
+                type: appointment.issue || 'Consultation',
+              }));
 
-        // Fetch equipment allocations
-        let equipmentAllocations = 0;
-        let equipmentRequests = 0;
-        try {
-          const allocationsResponse = await api.get(`/equipment/allocations/`);
-          equipmentAllocations = allocationsResponse.data.count || allocationsResponse.data.length || 0;
+              setRecentAppointments(formattedAppointments);
+            }
 
-          const requestsResponse = await api.get(`/equipment/requests/`);
-          equipmentRequests = requestsResponse.data.count || requestsResponse.data.length || 0;
-        } catch (equipmentError) {
-          console.error('Error fetching equipment data:', equipmentError);
-        }
+            // If we have treatment plan change requests, we can use them later
+            if (summary.treatment_plan_change_requests && Array.isArray(summary.treatment_plan_change_requests)) {
+              // Store them for use in notifications or indicators
+              console.log(`Found ${summary.treatment_plan_change_requests.length} treatment plan change requests`);
+            }
 
-        // Fetch recent appointments (limit to 5)
-        const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
+            return { success: true };
+          }
 
-        // Fetch monthly earnings
-        let monthlyEarnings = 0;
-        try {
-          // Get real earnings data from API
-          const currentMonth = new Date().getMonth() + 1;
-          const currentYear = new Date().getFullYear();
+          // If we reach here, the summary endpoint didn't work, so we fall back to individual API calls
+          console.log('Dashboard summary endpoint not available, using individual API calls');
 
-          console.log(`Fetching earnings data for therapist ${therapistId}, ${currentYear}-${currentMonth}`);
+          // Get therapist ID from user object
+          const therapistId = user.therapist_id || user.id;
 
-          // Use the earnings service instead of direct API call
-          // Use the earnings service to get monthly earnings
-          const earningsService = (await import('../../services/earningsService')).default;
-          const earningsResponse = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
+          // Fetch upcoming appointments using the service
+          const upcomingResponse = await appointmentService.getByTherapist(therapistId, {
+            status: 'SCHEDULED,RESCHEDULED'
+          });
 
-          // Check if we have a valid response
-          if (earningsResponse && earningsResponse.data) {
-            // The API will return either real data or sample data for new therapists
-            if (earningsResponse.data.summary) {
-              monthlyEarnings = earningsResponse.data.summary.totalEarned || 0;
+          // Fetch today's appointments using the service
+          const todayResponse = await appointmentService.getTherapistTodayAppointments(therapistId);
 
-              // If this is sample data, log it (but still use it)
-              if (earningsResponse.data.isMockData) {
-                console.info('Using sample earnings data for new therapist');
+          // Fetch assigned patients count using the service
+          const patientsResponse = await patientService.getByTherapist(therapistId);
+          const patientCount = patientsResponse.data.count || patientsResponse.data.length || 0;
+
+          // Fetch pending assessments
+          const assessmentsResponse = await api.get(`/assessments/?therapist=${therapistId}&status=pending`);
+
+          // Fetch equipment allocations
+          let equipmentAllocations = 0;
+          let equipmentRequests = 0;
+          try {
+            const allocationsResponse = await api.get(`/equipment/allocations/`);
+            equipmentAllocations = allocationsResponse.data.count || allocationsResponse.data.length || 0;
+
+            const requestsResponse = await api.get(`/equipment/requests/`);
+            equipmentRequests = requestsResponse.data.count || requestsResponse.data.length || 0;
+          } catch (equipmentError) {
+            console.error('Error fetching equipment data:', equipmentError);
+          }
+
+          // Fetch active visits count
+          let activeVisitsCount = 0;
+          let pendingReportsCount = 0;
+          try {
+            const visitsResponse = await visitsService.getAll({
+              therapist: therapistId,
+              status: 'scheduled,en_route,arrived,in_session'
+            });
+            activeVisitsCount = visitsResponse.data?.length || 0;
+
+            // Fetch pending reports count using the service
+            const reportsResponse = await reportsService.getByTherapist(therapistId, { status: 'draft' });
+            pendingReportsCount = reportsResponse.data?.count || reportsResponse.data?.length || 0;
+          } catch (visitsError) {
+            console.error('Error fetching visits data:', visitsError);
+          }
+
+          // Fetch recent appointments (limit to 5)
+          const recentResponse = await api.get(`/scheduling/appointments/?therapist=${therapistId}&limit=5`);
+
+          // Fetch monthly earnings
+          let monthlyEarnings = 0;
+          try {
+            // Get real earnings data from API
+            const currentMonth = new Date().getMonth() + 1;
+            const currentYear = new Date().getFullYear();
+
+            console.log(`Fetching earnings data for therapist ${therapistId}, ${currentYear}-${currentMonth}`);
+
+            // Use the earnings service that's already imported at the top of the file
+            const earningsResponse = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
+
+            // Check if we have a valid response
+            if (earningsResponse && earningsResponse.data) {
+              // The API will return either real data or sample data for new therapists
+              if (earningsResponse.data.summary) {
+                monthlyEarnings = earningsResponse.data.summary.totalEarned || 0;
+
+                // If this is sample data, log it (but still use it)
+                if (earningsResponse.data.isMockData) {
+                  console.info('Using sample earnings data for new therapist');
+                }
+              } else {
+                console.log('Response received but no summary data:', earningsResponse.data);
+                // Set a default value
+                monthlyEarnings = 0;
               }
             } else {
-              console.log('Response received but no summary data:', earningsResponse.data);
-              // Set a default value
-              monthlyEarnings = 0;
+              console.warn('Invalid earnings response format:', earningsResponse);
             }
-          } else {
-            console.warn('Invalid earnings response format:', earningsResponse);
+          } catch (earningsError) {
+            console.error('Error fetching earnings data:', earningsError);
+            monthlyEarnings = 0;
           }
-        } catch (earningsError) {
-          console.error('Error fetching earnings data:', earningsError);
-          monthlyEarnings = 0;
-        }
 
-        // Update stats
-        setStats({
-          upcomingAppointments: upcomingResponse.data.count || upcomingResponse.data.length || 0,
-          todayAppointments: todayResponse.data.count || todayResponse.data.length || 0,
-          totalPatients: patientCount,
-          pendingAssessments: assessmentsResponse.data.count || assessmentsResponse.data.length || 0,
-          monthlyEarnings: monthlyEarnings.toFixed(2),
-          equipmentAllocations: equipmentAllocations,
-          equipmentRequests: equipmentRequests
-        });
+          // Try to fetch treatment plan change requests
+          let pendingTreatmentPlanChangeRequests = 0;
+          try {
+            const changeRequestsResponse = await therapistService.getTreatmentPlanChangeRequests('pending');
+            pendingTreatmentPlanChangeRequests = changeRequestsResponse.data?.length || 0;
+          } catch (changeRequestsError) {
+            console.error('Error fetching treatment plan change requests:', changeRequestsError);
+          }
 
-        // Format recent appointments
-        const formattedAppointments = (recentResponse.data.results || recentResponse.data).map(appointment => ({
-          id: appointment.id,
-          patientName: appointment.patient_details ?
-            `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` :
-            'Unknown Patient',
-          date: appointment.datetime,
-          status: appointment.status.toLowerCase(),
-          type: appointment.issue || 'Consultation',
-        }));
+          // Update stats
+          setStats({
+            upcomingAppointments: upcomingResponse.data?.count || upcomingResponse.data?.length || 0,
+            todayAppointments: todayResponse.data?.count || todayResponse.data?.length || 0,
+            totalPatients: patientCount,
+            pendingAssessments: assessmentsResponse.data?.count || assessmentsResponse.data?.length || 0,
+            monthlyEarnings: monthlyEarnings.toFixed(2),
+            equipmentAllocations: equipmentAllocations,
+            equipmentRequests: equipmentRequests,
+            activeVisits: activeVisitsCount,
+            pendingReports: pendingReportsCount,
+            pendingTreatmentPlanChangeRequests: pendingTreatmentPlanChangeRequests
+          });
 
-        setRecentAppointments(formattedAppointments);
-        setLoading(false);
-      } catch (error) {
-        // Use our error handler utility
-        tryApiCall(
-          () => { throw error; }, // Just to reuse the error handling logic
-          {
-            context: 'dashboard data',
-            setLoading: setLoading,
-            defaultData: {
-              stats: {
-                upcomingAppointments: 0,
-                todayAppointments: 0,
-                totalPatients: 0,
-                pendingAssessments: 0,
-                monthlyEarnings: '0.00',
-                equipmentAllocations: 0,
-                equipmentRequests: 0
-              },
-              appointments: []
+          // Format recent appointments
+          const formattedAppointments = (recentResponse.data?.results || recentResponse.data || []).map(appointment => ({
+            id: appointment.id,
+            patientName: appointment.patient_details ?
+              `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` :
+              'Unknown Patient',
+            date: appointment.datetime,
+            status: appointment.status.toLowerCase(),
+            type: appointment.issue || 'Consultation',
+          }));
+
+          setRecentAppointments(formattedAppointments);
+
+          return { success: true };
+        },
+        {
+          context: 'dashboard data',
+          setLoading: setLoading,
+          defaultData: {
+            stats: {
+              upcomingAppointments: 0,
+              todayAppointments: 0,
+              totalPatients: 0,
+              pendingAssessments: 0,
+              monthlyEarnings: '0.00',
+              equipmentAllocations: 0,
+              equipmentRequests: 0,
+              activeVisits: 0,
+              pendingReports: 0,
+              pendingTreatmentPlanChangeRequests: 0
             },
-            onSuccess: null // No success handler needed here
+            appointments: []
+          },
+          onError: (error) => {
+            console.error('Error fetching dashboard data:', error);
+            // Set default data
+            setStats({
+              upcomingAppointments: 0,
+              todayAppointments: 0,
+              totalPatients: 0,
+              pendingAssessments: 0,
+              monthlyEarnings: '0.00',
+              equipmentAllocations: 0,
+              equipmentRequests: 0,
+              activeVisits: 0,
+              pendingReports: 0,
+              pendingTreatmentPlanChangeRequests: 0
+            });
+            setRecentAppointments([]);
           }
-        );
-
-        // Set default data
-        setStats({
-          upcomingAppointments: 0,
-          todayAppointments: 0,
-          totalPatients: 0,
-          pendingAssessments: 0,
-          monthlyEarnings: '0.00',
-          equipmentAllocations: 0,
-          equipmentRequests: 0
-        });
-        setRecentAppointments([]);
-        setLoading(false);
-      }
+        }
+      );
     };
 
     if (user) {
@@ -249,97 +393,24 @@ const TherapistDashboard = () => {
     }
   }, [user]);
 
-  // Check therapist approval status and update feature access
-  useEffect(() => {
-    const checkApprovalStatus = async () => {
-      try {
-        if (!user) return;
-
-        // Get therapist ID from user object
-        const therapistId = user.therapist_id || user.id;
-
-        // Define all possible endpoints to try
-        const endpoints = [
-          `/users/therapist-status/`,
-          `/users/therapists/${therapistId}/status/`
-        ];
-
-        let success = false;
-
-        // Try each endpoint until one succeeds
-        for (const endpoint of endpoints) {
-          try {
-            console.log(`Trying endpoint: ${endpoint}`);
-            const response = await api.get(endpoint);
-
-            // Update approval status
-            setIsApproved(response.data.is_approved);
-
-            // Update feature access based on approval status
-            setFeatureAccess(prevAccess => ({
-              ...prevAccess,
-              attendance: response.data.is_approved,
-              earnings: response.data.is_approved,
-              equipment: response.data.is_approved,
-              // Update other features as needed based on response data
-            }));
-
-            console.log(`Approval status: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
-            success = true;
-            break; // Exit the loop if successful
-          } catch (endpointError) {
-            console.log(`Endpoint ${endpoint} failed: ${endpointError.message}`);
-            // Continue to the next endpoint
-          }
-        }
-
-        // If all endpoints failed, set default values
-        if (!success) {
-          console.error('All approval status endpoints failed');
-          setIsApproved(false);
-          setFeatureAccess(prevAccess => ({
-            ...prevAccess,
-            attendance: false,
-            earnings: false,
-            equipment: false,
-            // Reset other features as needed
-          }));
-        }
-
-      } catch (error) {
-        console.error('Error checking approval status:', error);
-        setIsApproved(false);
-        setFeatureAccess(prevAccess => ({
-          ...prevAccess,
-          attendance: false,
-          earnings: false,
-          equipment: false,
-          // Reset other features as needed
-        }));
-      }
-    };
-
-    checkApprovalStatus();
-  }, [user]);
+  // We don't need to track approval status separately anymore
+  // since we're using featureAccess directly
 
   // Memoized function to fetch earnings data
   const fetchEarningsData = useCallback(async () => {
     setEarningsLoading(true);
-    setEarningsError(null);
-    try {
-      // Check if the user is authenticated
-      if (!user) {
-        console.warn('User not authenticated or token missing');
-        setEarningsError('Authentication required. Please log in again.');
-        setEarningsLoading(false);
-        return;
-      }
 
-      // Use therapist_id from user object if available
-      const therapistId = user.therapist_id || user.id;
+    await tryApiCall(
+      async () => {
+        // Check if the user is authenticated
+        if (!user) {
+          throw new Error('User not authenticated or token missing');
+        }
 
-      try {
-        // Use earningsService instead of direct API call
+        // Use therapist_id from user object if available
+        const therapistId = user.therapist_id || user.id;
+
+        // Use earningsService
         const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
 
         // Check if we have a valid response
@@ -357,38 +428,33 @@ const TherapistDashboard = () => {
           // Log success for debugging
           console.log('Successfully loaded earnings data:', response.data);
         } else {
-          console.warn('Invalid response format:', response);
-          setEarningsError('Received an invalid response format from the server.');
+          throw new Error('Invalid response format from earnings API');
         }
-      } catch (apiError) {
-        console.error('Error fetching earnings data:', apiError);
-        setEarningsData(null);
 
-        // Set an appropriate error message
-        if (apiError.response?.status === 404) {
-          setEarningsError('Earnings data not found for this period.');
-        } else if (apiError.response?.status === 403) {
-          setEarningsError('You don\'t have permission to view these earnings.');
-        } else {
-          setEarningsError('Failed to load earnings data. Please try again later.');
+        return response;
+      },
+      {
+        context: 'earnings data',
+        setLoading: setEarningsLoading,
+        onError: (error) => {
+          console.error('Error fetching earnings data:', error);
+          setEarningsData(null);
+
+          // Set an appropriate error message
+          if (error.response?.status === 404) {
+            setEarningsError('Earnings data not found for this period.');
+          } else if (error.response?.status === 403) {
+            setEarningsError('You don\'t have permission to view these earnings.');
+          } else if (error.response?.status === 401) {
+            setEarningsError('Authentication failed. Please log in again.');
+          } else if (error.message === 'User not authenticated or token missing') {
+            setEarningsError('Authentication required. Please log in again.');
+          } else {
+            setEarningsError('Failed to load earnings data. Please try again later.');
+          }
         }
       }
-    } catch (error) {
-      console.error('Error fetching earnings data:', error);
-      const errorMessage = error.response?.status === 401
-        ? 'Authentication failed. Please log in again.'
-        : error.response?.data?.message || 'Failed to load earnings data';
-      setEarningsError(errorMessage);
-
-      // Set a user-friendly error message
-      if (error.response?.status === 404) {
-        setEarningsError('The earnings data endpoint is not available yet. Using mock data instead.');
-      } else {
-        setEarningsError('There was a problem loading your earnings data. Please try again later.');
-      }
-    } finally {
-      setEarningsLoading(false);
-    }
+    );
   }, [currentYear, currentMonth, user]);
 
   // Add useEffect for attendance data
@@ -407,69 +473,20 @@ const TherapistDashboard = () => {
     }
   }, [fetchEarningsData, featureAccess.earnings]);
 
-  // Add an effect to check approval status periodically
+  // Add an effect to refresh feature access periodically
   // This ensures that if admin revokes approval, the UI updates
   useEffect(() => {
-    // Check approval status every 30 seconds
+    // Refresh feature access every 60 seconds
     const intervalId = setInterval(() => {
       if (user) {
-        const checkApprovalStatus = async () => {
-          try {
-            const therapistId = user.therapist_id || user.id;
-
-            // Define all possible endpoints to try
-            const endpoints = [
-              `/users/therapist-status/`,
-              `/users/therapists/${therapistId}/status/`
-            ];
-
-            let success = false;
-
-            // Try each endpoint until one succeeds
-            for (const endpoint of endpoints) {
-              try {
-                const response = await api.get(endpoint);
-
-                // Update approval status
-                setIsApproved(response.data.is_approved);
-
-                // Update feature access based on approval status
-                setFeatureAccess(prevAccess => ({
-                  ...prevAccess,
-                  attendance: response.data.is_approved,
-                  earnings: response.data.is_approved,
-                }));
-
-                // Log status change if it changed
-                if (response.data.is_approved !== isApproved) {
-                  console.log(`Approval status changed to: ${response.data.is_approved ? 'Approved' : 'Not Approved'}`);
-                }
-
-                success = true;
-                break; // Exit the loop if successful
-              } catch (endpointError) {
-                // Continue to the next endpoint silently in periodic check
-              }
-            }
-
-            // If all endpoints failed, set default values
-            if (!success) {
-              console.log('Periodic check: All approval status endpoints failed');
-              // Don't reset values here to avoid flickering if it's just a temporary network issue
-            }
-
-          } catch (error) {
-            console.error('Error in periodic approval status check:', error);
-          }
-        };
-
-        checkApprovalStatus();
+        console.log('Performing periodic refresh of feature access');
+        refreshAccess();
       }
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds - reduced frequency to avoid excessive API calls
 
     // Clean up interval on component unmount
     return () => clearInterval(intervalId);
-  }, [user, isApproved]);
+  }, [user, refreshAccess]);
 
   // Add handlers for month navigation
   const handlePrevMonth = () => {
@@ -510,22 +527,24 @@ const TherapistDashboard = () => {
       );
     }
 
-    // If user has access to the feature, show the component
-    if (featureAccess[featureName]) {
-      return component;
-    }
-
-    // Otherwise show the waiting message
+    // Use the FeatureGuard component to handle access control
     return (
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
-        <div className="flex flex-col items-center justify-center">
-          <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
-          <p className="text-gray-600">{waitingMessage || "This feature requires admin approval before you can access it."}</p>
-        </div>
-      </div>
+      <FeatureGuard
+        feature={featureName}
+        fallback={
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center">
+            <div className="flex flex-col items-center justify-center">
+              <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+              <p className="text-gray-600">{waitingMessage || "This feature requires admin approval before you can access it."}</p>
+            </div>
+          </div>
+        }
+      >
+        {component}
+      </FeatureGuard>
     );
   };
 
@@ -695,6 +714,39 @@ const TherapistDashboard = () => {
                     <div className="text-sm">
                       <Link to="/therapist/equipment/requests" className="font-medium text-primary-600 hover:text-primary-500">
                         Manage equipment
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stat 6 - Active Visits */}
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
+                        <svg className="h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">
+                            Active Visits
+                          </dt>
+                          <dd>
+                            <div className="text-lg font-medium text-gray-900">
+                              {stats.activeVisits}
+                            </div>
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-4 sm:px-6">
+                    <div className="text-sm">
+                      <Link to="/therapist/visits" className="font-medium text-primary-600 hover:text-primary-500">
+                        Track visits
                       </Link>
                     </div>
                   </div>
@@ -921,6 +973,188 @@ const TherapistDashboard = () => {
               </div>
             </div>
 
+            {/* Active Visits Section */}
+            <div className="mt-8">
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Active Visits</h3>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                      Track your current and upcoming visits
+                    </p>
+                  </div>
+                  <Link to="/therapist/visits" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                    View All Visits
+                  </Link>
+                </div>
+
+                {featureAccess.visits ? (
+                  <div className="border-t border-gray-200">
+                    {visitsLoading ? (
+                      <div className="px-4 py-5 sm:p-6 text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+                        <p className="mt-3 text-gray-700">Loading active visits...</p>
+                      </div>
+                    ) : visitsError ? (
+                      <div className="px-4 py-5 sm:p-6">
+                        <div className="rounded-md bg-red-50 p-4">
+                          <div className="flex">
+                            <div className="flex-shrink-0">
+                              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <h3 className="text-sm font-medium text-red-800">Error loading active visits</h3>
+                              <div className="mt-2 text-sm text-red-700">
+                                <p>{visitsError}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : activeVisits.length === 0 ? (
+                      <div className="px-4 py-5 sm:p-6 text-center">
+                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No active visits</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          You don't have any active or upcoming visits at the moment.
+                        </p>
+                        <div className="mt-6">
+                          <Link to="/therapist/appointments" className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                            <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                            </svg>
+                            View Appointments
+                          </Link>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Patient
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Scheduled Time
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Location
+                              </th>
+                              <th scope="col" className="relative px-6 py-3">
+                                <span className="sr-only">Actions</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {activeVisits.slice(0, 5).map((visit) => (
+                              <tr key={visit.id}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="flex-shrink-0 h-10 w-10">
+                                      <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
+                                        {visit.patient_details?.user?.first_name?.charAt(0) || '?'}
+                                      </div>
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {visit.patient_details?.user?.first_name} {visit.patient_details?.user?.last_name}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {visit.appointment_details?.issue || 'Regular visit'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">
+                                    {new Date(visit.scheduled_start).toLocaleDateString()}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {new Date(visit.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    ${visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                                      visit.status === 'en_route' ? 'bg-purple-100 text-purple-800' :
+                                      visit.status === 'arrived' ? 'bg-indigo-100 text-indigo-800' :
+                                      visit.status === 'in_session' ? 'bg-green-100 text-green-800' :
+                                      'bg-gray-100 text-gray-800'}`}>
+                                    {visit.status.charAt(0).toUpperCase() + visit.status.slice(1).replace('_', ' ')}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {visit.patient_details?.address || 'No address provided'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                  <Link to={`/therapist/visits/${visit.id}`} className="text-primary-600 hover:text-primary-900">
+                                    Track
+                                  </Link>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {activeVisits.length > 5 && (
+                          <div className="bg-gray-50 px-6 py-3 text-right">
+                            <Link to="/therapist/visits" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                              View all {activeVisits.length} visits <span aria-hidden="true">→</span>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-6 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+                      <p className="text-gray-600">Your account is pending approval from an administrator. Visit tracking will be available once your account is approved.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Proximity Alerts Section */}
+            <div className="mt-8">
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Proximity Alerts</h3>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                    Safety monitoring alerts that require your attention
+                  </p>
+                </div>
+
+                {featureAccess.visits ? (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+                    <ProximityAlertComponent />
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-6 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <svg className="h-12 w-12 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Waiting for Admin Approval</h3>
+                      <p className="text-gray-600">Your account is pending approval from an administrator. Proximity alerts will be available once your account is approved.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Recent Appointments */}
             <div className="py-6">
               <h2 className="text-lg font-medium text-gray-900 px-4 sm:px-0">Recent Appointments</h2>
@@ -1059,6 +1293,7 @@ const TherapistDashboard = () => {
                       <EarningsSummary
                         summary={earningsData?.summary}
                         loading={earningsLoading}
+                        isMockData={isMockData(earningsData)}
                       />
                     </div>,
                     "Earnings summary requires admin approval.",
@@ -1364,4 +1599,6 @@ const TherapistDashboard = () => {
 };
 
 export default TherapistDashboard;
+
+
 

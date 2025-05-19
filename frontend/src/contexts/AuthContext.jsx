@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import axios from 'axios';
@@ -20,47 +20,65 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
   // Function to fetch therapist profile
-  const fetchTherapistProfile = async (userId) => {
+  const fetchTherapistProfile = useCallback(async (userId) => {
+    console.log('Fetching therapist profile for user ID:', userId);
     try {
-      // Try to get the current user's profile first
-      try {
-        // First try the profile endpoint
-        const response = await api.get('/users/therapists/profile/');
-        if (response.data) {
-          setTherapistProfile(response.data);
-          // Store therapist profile in localStorage for persistence
-          localStorage.setItem('therapistProfile', JSON.stringify(response.data));
-          return response.data;
-        }
-      } catch (profileError) {
-        console.log('Could not fetch current user profile, trying by ID');
-        // If that fails, try to get by user ID
+      // Try multiple endpoints in sequence until one succeeds
+      const endpoints = [
+        '/users/therapists/profile/',
+        userId ? `/users/therapists/${userId}/` : null,
+        userId ? `/users/therapist-profile/${userId}/` : null,
+        '/users/therapist-status/'
+      ].filter(Boolean); // Remove null entries
+
+      let profileData = null;
+
+      // Try each endpoint until one succeeds
+      for (const endpoint of endpoints) {
         try {
-          const response = await api.get(`/users/therapists/${userId}/`);
+          console.log(`Trying to fetch therapist profile from: ${endpoint}`);
+          const response = await api.get(endpoint);
           if (response.data) {
-            setTherapistProfile(response.data);
-            // Store therapist profile in localStorage for persistence
-            localStorage.setItem('therapistProfile', JSON.stringify(response.data));
-            return response.data;
+            profileData = response.data;
+            console.log('Successfully fetched therapist profile:', profileData);
+            break;
           }
-        } catch (idError) {
-          console.log('Could not fetch by ID, trying therapist-profile endpoint');
-          // Try one more endpoint
-          const response = await api.get(`/users/therapist-profile/${userId}/`);
-          if (response.data) {
-            setTherapistProfile(response.data);
-            // Store therapist profile in localStorage for persistence
-            localStorage.setItem('therapistProfile', JSON.stringify(response.data));
-            return response.data;
-          }
+        } catch (endpointError) {
+          console.log(`Failed to fetch from ${endpoint}:`, endpointError.message);
+          // Continue to next endpoint
         }
       }
+
+      if (profileData) {
+        // Check if the profile data has changed before updating state and localStorage
+        const currentProfile = JSON.parse(localStorage.getItem('therapistProfile') || '{}');
+        const hasChanged = JSON.stringify(currentProfile) !== JSON.stringify(profileData);
+
+        if (hasChanged) {
+          console.log('Therapist profile has changed, updating state and localStorage');
+          setTherapistProfile(profileData);
+          localStorage.setItem('therapistProfile', JSON.stringify(profileData));
+
+          // Log approval status changes for debugging
+          if (currentProfile.attendance_approved !== profileData.attendance_approved) {
+            console.log(`Attendance approval changed from ${currentProfile.attendance_approved} to ${profileData.attendance_approved}`);
+          }
+        } else {
+          console.log('Therapist profile unchanged');
+        }
+
+        return profileData;
+      }
+
+      console.log('No therapist profile data found from any endpoint');
+      return null;
     } catch (error) {
       console.error('Error fetching therapist profile:', error);
       return null;
     }
-  };
+  }, []);
 
+  // Effect for initial auth check
   useEffect(() => {
     // Check if user is already logged in
     const checkAuthStatus = async () => {
@@ -81,8 +99,10 @@ export function AuthProvider({ children }) {
           // Use stored therapist profile if available
           if (storedTherapistProfile) {
             setTherapistProfile(JSON.parse(storedTherapistProfile));
-          } else if (user.role === 'therapist') {
-            // Fetch therapist profile if not in localStorage
+          }
+
+          // Always fetch fresh therapist profile if user is a therapist
+          if (user.role === 'therapist') {
             fetchTherapistProfile(user.id);
           }
 
@@ -111,25 +131,88 @@ export function AuthProvider({ children }) {
     };
 
     checkAuthStatus();
-  }, []);
+  }, [fetchTherapistProfile]);
 
+  // Effect for periodic refresh of therapist profile
+  useEffect(() => {
+    // Only set up refresh interval if user is a therapist
+    if (!currentUser || currentUser.role !== 'therapist') {
+      return;
+    }
+
+    console.log('Setting up periodic therapist profile refresh');
+
+    // Refresh therapist profile every 30 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('Periodic refresh of therapist profile');
+      fetchTherapistProfile(currentUser.id);
+    }, 30000); // 30 seconds
+
+    // Clean up interval on unmount
+    return () => {
+      console.log('Clearing therapist profile refresh interval');
+      clearInterval(refreshInterval);
+    };
+  }, [currentUser, fetchTherapistProfile, navigate]);
+
+  /**
+   * Authenticate a user with their identifier (username, email, or phone) and password
+   *
+   * This function handles the authentication process securely by:
+   * 1. Determining the type of identifier provided (email, phone, or username)
+   * 2. Creating the appropriate payload for the authentication request
+   * 3. Sending the authentication request to the backend API
+   * 4. Handling the response and storing the authentication tokens
+   * 5. Setting up the authenticated user session
+   *
+   * @param {string} identifier - The user's username, email, or phone number
+   * @param {string} password - The user's password
+   * @returns {Object} The authenticated user object
+   */
   const login = async (identifier, password) => {
     try {
       setError('');
-      const response = await api.post('/auth/login/', {
-                username: identifier,
-                email:    identifier,
-                phone:    identifier,
-                password
-              });
+
+      // Determine if identifier is an email, phone, or username
+      const isEmail = /\S+@\S+\.\S+/.test(identifier);
+      const isPhone = /^\d+$/.test(identifier);
+
+      // Create payload based on identifier type
+      const payload = {
+        password
+      };
+
+      if (isEmail) {
+        payload.email = identifier;
+      } else if (isPhone) {
+        payload.phone = identifier;
+      } else {
+        payload.username = identifier;
+      }
+
+      // Log the payload for debugging (without the password)
+      console.log('Login payload:', { ...payload, password: '[REDACTED]' });
+
+      // Use the API service to make the request to ensure consistent error handling
+      const response = await api.post('/auth/token/', payload);
+
+      // Extract authentication data from response
       const { access, refresh, user } = response.data;
+
+      if (!access || !refresh || !user) {
+        throw new Error('Invalid response from authentication server');
+      }
+
+      // Store authentication tokens securely
       localStorage.setItem('token', access);
       localStorage.setItem('refreshToken', refresh);
-
-      // Save token and set user
-      localStorage.setItem('token', access);
       localStorage.setItem('user', JSON.stringify(user));
+
+      // Set authorization headers for future API requests
       axios.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+
+      // Update application state
       setCurrentUser(user);
 
       // If user is a therapist, fetch their therapist profile
@@ -147,15 +230,62 @@ export function AuthProvider({ children }) {
       if (user.role === 'admin') {
         navigate('/admin/dashboard');
       } else if (user.role === 'doctor') {
-        navigate('/dashboard');
+        navigate('/doctor/dashboard');
       } else if (user.role === 'therapist') {
         navigate('/therapist/dashboard');
+      } else if (user.role === 'patient') {
+        navigate('/patient/dashboard');
+      } else {
+        // Default fallback
+        navigate('/dashboard');
       }
 
       return user;
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.response?.data?.message || 'Failed to login');
+
+      // Handle different types of errors with appropriate user-friendly messages
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        const status = error.response.status;
+        const data = error.response.data;
+
+        if (status === 401) {
+          setError('Invalid credentials. Please check your username/email/phone and password.');
+        } else if (status === 403) {
+          setError('Your account does not have permission to access the system.');
+        } else if (status === 404) {
+          setError('Authentication service not available. Please contact support.');
+        } else if (status === 400) {
+          // Handle validation errors
+          if (data.error) {
+            setError(data.error);
+          } else if (data.detail) {
+            setError(data.detail);
+          } else if (data.username && Array.isArray(data.username)) {
+            setError(data.username[0]);
+          } else if (data.password && Array.isArray(data.password)) {
+            setError(data.password[0]);
+          } else if (data.email && Array.isArray(data.email)) {
+            setError(data.email[0]);
+          } else if (data.phone && Array.isArray(data.phone)) {
+            setError(data.phone[0]);
+          } else {
+            setError('Invalid login information provided.');
+          }
+        } else {
+          setError(`Authentication failed: ${data.detail || data.error || 'Unknown error'}`);
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        setError('No response from authentication server. Please check your network connection.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        setError(`Authentication error: ${error.message}`);
+      }
+
+      // Rethrow the error for the component to handle
       throw error;
     }
   };

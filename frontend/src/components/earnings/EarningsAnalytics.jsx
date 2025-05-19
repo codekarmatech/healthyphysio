@@ -37,30 +37,30 @@ const EarningsAnalytics = ({ earnings, loading }) => {
         attended: 0
       };
     }
-    
+
     acc[date].sessions += 1;
     acc[date].totalPotential += earning.sessionFee;
-    
+
     if (earning.attended) {
       acc[date].attended += 1;
       acc[date].totalEarned += earning.earned;
     }
-    
+
     return acc;
   }, {});
 
   // Convert to array and sort by date
-  const dailyEarnings = Object.values(earningsByDate).sort((a, b) => 
+  const dailyEarnings = Object.values(earningsByDate).sort((a, b) =>
     new Date(a.date) - new Date(b.date)
   );
 
   // Calculate the highest earning day
-  const highestEarningDay = dailyEarnings.reduce((max, day) => 
+  const highestEarningDay = dailyEarnings.reduce((max, day) =>
     day.totalEarned > max.totalEarned ? day : max
   , { totalEarned: 0 });
 
   // Calculate the day with most sessions
-  const mostSessionsDay = dailyEarnings.reduce((max, day) => 
+  const mostSessionsDay = dailyEarnings.reduce((max, day) =>
     day.sessions > max.sessions ? day : max
   , { sessions: 0 });
 
@@ -72,7 +72,7 @@ const EarningsAnalytics = ({ earnings, loading }) => {
           Detailed breakdown of your earnings for this period.
         </p>
       </div>
-      
+
       <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {/* Highest Earning Day */}
@@ -83,7 +83,7 @@ const EarningsAnalytics = ({ earnings, loading }) => {
                   Highest Earning Day
                 </dt>
                 <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                  ${highestEarningDay.totalEarned.toFixed(2)}
+                  ₹{highestEarningDay.totalEarned.toFixed(2)}
                 </dd>
                 <dd className="mt-1 text-sm text-gray-500">
                   {new Date(highestEarningDay.date).toLocaleDateString()}
@@ -91,7 +91,7 @@ const EarningsAnalytics = ({ earnings, loading }) => {
               </dl>
             </div>
           </div>
-          
+
           {/* Day with Most Sessions */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
@@ -108,7 +108,7 @@ const EarningsAnalytics = ({ earnings, loading }) => {
               </dl>
             </div>
           </div>
-          
+
           {/* Average Daily Earnings */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
@@ -117,7 +117,7 @@ const EarningsAnalytics = ({ earnings, loading }) => {
                   Average Daily Earnings
                 </dt>
                 <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                  ${(dailyEarnings.reduce((sum, day) => sum + day.totalEarned, 0) / dailyEarnings.length).toFixed(2)}
+                  ₹{(dailyEarnings.reduce((sum, day) => sum + day.totalEarned, 0) / dailyEarnings.length).toFixed(2)}
                 </dd>
                 <dd className="mt-1 text-sm text-gray-500">
                   For days with sessions
@@ -126,7 +126,7 @@ const EarningsAnalytics = ({ earnings, loading }) => {
             </div>
           </div>
         </div>
-        
+
         {/* Daily Earnings Table */}
         <div className="mt-8">
           <h4 className="text-lg font-medium text-gray-900 mb-4">Daily Earnings Breakdown</h4>
@@ -167,10 +167,10 @@ const EarningsAnalytics = ({ earnings, loading }) => {
                             {day.attended} ({Math.round(day.attended / day.sessions * 100)}%)
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${day.totalEarned.toFixed(2)}
+                            ₹{day.totalEarned.toFixed(2)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ${day.totalPotential.toFixed(2)}
+                            ₹{day.totalPotential.toFixed(2)}
                           </td>
                         </tr>
                       ))}

@@ -920,7 +920,7 @@ const TherapistPatientDetailPage = () => {
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <p className="text-sm font-medium text-gray-500">Total Earned</p>
                       <p className="mt-1 text-3xl font-semibold text-gray-900">
-                        ${typeof earnings?.summary?.totalEarned === 'number' ? earnings.summary.totalEarned.toFixed(2) : '0.00'}
+                        ₹{typeof earnings?.summary?.totalEarned === 'number' ? earnings.summary.totalEarned.toFixed(2) : '0.00'}
                       </p>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">

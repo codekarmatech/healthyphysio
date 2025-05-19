@@ -12,6 +12,8 @@ import {
   Filler
 } from 'chart.js';
 import earningsService from '../../services/earningsService';
+import { tryApiCall } from '../../utils/apiErrorHandler';
+import { isMockData } from '../../utils/responseNormalizer';
 
 // Register Chart.js components
 ChartJS.register(
@@ -38,112 +40,101 @@ const EarningsChart = ({ therapistId, year, month }) => {
         setLoading(false);
         return;
       }
-      
-      try {
-        setLoading(true);
-        setError(null);
-        
-        console.log(`Fetching earnings data for therapist ${therapistId}, ${year}-${month}`);
-        
-        let response;
-        try {
+
+      setLoading(true);
+
+      await tryApiCall(
+        async () => {
+          console.log(`Fetching earnings data for therapist ${therapistId}, ${year}-${month}`);
+
           // Get earnings data from API
-          response = await earningsService.getMonthlyEarnings(therapistId, year, month);
-          
-          // Check if we have a valid response
-          if (response && response.data) {
-            // If this is sample data, log it (but still use it)
-            if (response.data.isMockData) {
-              console.info('Using sample earnings data for new therapist');
+          const response = await earningsService.getMonthlyEarnings(therapistId, year, month);
+
+          // Validate response
+          if (!response || !response.data) {
+            throw new Error('Invalid response format from earnings API');
+          }
+
+          // Log the response for debugging
+          console.log('Earnings API response:', response.data);
+
+          // Check if this is mock data
+          if (isMockData(response)) {
+            console.info('Using sample earnings data for new therapist');
+          }
+
+          const earningsData = response.data.earnings || [];
+
+          // Group by date and sum earnings
+          const dailyEarnings = {};
+          earningsData.forEach(item => {
+            if (!item || !item.date || item.amount === undefined) return;
+
+            const date = item.date;
+            if (!dailyEarnings[date]) {
+              dailyEarnings[date] = 0;
             }
-            console.log('Successfully fetched earnings data:', response.data);
-          } else {
-            throw new Error('Invalid response format');
+
+            // Handle non-numeric amounts
+            const amount = parseFloat(item.amount);
+            if (!isNaN(amount)) {
+              dailyEarnings[date] += amount;
+            }
+          });
+
+          // Sort dates and format for chart
+          const sortedDates = Object.keys(dailyEarnings).sort();
+          const formattedDates = sortedDates.map(date => {
+            // Format date as "MMM DD" (e.g., "May 15")
+            const dateObj = new Date(date);
+            return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          });
+
+          // Get amounts for each date
+          const amounts = sortedDates.map(date => dailyEarnings[date]);
+
+          // Create chart data object
+          const data = {
+            labels: formattedDates,
+            datasets: [
+              {
+                label: 'Daily Earnings ($)',
+                data: amounts,
+                fill: true,
+                backgroundColor: 'rgba(79, 70, 229, 0.2)', // Indigo color with transparency
+                borderColor: 'rgba(79, 70, 229, 1)',       // Solid indigo for the line
+                tension: 0.4,                              // Smooth curve
+                pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(79, 70, 229, 1)',
+                pointHoverBorderWidth: 2,
+              },
+            ],
+          };
+
+          setChartData(data);
+          return response;
+        },
+        {
+          context: 'earnings chart data',
+          setLoading: setLoading,
+          onError: (error) => {
+            console.error('Error fetching earnings data for chart:', error);
+            setError(error.message || 'Failed to load earnings data');
           }
-        } catch (err) {
-          console.error('Error fetching earnings data:', err);
-          setError('Failed to load earnings data. Please try again later.');
-          setLoading(false);
-          return;
         }
-        
-        // Process the data for the chart
-        if (!response || !response.data) {
-          console.error('Invalid response format from earnings API');
-          setError('Invalid data format received');
-          setLoading(false);
-          return;
-        }
-        
-        // Log the response for debugging
-        console.log('Earnings API response:', response.data);
-        
-        const earningsData = response.data.earnings || [];
-        
-        // Group by date and sum earnings
-        const dailyEarnings = {};
-        earningsData.forEach(item => {
-          if (!item || !item.date || !item.amount) return;
-          
-          const date = item.date;
-          if (!dailyEarnings[date]) {
-            dailyEarnings[date] = 0;
-          }
-          
-          // Handle non-numeric amounts
-          const amount = parseFloat(item.amount);
-          if (!isNaN(amount)) {
-            dailyEarnings[date] += amount;
-          }
-        });
-        
-        // Sort dates and prepare chart data
-        const sortedDates = Object.keys(dailyEarnings).sort();
-        const amounts = sortedDates.map(date => dailyEarnings[date]);
-        
-        // Format dates for display (e.g., "Apr 15")
-        const formattedDates = sortedDates.map(date => {
-          const d = new Date(date);
-          return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
-        });
-        
-        // Create chart data object
-        const data = {
-          labels: formattedDates,
-          datasets: [
-            {
-              label: 'Daily Earnings ($)',
-              data: amounts,
-              fill: true,
-              backgroundColor: 'rgba(79, 70, 229, 0.2)', // Indigo color with transparency
-              borderColor: 'rgba(79, 70, 229, 1)',       // Solid indigo for the line
-              tension: 0.4,                              // Smooth curve
-              pointBackgroundColor: 'rgba(79, 70, 229, 1)',
-              pointBorderColor: '#fff',
-              pointBorderWidth: 2,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              pointHoverBackgroundColor: '#fff',
-              pointHoverBorderColor: 'rgba(79, 70, 229, 1)',
-              pointHoverBorderWidth: 2,
-            },
-          ],
-        };
-        
-        setChartData(data);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching earnings data for chart:', err);
-        setError('Failed to load earnings data. Please try again later.');
-        setLoading(false);
-      }
+      );
     };
-    
+
     if (therapistId) {
       fetchEarningsData();
     }
   }, [therapistId, year, month]);
-  
+
   // Chart options
   const options = {
     responsive: true,
@@ -293,8 +284,18 @@ const EarningsChart = ({ therapistId, year, month }) => {
     );
   }
 
+  // Check if we're using mock data
+  const usingMockData = isMockData({ data: chartData });
+
   return (
-    <div className="bg-white p-5 rounded-lg shadow-md h-80 border border-gray-100">
+    <div className="bg-white p-5 rounded-lg shadow-md h-80 border border-gray-100 relative">
+      {usingMockData && (
+        <div className="absolute top-2 right-2 z-10">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            Sample Data
+          </span>
+        </div>
+      )}
       <Line data={chartData} options={options} />
     </div>
   );

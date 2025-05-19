@@ -31,6 +31,13 @@ export const formatDate = (date, formatStr = 'yyyy-MM-dd') => {
   try {
     // If date is a string, parse it
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date provided to formatDate:', date);
+      return '';
+    }
+    
     return format(dateObj, formatStr);
   } catch (error) {
     console.error('Error formatting date:', error);
@@ -54,6 +61,13 @@ export const formatLocalDate = (date, options = {
   try {
     // If date is a string, parse it
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date provided to formatLocalDate:', date);
+      return '';
+    }
+    
     return new Intl.DateTimeFormat('en-US', options).format(dateObj);
   } catch (error) {
     console.error('Error formatting local date:', error);

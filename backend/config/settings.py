@@ -38,13 +38,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third-party apps
     'rest_framework',
     'corsheaders',
     'channels',
     'encrypted_files',
-    
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
+
     # Local apps
     'users',
     'scheduling',
@@ -54,6 +56,9 @@ INSTALLED_APPS = [
     'websocket',   # Add this if you've created it
     'equipment',   # Equipment management app
     'earnings',    # Earnings tracking app
+    'visits',      # Visit tracking and therapist reports app
+    'treatment_plans',  # Treatment plans app
+    'areas',       # Area management app
 ]
 
 # Add our custom middleware
@@ -172,18 +177,39 @@ REST_FRAMEWORK = {
 }
 
 # Add CORS settings
-# CORS_ALLOW_ALL_ORIGINS = False  # More secure to specify allowed origins
-# CORS settings
-# Add these settings to your settings.py file if they're not already there
 CORS_ALLOW_ALL_ORIGINS = True  # For development only, set to False in production
 
-# Or specify allowed origins:
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
-# ]
-# For development, you might want to allow credentials
+# Specify allowed origins explicitly
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Allow credentials
 CORS_ALLOW_CREDENTIALS = True
+
+# Allow all methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Allow all headers
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 # Channels settings
 CHANNEL_LAYERS = {
     'default': {

@@ -107,8 +107,8 @@ const EarningsPage = () => {
   };
 
   const formatCurrency = (amount) => {
-    if (!amount) return '$0.00';
-    return `$${parseFloat(amount).toFixed(2)}`;
+    if (!amount) return '₹0.00';
+    return `₹${parseFloat(amount).toFixed(2)}`;
   };
 
   const getStatusBadgeClass = (status) => {

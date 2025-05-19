@@ -14,7 +14,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
+  withCredentials: false, // Changed to false to fix CORS issues
 });
 
 /**
@@ -38,11 +38,11 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     // Handle token expiration
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
+
       try {
         // Try to refresh the token
         const refreshToken = localStorage.getItem('refreshToken');
@@ -50,7 +50,7 @@ api.interceptors.response.use(
           const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
             refresh: refreshToken
           });
-          
+
           if (response.data.access) {
             localStorage.setItem('token', response.data.access);
             originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
@@ -62,19 +62,19 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        
+
         // Redirect to login page if in browser environment
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }
       }
     }
-    
+
     // Handle other common error scenarios
     if (error.response?.status === 403) {
       console.error('Permission denied:', error.response.data);
     }
-    
+
     return Promise.reject(error);
   }
 );

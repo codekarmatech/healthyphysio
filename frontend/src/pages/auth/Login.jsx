@@ -19,18 +19,99 @@ const Login = () => {
     });
   };
 
+  /**
+   * Handle form submission for login
+   *
+   * This function:
+   * 1. Prevents the default form submission behavior
+   * 2. Sets the loading state and clears any previous errors
+   * 3. Attempts to log in using the AuthContext login function
+   * 4. Handles any errors that occur during login
+   * 5. Resets the loading state when done
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
-      console.log('Attempting login with:', credentials);
-      // Use the correct endpoint and format for JWT authentication
-      await login(credentials.username, credentials.password);
+      // Trim the credentials to prevent whitespace issues
+      const trimmedUsername = credentials.username.trim();
+      const trimmedPassword = credentials.password;
+
+      // Attempt to log in
+      await login(trimmedUsername, trimmedPassword);
+
+      // If we get here, login was successful
+      // The AuthContext will handle redirection based on user role
     } catch (error) {
-      console.error('Login error:', error);
-      setError(error.response?.data?.detail || error.response?.data?.error || 'Invalid username or password');
+      // Handle different types of errors
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        const status = error.response.status;
+        const data = error.response.data;
+
+        // Log detailed error information for debugging
+        console.error('Authentication error details:', {
+          status,
+          data,
+          headers: error.response.headers,
+          config: error.config
+        });
+
+        if (status === 401) {
+          setError('Invalid credentials. Please check your username/email/phone and password.');
+        } else if (status === 403) {
+          setError('Your account does not have permission to access the system.');
+        } else if (status === 404) {
+          setError('Authentication service not available. Please contact support.');
+        } else if (status === 400) {
+          // Handle validation errors
+          console.error('Validation error details:', data);
+
+          // Try to extract the error message from various possible formats
+          let errorMessage = 'Invalid login information provided.';
+
+          if (typeof data === 'string') {
+            errorMessage = data;
+          } else if (data.error) {
+            errorMessage = data.error;
+          } else if (data.detail) {
+            errorMessage = data.detail;
+          } else if (data.username && Array.isArray(data.username)) {
+            errorMessage = data.username[0];
+          } else if (data.password && Array.isArray(data.password)) {
+            errorMessage = data.password[0];
+          } else if (data.email && Array.isArray(data.email)) {
+            errorMessage = data.email[0];
+          } else if (data.phone && Array.isArray(data.phone)) {
+            errorMessage = data.phone[0];
+          } else if (data.non_field_errors) {
+            errorMessage = data.non_field_errors.join(', ');
+          } else {
+            // Try to extract error from any field
+            const fieldErrors = Object.entries(data)
+              .filter(([key, value]) => Array.isArray(value) || typeof value === 'string')
+              .map(([key, value]) => Array.isArray(value) ? `${key}: ${value.join(', ')}` : `${key}: ${value}`)
+              .join('; ');
+
+            if (fieldErrors) {
+              errorMessage = fieldErrors;
+            }
+          }
+
+          setError(errorMessage);
+        } else {
+          setError(`Authentication failed: ${data.detail || data.error || 'Unknown error'}`);
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        setError('No response from authentication server. Please check your network connection.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        setError(`Authentication error: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -61,7 +142,7 @@ const Login = () => {
               </div>
             </div>
           )}
-          
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">

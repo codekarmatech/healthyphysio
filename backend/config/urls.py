@@ -32,7 +32,7 @@ from users.views import CustomTokenObtainPairView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/', include('users.urls')),  
+    path('api/auth/', include('users.urls')),
     path('api/users/', include('users.urls')),
     # Add a direct route for therapists to match the frontend URL pattern
     path('api/therapists/', include('users.urls')),
@@ -45,6 +45,12 @@ urlpatterns = [
     path('api/equipment/', include('equipment.urls')),
     # Earnings API endpoints
     path('api/earnings/', include('earnings.urls')),
+    # Visit tracking and therapist reports
+    path('api/visits/', include('visits.urls')),
+    # Treatment plans
+    path('api/treatment-plans/', include('treatment_plans.urls')),
+    # Area management
+    path('api/areas/', include('areas.urls')),
 ]
 
 # Serve media files in development

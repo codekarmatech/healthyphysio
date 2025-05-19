@@ -36,45 +36,25 @@ class EarningsService extends BaseService {
       // Ensure basePath ends with a slash for consistent URL construction
       const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
 
-      // Try multiple URL formats to find the correct one
-      const urlFormats = [
-        // Format 1: Original format
-        `${basePath}therapist/${therapistId}/monthly/?year=${year}&month=${month}`,
+      // Use a single, consistent URL format
+      const url = `${basePath}monthly/${therapistId}/?year=${year}&month=${month}`;
 
-        // Format 2: Legacy format
-        `${basePath}monthly/${therapistId}/?year=${year}&month=${month}`,
-
-        // Format 3: Without trailing slash in query
-        `${basePath}therapist/${therapistId}/monthly?year=${year}&month=${month}`,
-
-        // Format 4: Without trailing slash in query for legacy
-        `${basePath}monthly/${therapistId}?year=${year}&month=${month}`
-      ];
-
-      // Try each URL format
-      for (const url of urlFormats) {
-        try {
-          console.log(`Trying URL format: ${url}`);
-          const response = await api.get(url);
-          console.log('Success with URL format:', url);
-          return response;
-        } catch (error) {
-          // Continue to next format if this one fails
-          if (error.response && error.response.status === 404) {
-            console.log(`404 Not Found for URL format: ${url}`);
-            continue;
-          }
-          // For other errors, throw immediately
-          throw error;
-        }
+      console.log(`Fetching monthly earnings from: ${url}`);
+      const response = await api.get(url);
+      console.log('Monthly earnings fetched successfully');
+      return response;
+    } catch (error) {
+      // If the endpoint returns 404, log and use mock data
+      if (error.response && error.response.status === 404) {
+        console.log(`404 Not Found for earnings endpoint: ${error.config?.url}`);
+        // Fall through to mock data generation
+      } else {
+        // For other errors, log the error
+        console.error('Error fetching monthly earnings:', error);
       }
 
-      // If all formats fail, throw a 404 error
-      throw { response: { status: 404 }, message: 'All URL formats returned 404' };
-
-    } catch (error) {
-      // If all API endpoints fail, generate mock data as a fallback
-      console.log('All earnings endpoints failed, using mock data as fallback');
+      // Generate mock data as fallback
+      console.log('Using mock earnings data as fallback');
       const mockData = await this.getMockEarnings(therapistId, year, month);
       // Add a flag to indicate this is mock data
       mockData.data.isMockData = true;
@@ -138,10 +118,10 @@ class EarningsService extends BaseService {
 
       // If all formats fail, return mock data
       console.log('All URL formats failed, returning mock data');
-      return this.getMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
+      return this.getDetailedMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
     } catch (error) {
       console.error('Error fetching earnings by patient:', error);
-      return this.getMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
+      return this.getDetailedMockPatientEarnings(patientId, new Date().getFullYear(), new Date().getMonth() + 1);
     }
   }
 
@@ -155,17 +135,17 @@ class EarningsService extends BaseService {
   async getPatientEarnings(patientId, year, month) {
     console.log('Patient earnings endpoint not available in backend, using mock data');
     // Return mock data directly since the backend doesn't support this endpoint yet
-    return this.getMockPatientEarnings(patientId, year, month);
+    return this.getDetailedMockPatientEarnings(patientId, year, month);
   }
 
   /**
-   * Get mock patient earnings data
+   * Get simple mock patient earnings data
    * @param {string|number} patientId - Patient ID
    * @param {number} year - Year
    * @param {number} month - Month (1-12)
-   * @returns {Object} Mock earnings data
+   * @returns {Object} Basic mock earnings data with minimal information
    */
-  getMockPatientEarnings(patientId, year, month) {
+  getSimpleMockPatientEarnings(patientId, year, month) {
     return {
       data: {
         isMockData: true,
@@ -245,13 +225,13 @@ class EarningsService extends BaseService {
 
   /**
    * @deprecated - This method is kept for reference only. The backend now provides sample data for new patients.
-   * Mock function to get patient-specific earnings data
+   * Mock function to get detailed patient-specific earnings data
    * @param {string|number} patientId - Patient ID
    * @param {number} year - Year
    * @param {number} month - Month (1-12)
-   * @returns {Object} Mock patient earnings data
+   * @returns {Object} Mock patient earnings data with detailed information
    */
-  getMockPatientEarnings(patientId, year, month) {
+  getDetailedMockPatientEarnings(patientId, year, month) {
     // Session types with realistic names
     const sessionTypes = [
       'Initial Assessment', 'Follow-up Consultation', 'Physical Therapy',
