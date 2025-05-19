@@ -6,7 +6,8 @@ from rest_framework import status, serializers  # Add serializers import here
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import PatientSignupStep1Serializer, PatientSignupStep2Serializer, PatientSignupStep3Serializer
-from .models import User, Patient  # Assuming you have User and Patient models
+from .models import User, Patient, Therapist, Doctor  # Import all user-related models
+from areas.models import Area, PatientArea  # Import area-related models
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -627,6 +628,50 @@ def register_user(request):
                 # Create the patient directly without using the serializer
                 patient = Patient.objects.create(user=user, **patient_data)
 
+                # Handle area selection or creation
+                area_id = data.get('area_id')
+                custom_area = data.get('custom_area')
+
+                if area_id:
+                    # Use existing area
+                    try:
+                        area = Area.objects.get(id=area_id)
+                        patient.area = area
+                        patient.save()
+
+                        # Create PatientArea relationship
+                        PatientArea.objects.create(patient=patient, area=area)
+                        print(f"Associated patient {patient.id} with existing area {area.id} ({area.name})")
+
+                    except Area.DoesNotExist:
+                        print(f"Area with ID {area_id} not found")
+                        # Continue without setting area - it's not critical to fail the registration
+
+                elif custom_area:
+                    # Create a new area with the custom name
+                    try:
+                        # Default to Ahmedabad, Gujarat, India
+                        new_area = Area.objects.create(
+                            name=custom_area,
+                            city='Ahmedabad',
+                            state='Gujarat',
+                            zip_code='380000',  # Default zip code for Ahmedabad
+                            description=f'Custom area created during patient registration: {custom_area}'
+                        )
+
+                        # Associate the new area with the patient
+                        patient.area = new_area
+                        patient.save()
+
+                        # Create PatientArea relationship
+                        PatientArea.objects.create(patient=patient, area=new_area)
+
+                        print(f"Created new area '{custom_area}' and associated with patient {patient.id}")
+
+                    except Exception as e:
+                        print(f"Error creating custom area: {str(e)}")
+                        # Continue without setting area - it's not critical to fail the registration
+
                 # Use serializer for the response instead of raw objects
                 return Response({
                     'message': 'Patient registered successfully',
@@ -713,7 +758,7 @@ class PatientSignupStep1View(APIView):
 class PatientSignupStep2View(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
-        # Retrieve the user ID from the request (you might use a token in a real app)
+        # Retrieve the user ID from the request
         user_id = request.data.get('user_id')
         if not user_id:
             return Response({'error': 'User ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -732,8 +777,39 @@ class PatientSignupStep2View(APIView):
             patient.address = serializer.validated_data['address']
             patient.city = serializer.validated_data['city']
             patient.state = serializer.validated_data['state']
-            patient.zip_code = serializer.validated_data['zipCode']  # Assuming zipCode is zip_code
+            patient.zip_code = serializer.validated_data['zipCode']
             patient.save()
+
+            # Handle area selection - this is now required
+            area_id = serializer.validated_data.get('area_id')
+            if not area_id:
+                return Response({'error': 'Area selection is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                area = Area.objects.get(id=area_id)
+
+                # Set the direct area reference on the Patient model
+                # The Patient.save() method will automatically handle the PatientArea relationship
+                patient.area = area
+                patient.save()
+
+                # Log success for debugging
+                print(f"Successfully associated patient {patient.id} with area {area.id} ({area.name})")
+
+            except Area.DoesNotExist:
+                return Response({
+                    'error': 'Selected area does not exist.',
+                    'area_id': area_id
+                }, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                # Log the error and return a detailed error message
+                print(f"Error associating patient with area: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return Response({
+                    'error': f'Error associating patient with area: {str(e)}',
+                    'details': traceback.format_exc()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             return Response({'user_id': user_id}, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

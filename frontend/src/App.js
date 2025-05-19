@@ -63,6 +63,12 @@ import AdminReportViewPage from './pages/admin/AdminReportViewPage';
 import TherapistApprovalsPage from './pages/admin/TherapistApprovalsPage';
 import LocationMonitoringPage from './pages/admin/LocationMonitoringPage';
 
+// Dashboard Components
+import AreaManagementDashboard from './components/dashboard/AreaManagementDashboard';
+import FinancialManagementDashboard from './components/dashboard/FinancialManagementDashboard';
+import SessionFeeManagement from './components/dashboard/SessionFeeManagement';
+import RevenueDistributionConfig from './components/dashboard/RevenueDistributionConfig';
+
 // Therapist Pages
 import TherapistAttendancePage from './pages/therapist/TherapistAttendancePage';
 import TherapistProfilePage from './pages/therapist/TherapistProfilePage';
@@ -137,6 +143,12 @@ function App() {
             <Route path="/admin/therapist-approvals" element={<TherapistApprovalsPage />} />
             {/* Location Monitoring */}
             <Route path="/admin/location-monitoring" element={<LocationMonitoringPage />} />
+            {/* Area Management */}
+            <Route path="/admin/area-management" element={<AreaManagementDashboard />} />
+            {/* Financial Management */}
+            <Route path="/admin/financial-dashboard" element={<FinancialManagementDashboard />} />
+            <Route path="/admin/session-fees" element={<SessionFeeManagement />} />
+            <Route path="/admin/revenue-distribution" element={<RevenueDistributionConfig />} />
           </Route>
 
           {/* Basic Therapist Routes - Accessible to all therapists */}

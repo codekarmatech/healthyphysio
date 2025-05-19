@@ -149,14 +149,22 @@ class UserSerializer(serializers.ModelSerializer):
 
 class PatientSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    area_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Patient
         fields = ['id', 'user', 'date_of_birth', 'medical_history', 'gender', 'age',
                  'address', 'city', 'state', 'zip_code', 'referred_by',
                  'reference_detail', 'treatment_location', 'disease',
-                 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship']
+                 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
+                 'area', 'area_name']
         read_only_fields = ['id']
+
+    def get_area_name(self, obj):
+        """Return the name of the patient's area if available"""
+        if obj.area:
+            return f"{obj.area.name}, {obj.area.city}, {obj.area.state}"
+        return None
 
     def create(self, validated_data):
         """
@@ -296,6 +304,18 @@ class PatientSignupStep2Serializer(serializers.Serializer):
     city = serializers.CharField(max_length=100)
     state = serializers.CharField(max_length=100)
     zipCode = serializers.CharField(max_length=10)
+    area_id = serializers.IntegerField(required=True, help_text="ID of the selected residential area")
+
+    def validate_area_id(self, value):
+        """
+        Validate that the area_id corresponds to an existing Area
+        """
+        from areas.models import Area
+        try:
+            Area.objects.get(id=value)
+        except Area.DoesNotExist:
+            raise serializers.ValidationError("Selected area does not exist")
+        return value
 
 
 class PatientSignupStep3Serializer(serializers.Serializer):

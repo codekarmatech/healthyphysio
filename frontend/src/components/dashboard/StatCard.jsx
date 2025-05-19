@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 const StatCard = ({
   title,
   value,
+  subtitle,
   icon,
   iconBgColor = 'bg-primary-100',
   iconColor = 'text-primary-600',
@@ -71,6 +72,12 @@ const StatCard = ({
                     <div className="text-2xl font-semibold text-gray-900 mr-1">
                       {value}
                     </div>
+
+                    {subtitle && (
+                      <div className="text-xs text-gray-500 w-full">
+                        {subtitle}
+                      </div>
+                    )}
 
                     {trend && (
                       <div className={`flex items-center text-xs ${trendColor}`}>

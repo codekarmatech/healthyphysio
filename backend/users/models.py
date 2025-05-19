@@ -77,22 +77,49 @@ class Patient(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='patient_profile')
     medical_history = models.TextField(blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    gender = models.CharField(max_length=20, blank=True)
-    age = models.IntegerField(null=True, blank=True)
-    address = models.TextField(blank=True)
-    city = models.CharField(max_length=100, blank=True)
-    state = models.CharField(max_length=100, blank=True)
-    zip_code = models.CharField(max_length=10, blank=True)
+    gender = models.CharField(max_length=20, blank=False)
+    age = models.IntegerField(null=False, blank=False)
+    address = models.TextField(blank=False)
+    city = models.CharField(max_length=100, blank=False)
+    state = models.CharField(max_length=100, blank=False)
+    zip_code = models.CharField(max_length=10, blank=False)
     referred_by = models.CharField(max_length=255, blank=True)
     reference_detail = models.TextField(blank=True)
-    treatment_location = models.CharField(max_length=50, blank=True)
-    disease = models.CharField(max_length=255, blank=True)
-    emergency_contact_name = models.CharField(max_length=255, blank=True)
-    emergency_contact_phone = models.CharField(max_length=20, blank=True)
-    emergency_contact_relationship = models.CharField(max_length=100, blank=True)
+    treatment_location = models.CharField(max_length=50, blank=False)
+    disease = models.CharField(max_length=255, blank=False)
+    emergency_contact_name = models.CharField(max_length=255, blank=False)
+    emergency_contact_phone = models.CharField(max_length=20, blank=False)
+    emergency_contact_relationship = models.CharField(max_length=100, blank=False)
+    # Add direct reference to area for easier access - now required
+    area = models.ForeignKey('areas.Area', on_delete=models.SET_NULL, null=True, blank=False,
+                            related_name='direct_patients',
+                            help_text="Patient's residential area (required)")
 
     def __str__(self):
         return f"{self.user.username}'s Patient Profile"
+
+    def save(self, *args, **kwargs):
+        """
+        Override save method to ensure PatientArea relationship is maintained
+        whenever the direct area reference is set or changed
+        """
+        # First save the patient to ensure it has an ID
+        super().save(*args, **kwargs)
+
+        # If area is set, ensure the PatientArea relationship exists
+        if self.area:
+            from areas.models import PatientArea
+            # Get or create the PatientArea relationship
+            patient_area, created = PatientArea.objects.get_or_create(
+                patient=self,
+                defaults={'area': self.area}
+            )
+
+            # If the relationship already existed but with a different area,
+            # update it to match the direct reference
+            if not created and patient_area.area != self.area:
+                patient_area.area = self.area
+                patient_area.save()
 
 
 # Update the Therapist model to include all fields referenced in serializers

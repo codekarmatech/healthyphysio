@@ -49,6 +49,8 @@ urlpatterns = [
     path('api/visits/', include('visits.urls')),
     # Treatment plans
     path('api/treatment-plans/', include('treatment_plans.urls')),
+    # Area management
+    path('api/areas/', include('areas.urls')),
 ]
 
 # Serve media files in development

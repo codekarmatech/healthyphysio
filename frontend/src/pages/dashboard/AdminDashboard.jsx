@@ -586,8 +586,8 @@ const AdminDashboard = () => {
             {
               title: "Pending Payouts",
               value: `₹${dashboardData?.earnings_stats?.pending_payouts?.toLocaleString() || '8,750'}`,
-              linkText: "View payouts",
-              linkUrl: "/admin/finance/payouts"
+              linkText: "View session fees",
+              linkUrl: "/admin/session-fees"
             },
             {
               title: "Average Session Fee",
@@ -610,8 +610,8 @@ const AdminDashboard = () => {
             }
           ]}
           loading={loading}
-          viewAllLink="/admin/finance"
-          viewAllText="View Financial Reports"
+          viewAllLink="/admin/financial-dashboard"
+          viewAllText="View Financial Dashboard"
         />
       </div>
 
@@ -1043,6 +1043,24 @@ const AdminDashboard = () => {
                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                 </svg>
                 Location Monitoring
+              </Link>
+              <Link
+                to="/admin/area-management"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clipRule="evenodd" />
+                </svg>
+                Area Management
+              </Link>
+              <Link
+                to="/admin/financial-dashboard"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+              >
+                <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
+                Financial Dashboard
               </Link>
               <Link
                 to="/therapists/new"
