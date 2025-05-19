@@ -44,19 +44,19 @@ const PatientEarningsChart = ({ data, year, month }) => {
 
   // Make sure daily data exists and is an array
   const dailyData = Array.isArray(data.daily) ? data.daily : [];
-  
+
   // Filter out days with zero earnings
   const filteredDailyData = dailyData.filter(item => item && item.amount > 0);
-  
+
   // Sort by day
   filteredDailyData.sort((a, b) => a.day - b.day);
-  
+
   // Create chart data
   const chartData = {
     labels: filteredDailyData.map(item => `Day ${item.day}`),
     datasets: [
       {
-        label: 'Daily Earnings ($)',
+        label: 'Daily Earnings (₹)',
         data: filteredDailyData.map(item => item.amount),
         fill: true,
         backgroundColor: 'rgba(79, 70, 229, 0.2)', // Indigo color with transparency
@@ -73,7 +73,7 @@ const PatientEarningsChart = ({ data, year, month }) => {
       },
     ],
   };
-  
+
   // Chart options
   const options = {
     responsive: true,
@@ -124,7 +124,7 @@ const PatientEarningsChart = ({ data, year, month }) => {
         callbacks: {
           label: function(context) {
             const value = typeof context.raw === 'number' ? context.raw.toFixed(2) : '0.00';
-            return `$${value}`;
+            return `₹${value}`;
           }
         }
       }
@@ -144,7 +144,7 @@ const PatientEarningsChart = ({ data, year, month }) => {
           color: '#6B7280', // Gray-500 in Tailwind
           padding: 8,
           callback: function(value) {
-            return '$' + value;
+            return '₹' + value;
           }
         }
       },

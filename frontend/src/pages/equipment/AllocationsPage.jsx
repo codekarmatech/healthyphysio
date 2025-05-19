@@ -8,7 +8,7 @@ const AllocationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { user } = useAuth();
-  
+
   useEffect(() => {
     const fetchAllocations = async () => {
       try {
@@ -23,18 +23,18 @@ const AllocationsPage = () => {
         setLoading(false);
       }
     };
-    
+
     fetchAllocations();
   }, []);
-  
+
   const handleReturnEquipment = async (id) => {
     try {
       await equipmentService.returnEquipment(id);
-      
+
       // Update the allocation in the list
-      setAllocations(allocations.map(allocation => 
-        allocation.id === id 
-          ? { ...allocation, status: 'returned', actual_return_date: new Date().toISOString().split('T')[0] } 
+      setAllocations(allocations.map(allocation =>
+        allocation.id === id
+          ? { ...allocation, status: 'returned', actual_return_date: new Date().toISOString().split('T')[0] }
           : allocation
       ));
     } catch (err) {
@@ -42,26 +42,26 @@ const AllocationsPage = () => {
       alert('Failed to return equipment. Please try again later.');
     }
   };
-  
+
   const handleExtendReturnDate = async (id) => {
     try {
       const newDate = prompt('Enter new return date (YYYY-MM-DD):');
       if (!newDate) return;
-      
+
       const reason = prompt('Enter reason for extension:');
       if (!reason) return;
-      
+
       await equipmentService.extendReturnDate(id, newDate, reason);
-      
+
       // Update the allocation in the list
-      setAllocations(allocations.map(allocation => 
-        allocation.id === id 
-          ? { 
-              ...allocation, 
-              status: 'approved', 
+      setAllocations(allocations.map(allocation =>
+        allocation.id === id
+          ? {
+              ...allocation,
+              status: 'approved',
               expected_return_date: newDate,
               extension_reason: reason
-            } 
+            }
           : allocation
       ));
     } catch (err) {
@@ -69,7 +69,7 @@ const AllocationsPage = () => {
       alert('Failed to extend return date. Please try again later.');
     }
   };
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
@@ -91,7 +91,7 @@ const AllocationsPage = () => {
           )}
         </div>
       </div>
-      
+
       {loading ? (
         <div className="flex justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
@@ -141,7 +141,7 @@ const AllocationsPage = () => {
                     </div>
                     <div className="ml-2 flex-shrink-0 flex">
                       <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        allocation.status === 'approved' ? 'bg-green-100 text-green-800' : 
+                        allocation.status === 'approved' ? 'bg-green-100 text-green-800' :
                         allocation.status === 'returned' ? 'bg-blue-100 text-blue-800' :
                         allocation.status === 'overdue' ? 'bg-red-100 text-red-800' :
                         'bg-yellow-100 text-yellow-800'
@@ -180,7 +180,7 @@ const AllocationsPage = () => {
                       Location: {allocation.location === 'therapist' ? 'With Therapist' : 'At Patient\'s Home'}
                     </div>
                   </div>
-                  
+
                   {allocation.notes && (
                     <div className="mt-2">
                       <p className="text-sm text-gray-700">
@@ -189,7 +189,7 @@ const AllocationsPage = () => {
                       </p>
                     </div>
                   )}
-                  
+
                   {allocation.extension_reason && (
                     <div className="mt-2">
                       <p className="text-sm text-gray-700">
@@ -198,7 +198,7 @@ const AllocationsPage = () => {
                       </p>
                     </div>
                   )}
-                  
+
                   {allocation.status === 'overdue' && (
                     <div className="mt-2 bg-red-50 border-l-4 border-red-400 p-4">
                       <div className="flex">
@@ -209,16 +209,16 @@ const AllocationsPage = () => {
                         </div>
                         <div className="ml-3">
                           <p className="text-sm text-red-700">
-                            This equipment is overdue by {allocation.days_overdue} days. 
-                            Extra charges: ${allocation.extra_charges_amount.toFixed(2)}
+                            This equipment is overdue by {allocation.days_overdue} days.
+                            Extra charges: ₹{allocation.extra_charges_amount.toFixed(2)}
                           </p>
                         </div>
                       </div>
                     </div>
                   )}
-                  
-                  {(user?.role === 'admin' || 
-                    (user?.role === 'therapist' && allocation.therapist_details?.user?.id === user.id)) && 
+
+                  {(user?.role === 'admin' ||
+                    (user?.role === 'therapist' && allocation.therapist_details?.user?.id === user.id)) &&
                    allocation.status !== 'returned' && (
                     <div className="mt-4 flex space-x-2">
                       <button
@@ -227,7 +227,7 @@ const AllocationsPage = () => {
                       >
                         Mark as Returned
                       </button>
-                      
+
                       {user?.role === 'admin' && allocation.status === 'overdue' && (
                         <button
                           onClick={() => handleExtendReturnDate(allocation.id)}

@@ -7,27 +7,27 @@ const EquipmentDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [equipment, setEquipment] = useState(null);
   const [allocations, setAllocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  
+
   useEffect(() => {
     const fetchEquipmentDetails = async () => {
       try {
         setLoading(true);
         const equipmentResponse = await equipmentService.getEquipmentById(id);
         setEquipment(equipmentResponse.data);
-        
+
         // Fetch allocations for this equipment
         const allocationsResponse = await equipmentService.getAllAllocations();
         const filteredAllocations = allocationsResponse.data.filter(
           allocation => allocation.equipment === parseInt(id)
         );
         setAllocations(filteredAllocations);
-        
+
         setError(null);
       } catch (err) {
         console.error('Error fetching equipment details:', err);
@@ -36,10 +36,10 @@ const EquipmentDetailPage = () => {
         setLoading(false);
       }
     };
-    
+
     fetchEquipmentDetails();
   }, [id]);
-  
+
   const handleDelete = async () => {
     try {
       await equipmentService.deleteEquipment(id);
@@ -49,7 +49,7 @@ const EquipmentDetailPage = () => {
       setError('Failed to delete equipment. Please try again later.');
     }
   };
-  
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center">
@@ -57,7 +57,7 @@ const EquipmentDetailPage = () => {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -82,7 +82,7 @@ const EquipmentDetailPage = () => {
       </div>
     );
   }
-  
+
   if (!equipment) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -107,7 +107,7 @@ const EquipmentDetailPage = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -121,7 +121,7 @@ const EquipmentDetailPage = () => {
           Back to Equipment List
         </Link>
       </div>
-      
+
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
           <div>
@@ -132,7 +132,7 @@ const EquipmentDetailPage = () => {
               Details and allocations for {equipment.name}.
             </p>
           </div>
-          
+
           {user?.role === 'admin' && (
             <div className="flex space-x-2">
               <Link
@@ -150,7 +150,7 @@ const EquipmentDetailPage = () => {
             </div>
           )}
         </div>
-        
+
         <div className="border-t border-gray-200">
           <dl>
             <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -211,9 +211,9 @@ const EquipmentDetailPage = () => {
                   Photo
                 </dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                  <img 
-                    src={equipment.photo} 
-                    alt={equipment.name} 
+                  <img
+                    src={equipment.photo}
+                    alt={equipment.name}
                     className="h-48 w-auto object-contain"
                   />
                 </dd>
@@ -222,17 +222,17 @@ const EquipmentDetailPage = () => {
           </dl>
         </div>
       </div>
-      
+
       {/* Current Allocation Section */}
       <div className="mt-8">
         <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
           Current Allocation
         </h3>
-        
+
         {allocations.length === 0 ? (
           <div className="bg-white shadow overflow-hidden sm:rounded-md p-6">
             <p className="text-gray-500">This equipment is not currently allocated.</p>
-            
+
             {user?.role === 'admin' && equipment.is_available && (
               <Link
                 to={`/equipment/${id}/allocate`}
@@ -259,7 +259,7 @@ const EquipmentDetailPage = () => {
                       </div>
                       <div className="ml-2 flex-shrink-0 flex">
                         <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          allocation.status === 'approved' ? 'bg-green-100 text-green-800' : 
+                          allocation.status === 'approved' ? 'bg-green-100 text-green-800' :
                           allocation.status === 'overdue' ? 'bg-red-100 text-red-800' :
                           'bg-yellow-100 text-yellow-800'
                         }`}>
@@ -289,7 +289,7 @@ const EquipmentDetailPage = () => {
                         Location: {allocation.location === 'therapist' ? 'With Therapist' : 'At Patient\'s Home'}
                       </div>
                     </div>
-                    
+
                     {allocation.status === 'overdue' && (
                       <div className="mt-2 bg-red-50 border-l-4 border-red-400 p-4">
                         <div className="flex">
@@ -300,14 +300,14 @@ const EquipmentDetailPage = () => {
                           </div>
                           <div className="ml-3">
                             <p className="text-sm text-red-700">
-                              This equipment is overdue by {allocation.days_overdue} days. 
-                              Extra charges: ${allocation.extra_charges_amount.toFixed(2)}
+                              This equipment is overdue by {allocation.days_overdue} days.
+                              Extra charges: ₹{allocation.extra_charges_amount.toFixed(2)}
                             </p>
                           </div>
                         </div>
                       </div>
                     )}
-                    
+
                     {user?.role === 'admin' && (
                       <div className="mt-4 flex space-x-2">
                         {allocation.status !== 'returned' && (
@@ -327,13 +327,13 @@ const EquipmentDetailPage = () => {
                             Mark as Returned
                           </button>
                         )}
-                        
+
                         {allocation.status === 'overdue' && (
                           <button
                             onClick={() => {
                               const newDate = prompt('Enter new return date (YYYY-MM-DD):');
                               const reason = prompt('Enter reason for extension:');
-                              
+
                               if (newDate && reason) {
                                 equipmentService.extendReturnDate(allocation.id, newDate, reason)
                                   .then(() => {
@@ -360,7 +360,7 @@ const EquipmentDetailPage = () => {
           </div>
         )}
       </div>
-      
+
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (
         <div className="fixed z-10 inset-0 overflow-y-auto">
@@ -368,9 +368,9 @@ const EquipmentDetailPage = () => {
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-            
+
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
+
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">

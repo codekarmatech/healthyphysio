@@ -105,7 +105,7 @@ const EarningsSummary = ({ summary, loading, isMockData = false }) => {
         <div className="flex justify-between items-center mb-1">
           <span className="text-sm font-medium text-gray-500">Earnings Realization</span>
           <span className="text-sm font-medium text-gray-900">
-            ${safeTotal.toFixed(2)} of ${safePotential.toFixed(2)}
+            ₹{safeTotal.toFixed(2)} of ₹{safePotential.toFixed(2)}
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
@@ -133,7 +133,7 @@ const EarningsSummary = ({ summary, loading, isMockData = false }) => {
           <div>
             <dt className="text-sm font-medium text-gray-500">Avg. Earnings/Session</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              ${attendedSessions > 0 ? safeAverage.toFixed(2) : '0.00'}
+              ₹{attendedSessions > 0 ? safeAverage.toFixed(2) : '0.00'}
             </dd>
           </div>
         </dl>

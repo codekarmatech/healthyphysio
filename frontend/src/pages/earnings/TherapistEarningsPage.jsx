@@ -25,7 +25,7 @@ const TherapistEarningsPage = () => {
     try {
       // Get therapist ID from user object
       const therapistId = user.therapist_id || user.id;
-      
+
       // Get earnings data from API
       const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
       setEarningsData(response.data);
@@ -126,18 +126,18 @@ const TherapistEarningsPage = () => {
                 </div>
               )}
 
-              <EarningsMonthSelector 
+              <EarningsMonthSelector
                 currentDate={currentDate}
                 onPrevMonth={handlePrevMonth}
                 onNextMonth={handleNextMonth}
               />
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <EarningsSummary 
+                <EarningsSummary
                   summary={earningsData?.summary}
                   loading={loading}
                 />
-                
+
                 <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                   <div className="px-4 py-5 sm:px-6">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">Monthly Overview</h3>
@@ -157,7 +157,7 @@ const TherapistEarningsPage = () => {
                         <div>
                           <div className="text-sm font-medium text-gray-500">Total Earned</div>
                           <div className="mt-1 text-3xl font-semibold text-gray-900">
-                            ${earningsData.summary.totalEarned.toFixed(2)}
+                            ₹{earningsData.summary.totalEarned.toFixed(2)}
                           </div>
                         </div>
                         <div>
@@ -178,7 +178,7 @@ const TherapistEarningsPage = () => {
               </div>
 
               <div className="mt-6">
-                <EarningsAnalytics 
+                <EarningsAnalytics
                   earnings={earningsData?.earnings}
                   loading={loading}
                 />
