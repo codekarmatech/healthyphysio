@@ -527,7 +527,7 @@ class TherapistReportViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def submit(self, request, pk=None):
-        """Submit a report"""
+        """Submit a report with location verification and time validation"""
         report = self.get_object()
 
         # Check if user is the report's therapist
@@ -550,27 +550,75 @@ class TherapistReportViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Check if the therapist is still at the patient's location
-        if report.visit:
-            visit = report.visit
-            if visit.status != Visit.Status.IN_SESSION and visit.status != Visit.Status.ARRIVED:
+        # Get location data from request
+        location_data = None
+        if 'location' in request.data:
+            location_data = request.data.get('location')
+
+        # Check time constraints
+        now = timezone.now()
+        if report.visit and report.visit.scheduled_end:
+            time_diff = now - report.visit.scheduled_end
+            hours_diff = time_diff.total_seconds() / 3600
+
+            if hours_diff > 12:
                 return Response(
-                    {"error": "You must submit the report before leaving the patient's location"},
+                    {"error": "Reports must be submitted within 12 hours of the visit end time"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        success = report.submit()
+            # Warn about late submission
+            if hours_diff > 1:
+                # This is a late submission, but still allowed
+                pass
+
+        # Submit the report with location data
+        success = report.submit(location_data)
 
         if success:
+            # Determine if this is a late submission
+            is_late = report.status == TherapistReport.Status.LATE_SUBMISSION
+
+            # Prepare notification data
+            notification_data = {
+                "report_id": report.id,
+                "therapist": report.therapist.user.get_full_name(),
+                "patient": report.patient.user.get_full_name(),
+                "submitted_at": report.submitted_at.isoformat(),
+                "is_late": is_late,
+                "location_verified": report.location_verified
+            }
+
+            # Add location data if available
+            if location_data:
+                notification_data["location"] = {
+                    "latitude": report.submission_location_latitude,
+                    "longitude": report.submission_location_longitude,
+                    "accuracy": report.submission_location_accuracy
+                }
+
             # Notify admin about the report submission
             # In a real implementation, this would send an email or push notification
             # For now, we'll just log it
             print(f"ADMIN NOTIFICATION: Report {report.id} submitted by {report.therapist.user.username}")
+            print(f"Notification data: {notification_data}")
 
-            return Response({"message": "Report submitted successfully"})
+            # Create a response with appropriate message
+            if is_late:
+                return Response({
+                    "message": "Report submitted successfully (late submission)",
+                    "is_late": True,
+                    "location_verified": report.location_verified
+                })
+            else:
+                return Response({
+                    "message": "Report submitted successfully",
+                    "is_late": False,
+                    "location_verified": report.location_verified
+                })
         else:
             return Response(
-                {"error": "Cannot submit this report"},
+                {"error": "Cannot submit this report. It may be too late (over 12 hours) or the report is not in draft status."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

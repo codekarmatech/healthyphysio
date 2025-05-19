@@ -1,79 +1,76 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Spinner from '../../components/common/Spinner';
 import { toast } from 'react-toastify';
+import { reportsService } from '../../services/visitsService';
+import { formatDate } from '../../utils/dateUtils';
 
 const ReportsPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState([]);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'submitted', 'approved'
+  const [isMockData, setIsMockData] = useState(false);
 
-  // Fetch reports (mock data for now)
+  // Fetch reports from the API
   useEffect(() => {
     const fetchReports = async () => {
       try {
         setLoading(true);
 
-        // Mock data - in a real app, this would be an API call
-        const mockData = [
-          {
-            id: 1,
-            patientName: 'John Smith',
-            sessionDate: '2023-05-15',
-            submittedDate: '2023-05-15',
-            status: 'approved'
-          },
-          {
-            id: 2,
-            patientName: 'Sarah Johnson',
-            sessionDate: '2023-05-14',
-            submittedDate: '2023-05-14',
-            status: 'submitted'
-          },
-          {
-            id: 3,
-            patientName: 'Michael Brown',
-            sessionDate: '2023-05-13',
-            submittedDate: null,
-            status: 'pending'
-          },
-          {
-            id: 4,
-            patientName: 'Emily Davis',
-            sessionDate: '2023-05-12',
-            submittedDate: '2023-05-12',
-            status: 'approved'
-          },
-          {
-            id: 5,
-            patientName: 'Robert Wilson',
-            sessionDate: '2023-05-11',
-            submittedDate: '2023-05-11',
-            status: 'flagged'
-          }
-        ];
+        // Get therapist ID from user object
+        const therapistId = user.therapist_id || user.id;
 
-        // Simulate API delay
-        setTimeout(() => {
-          setReports(mockData);
-          setLoading(false);
+        // Fetch reports from the API
+        const response = await reportsService.getByTherapist(therapistId);
+
+        if (response && response.data) {
+          // Format the data for display
+          const formattedReports = response.data.map(report => ({
+            id: report.id,
+            patientName: report.patient_details?.user?.full_name || 'Unknown Patient',
+            sessionDate: report.report_date,
+            submittedDate: report.submitted_at,
+            status: report.status,
+            visitId: report.visit,
+            sessionId: report.session,
+            // Additional data for detailed view
+            content: report.content,
+            therapistId: report.therapist,
+            patientId: report.patient,
+            reviewedAt: report.reviewed_at,
+            reviewNotes: report.review_notes,
+            // Flag to indicate this is real data
+            isMockData: false
+          }));
+
+          setReports(formattedReports);
+          setIsMockData(false);
           toast.success(`Welcome ${user.firstName}, your reports have been loaded.`);
-        }, 1000);
+        } else {
+          // If no data is returned, use empty array
+          setReports([]);
+          toast.info(`Welcome ${user.firstName}, you don't have any reports yet.`);
+        }
 
+        setLoading(false);
       } catch (err) {
         console.error('Error fetching reports:', err);
+
+        // If API call fails, show error and use empty array
         setError('Failed to load reports. Please try again.');
         toast.error(`Sorry ${user.firstName}, we couldn't load your reports. Please try again.`);
+        setReports([]);
         setLoading(false);
       }
     };
 
     fetchReports();
-  }, [user.firstName]);
+  }, [user.firstName, user.therapist_id, user.id]);
 
   // Filter reports based on active tab
   const filteredReports = reports.filter(report => {
@@ -106,14 +103,24 @@ const ReportsPage = () => {
           </div>
         ) : (
           <div className="bg-white shadow-md rounded-lg p-6">
-            <h1 className="text-2xl font-bold mb-6">Session Reports</h1>
-
-            {/* Warning for mock data */}
-            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-              <p className="font-bold">⚠️ Mock Data Warning</p>
-              <p>The data displayed below is sample mock data for demonstration purposes only and does not reflect actual database records.
-              Clicking on actions may result in 404 errors as these records don't exist in the database.</p>
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold">Session Reports</h1>
+              <button
+                onClick={() => navigate('/therapist/reports/new')}
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center"
+              >
+                <span className="mr-2">+</span> Create New Report
+              </button>
             </div>
+
+            {/* Warning for mock data - only shown if using mock data */}
+            {isMockData && (
+              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+                <p className="font-bold">⚠️ Mock Data Warning</p>
+                <p>The data displayed below is sample mock data for demonstration purposes only and does not reflect actual database records.
+                Clicking on actions may result in 404 errors as these records don't exist in the database.</p>
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="flex border-b mb-6">
@@ -178,10 +185,10 @@ const ReportsPage = () => {
                           {report.patientName}
                         </td>
                         <td className="py-3 px-6 text-left">
-                          {report.sessionDate}
+                          {report.sessionDate ? formatDate(new Date(report.sessionDate), 'MMM dd, yyyy') : 'N/A'}
                         </td>
                         <td className="py-3 px-6 text-left">
-                          {report.submittedDate || 'Not submitted'}
+                          {report.submittedDate ? formatDate(new Date(report.submittedDate), 'MMM dd, yyyy HH:mm') : 'Not submitted'}
                         </td>
                         <td className="py-3 px-6 text-left">
                           <span className={`py-1 px-3 rounded-full text-xs ${getStatusBadgeClass(report.status)}`}>

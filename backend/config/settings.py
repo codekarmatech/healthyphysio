@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'channels',
     'encrypted_files',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
 
     # Local apps
     'users',

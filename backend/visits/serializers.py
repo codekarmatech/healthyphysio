@@ -12,15 +12,15 @@ from django.utils import timezone
 class LocationUpdateSerializer(serializers.ModelSerializer):
     """Serializer for location updates"""
     user_details = serializers.SerializerMethodField(read_only=True)
-    
+
     class Meta:
         model = LocationUpdate
         fields = [
-            'id', 'user', 'visit', 'latitude', 'longitude', 
+            'id', 'user', 'visit', 'latitude', 'longitude',
             'accuracy', 'timestamp', 'user_details'
         ]
         read_only_fields = ['id', 'timestamp']
-    
+
     def get_user_details(self, obj):
         """Get basic user details"""
         return {
@@ -37,7 +37,7 @@ class VisitSerializer(serializers.ModelSerializer):
     patient_details = PatientSerializer(source='patient', read_only=True)
     appointment_details = AppointmentSerializer(source='appointment', read_only=True)
     location_updates = LocationUpdateSerializer(many=True, read_only=True)
-    
+
     class Meta:
         model = Visit
         fields = [
@@ -47,7 +47,7 @@ class VisitSerializer(serializers.ModelSerializer):
             'appointment_details', 'location_updates'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
-    
+
     def validate(self, data):
         """Validate visit data"""
         # Ensure scheduled_end is after scheduled_start
@@ -56,7 +56,7 @@ class VisitSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Scheduled end time must be after scheduled start time"
                 )
-        
+
         # Ensure therapist and patient match the appointment
         if 'appointment' in data:
             appointment = data['appointment']
@@ -68,7 +68,7 @@ class VisitSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Patient must match the appointment's patient"
                 )
-        
+
         return data
 
 
@@ -79,7 +79,7 @@ class ProximityAlertSerializer(serializers.ModelSerializer):
     therapist_location_details = LocationUpdateSerializer(source='therapist_location', read_only=True)
     patient_location_details = LocationUpdateSerializer(source='patient_location', read_only=True)
     acknowledged_by_details = serializers.SerializerMethodField(read_only=True)
-    
+
     class Meta:
         model = ProximityAlert
         fields = [
@@ -89,7 +89,7 @@ class ProximityAlertSerializer(serializers.ModelSerializer):
             'therapist_location_details', 'patient_location_details', 'acknowledged_by_details'
         ]
         read_only_fields = ['id', 'created_at', 'acknowledged_at', 'acknowledged_by']
-    
+
     def get_acknowledged_by_details(self, obj):
         """Get details of the user who acknowledged the alert"""
         if obj.acknowledged_by:
@@ -109,7 +109,7 @@ class TherapistReportSerializer(serializers.ModelSerializer):
     visit_details = VisitSerializer(source='visit', read_only=True)
     session_details = SessionSerializer(source='session', read_only=True)
     reviewed_by_details = serializers.SerializerMethodField(read_only=True)
-    
+
     class Meta:
         model = TherapistReport
         fields = [
@@ -117,13 +117,19 @@ class TherapistReportSerializer(serializers.ModelSerializer):
             'content', 'status', 'history', 'submitted_at', 'reviewed_at',
             'reviewed_by', 'review_notes', 'created_at', 'updated_at',
             'therapist_details', 'patient_details', 'visit_details',
-            'session_details', 'reviewed_by_details'
+            'session_details', 'reviewed_by_details',
+            # New fields for time-based validation and location verification
+            'is_late_submission', 'submission_location_latitude',
+            'submission_location_longitude', 'submission_location_accuracy',
+            'location_verified'
         ]
         read_only_fields = [
             'id', 'history', 'submitted_at', 'reviewed_at', 'reviewed_by',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at', 'is_late_submission',
+            'submission_location_latitude', 'submission_location_longitude',
+            'submission_location_accuracy', 'location_verified'
         ]
-    
+
     def get_reviewed_by_details(self, obj):
         """Get details of the user who reviewed the report"""
         if obj.reviewed_by:

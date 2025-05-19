@@ -94,6 +94,29 @@ const TherapistReportPage = () => {
     }
   };
 
+  // Get current location
+  const getCurrentLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            });
+          },
+          (error) => {
+            console.error('Error getting location:', error);
+            reject(new Error('Unable to get your current location. Please enable location services.'));
+          }
+        );
+      } else {
+        reject(new Error('Geolocation is not supported by this browser.'));
+      }
+    });
+  };
+
   // Handle final submission
   const handleSubmitReport = async () => {
     // Validate required fields
@@ -110,10 +133,30 @@ const TherapistReportPage = () => {
       // First save the latest changes
       await sessionService.updateReport(id, reportData);
 
-      // Then submit the report
+      // Get current location
+      let locationData = null;
+      try {
+        locationData = await getCurrentLocation();
+      } catch (locationError) {
+        // Show warning but continue with submission
+        toast.warning(`Location services not available. Your report will be submitted without location verification.`);
+      }
+
+      // Then submit the report with location data
       setSubmitting(true);
-      await sessionService.submitReport(id);
-      toast.success(`Thank you ${user.firstName}, your report has been submitted successfully`);
+      const submitResponse = await sessionService.submitReport(id, locationData);
+
+      // Check if this was a late submission
+      if (submitResponse.data && submitResponse.data.is_late) {
+        toast.warning(`Your report has been submitted as a late submission. This will be flagged for admin review.`);
+      } else {
+        toast.success(`Thank you ${user.firstName}, your report has been submitted successfully`);
+      }
+
+      // Check if location was verified
+      if (submitResponse.data && submitResponse.data.location_verified === false && locationData) {
+        toast.warning(`Your location could not be verified. This will be noted in the report.`);
+      }
 
       // Refresh session data
       const response = await sessionService.getById(id);
@@ -127,7 +170,14 @@ const TherapistReportPage = () => {
       }, 2000);
     } catch (err) {
       console.error('Error submitting report:', err);
-      toast.error(`Sorry ${user.firstName}, we couldn't submit your report. Please try again.`);
+
+      // Check for specific error messages
+      if (err.response && err.response.data && err.response.data.error) {
+        toast.error(err.response.data.error);
+      } else {
+        toast.error(`Sorry ${user.firstName}, we couldn't submit your report. Please try again.`);
+      }
+
       setSubmitting(false);
     }
   };

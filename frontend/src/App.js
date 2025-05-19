@@ -71,6 +71,7 @@ import PendingReportsPage from './pages/therapist/PendingReportsPage';
 import TreatmentPlansPage from './pages/therapist/TreatmentPlansPage';
 import TreatmentPlanDetailPage from './pages/therapist/TreatmentPlanDetailPage';
 import ReportsPage from './pages/therapist/ReportsPage';
+import NewReportPage from './pages/therapist/NewReportPage';
 import PendingApprovalPage from './pages/therapist/PendingApprovalPage';
 import FeatureNotApprovedPage from './pages/therapist/FeatureNotApprovedPage';
 import RequestSessionPage from './pages/therapist/RequestSessionPage';
@@ -178,6 +179,7 @@ function App() {
             <Route path="/therapist/pending-reports" element={<PendingReportsPage />} />
             <Route path="/therapist/report/:id" element={<TherapistReportPage />} />
             <Route path="/therapist/reports" element={<ReportsPage />} />
+            <Route path="/therapist/reports/new" element={<NewReportPage />} />
             <Route path="/therapist/request-session" element={<RequestSessionPage />} />
           </Route>
 

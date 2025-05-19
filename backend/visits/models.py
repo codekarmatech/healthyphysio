@@ -233,6 +233,7 @@ class TherapistReport(models.Model):
         SUBMITTED = 'submitted', 'Submitted'
         REVIEWED = 'reviewed', 'Reviewed'
         FLAGGED = 'flagged', 'Flagged'
+        LATE_SUBMISSION = 'late_submission', 'Late Submission'
 
     therapist = models.ForeignKey(
         Therapist,
@@ -261,7 +262,7 @@ class TherapistReport(models.Model):
     report_date = models.DateField(default=timezone.now)
     content = models.TextField()
     status = models.CharField(
-        max_length=10,
+        max_length=15,  # Increased length to accommodate 'late_submission'
         choices=Status.choices,
         default=Status.DRAFT
     )
@@ -278,6 +279,13 @@ class TherapistReport(models.Model):
     review_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # New fields for time-based validation and location verification
+    is_late_submission = models.BooleanField(default=False)
+    submission_location_latitude = models.FloatField(null=True, blank=True)
+    submission_location_longitude = models.FloatField(null=True, blank=True)
+    submission_location_accuracy = models.FloatField(null=True, blank=True)
+    location_verified = models.BooleanField(default=False)
 
     def append_content(self, new_content):
         """Append new content to the report, preserving history"""
@@ -296,11 +304,78 @@ class TherapistReport(models.Model):
         self.save()
         return True
 
-    def submit(self):
-        """Submit the report"""
+    def submit(self, location_data=None):
+        """
+        Submit the report with time-based validation and location verification
+
+        Args:
+            location_data (dict): Optional location data with latitude, longitude, and accuracy
+        """
         if self.status == self.Status.DRAFT:
-            self.status = self.Status.SUBMITTED
-            self.submitted_at = timezone.now()
+            now = timezone.now()
+            self.submitted_at = now
+
+            # Check if this is a late submission (more than 1 hour after visit end)
+            if self.visit and self.visit.scheduled_end:
+                time_diff = now - self.visit.scheduled_end
+                hours_diff = time_diff.total_seconds() / 3600
+
+                if hours_diff > 12:
+                    # Too late to submit (more than 12 hours after visit)
+                    return False
+                elif hours_diff > 1:
+                    # Late submission (between 1 and 12 hours after visit)
+                    self.is_late_submission = True
+                    self.status = self.Status.LATE_SUBMISSION
+                else:
+                    # On-time submission (within 1 hour of visit end)
+                    self.status = self.Status.SUBMITTED
+            else:
+                # No visit associated, default to submitted
+                self.status = self.Status.SUBMITTED
+
+            # Store location data if provided
+            if location_data:
+                self.submission_location_latitude = location_data.get('latitude')
+                self.submission_location_longitude = location_data.get('longitude')
+                self.submission_location_accuracy = location_data.get('accuracy')
+
+                # Verify location if visit has patient location
+                if self.visit:
+                    patient_locations = self.visit.location_updates.filter(
+                        user=self.patient.user
+                    ).order_by('-timestamp')
+
+                    if patient_locations.exists():
+                        patient_location = patient_locations.first()
+
+                        # Calculate distance between therapist and patient
+                        from math import radians, cos, sin, asin, sqrt
+
+                        def haversine(lon1, lat1, lon2, lat2):
+                            """Calculate distance between two points in meters"""
+                            # Convert decimal degrees to radians
+                            lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+                            # Haversine formula
+                            dlon = lon2 - lon1
+                            dlat = lat2 - lat1
+                            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                            c = 2 * asin(sqrt(a))
+                            r = 6371000  # Radius of earth in meters
+                            return c * r
+
+                        distance = haversine(
+                            self.submission_location_longitude,
+                            self.submission_location_latitude,
+                            patient_location.longitude,
+                            patient_location.latitude
+                        )
+
+                        # If within 100 meters, consider location verified
+                        if distance < 100:
+                            self.location_verified = True
+
             self.save()
             return True
         return False

@@ -33,6 +33,7 @@ urlpatterns = [
     path('token/', views.CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('login/', views.CustomTokenObtainPairView.as_view(), name='login'),    # if you still need your custom view
+    path('logout/', views.logout_view, name='logout'),
     path('register/', views.register_user, name='register_user'),
     path('me/', views.UserViewSet.as_view({'get': 'me'}), name='user-me'),
 

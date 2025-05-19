@@ -212,9 +212,10 @@ class SessionService extends BaseService {
   /**
    * Submit the therapist's report for a session
    * @param {string|number} id - Session ID
+   * @param {Object} locationData - Optional location data (latitude, longitude, accuracy)
    * @returns {Promise} API response
    */
-  submitReport(id) {
+  submitReport(id, locationData = null) {
     // Check if this is likely a mock data ID (simple numeric IDs 1-10)
     if (typeof id === 'number' || (typeof id === 'string' && /^[1-9]$|^10$/.test(id))) {
       console.log(`ID ${id} appears to be from mock data. Returning mock submit response.`);
@@ -226,18 +227,23 @@ class SessionService extends BaseService {
           report_status: 'submitted',
           submitted_at: new Date().toISOString(),
           success: true,
+          is_late: false,
+          location_verified: locationData ? true : false,
           mock_data: true
         }
       });
     }
 
+    // Prepare request data with location if available
+    const requestData = locationData ? { location: locationData } : {};
+
     // First try the scheduling endpoint
-    return this.performAction(id, 'submit_report')
+    return this.performAction(id, 'submit_report', requestData)
       .catch(error => {
         if (error.response && error.response.status === 404) {
           // If not found, try the visits endpoint
           console.log('Session not found in scheduling, trying visits endpoint for submit');
-          return api.post(`/visits/reports/${id}/submit_report/`)
+          return api.post(`/visits/reports/${id}/submit/`, requestData)
             .catch(visitError => {
               if (visitError.response && visitError.response.status === 404) {
                 // Handle case where both endpoints return 404
