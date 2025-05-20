@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { locationService, visitsService } from '../../services/visitsService';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import Header from '../../components/layout/Header';
-import Footer from '../../components/layout/Footer';
 import Spinner from '../../components/common/Spinner';
 import LocationMap from '../../components/visits/LocationMap';
 import { toast } from 'react-toastify';
@@ -153,23 +151,19 @@ const LocationMonitoringPage = () => {
   // Check if user is admin
   if (user?.role !== 'admin') {
     return (
-      <DashboardLayout>
-        <Header title="Access Denied" />
+      <DashboardLayout title="Access Denied">
         <div className="container mx-auto px-4 py-8">
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             <p className="font-bold">Access Denied</p>
             <p>Only administrators can access this page for safety monitoring purposes.</p>
           </div>
         </div>
-        <Footer />
       </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
-      <Header title="Location Monitoring" />
-
+    <DashboardLayout title="Location Monitoring">
       <div className="container mx-auto px-4 py-8">
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-6">Location Monitoring Dashboard</h1>
@@ -320,8 +314,6 @@ const LocationMonitoringPage = () => {
           </div>
         </div>
       </div>
-
-      <Footer />
     </DashboardLayout>
   );
 };

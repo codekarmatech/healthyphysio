@@ -127,14 +127,18 @@ function App() {
 
           {/* Admin-only Routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route path="/appointments/new" element={<NewAppointmentPage />} />
-            <Route path="/appointments/:id/edit" element={<EditAppointmentPage />} />
+            <Route path="/admin/appointments" element={<AppointmentsPage />} />
+            <Route path="/admin/appointments/new" element={<NewAppointmentPage />} />
+            <Route path="/admin/appointments/:id" element={<AppointmentDetailPage />} />
+            <Route path="/admin/appointments/:id/edit" element={<EditAppointmentPage />} />
             <Route path="/patients" element={<PatientsPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
-            <Route path="/equipment/new" element={<EquipmentFormPage />} />
-            <Route path="/equipment/categories" element={<CategoryManagementPage />} />
-            <Route path="/equipment/requests" element={<AllocationRequestsPage />} />
-            <Route path="/equipment/:id/edit" element={<EquipmentFormPage />} />
+            <Route path="/admin/equipment" element={<EquipmentListPage />} />
+            <Route path="/admin/equipment/new" element={<EquipmentFormPage />} />
+            <Route path="/admin/equipment/categories" element={<CategoryManagementPage />} />
+            <Route path="/admin/equipment/requests" element={<AllocationRequestsPage />} />
+            <Route path="/admin/equipment/:id" element={<EquipmentDetailPage />} />
+            <Route path="/admin/equipment/:id/edit" element={<EquipmentFormPage />} />
             <Route path="/admin/attendance" element={<AdminAttendancePage />} />
             {/* New Report Routes for Admin */}
             <Route path="/admin/submitted-reports" element={<SubmittedReportsPage />} />

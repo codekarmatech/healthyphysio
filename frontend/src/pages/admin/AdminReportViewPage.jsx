@@ -5,8 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import sessionService from '../../services/sessionService';
 import { toast } from 'react-toastify';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import Header from '../../components/layout/Header';
-import Footer from '../../components/layout/Footer';
 import Spinner from '../../components/common/Spinner';
 import { formatDate } from '../../utils/dateUtils';
 
@@ -100,20 +98,17 @@ const AdminReportViewPage = () => {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <Header title="View Report" />
+      <DashboardLayout title="View Report">
         <div className="flex justify-center items-center h-64">
           <Spinner size="lg" />
         </div>
-        <Footer />
       </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout>
-        <Header title="View Report" />
+      <DashboardLayout title="View Report">
         <div className="container mx-auto px-4 py-8">
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
@@ -125,15 +120,13 @@ const AdminReportViewPage = () => {
             Back to Submitted Reports
           </button>
         </div>
-        <Footer />
       </DashboardLayout>
     );
   }
 
   if (!session) {
     return (
-      <DashboardLayout>
-        <Header title="View Report" />
+      <DashboardLayout title="View Report">
         <div className="container mx-auto px-4 py-8">
           <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
             Session not found
@@ -145,7 +138,6 @@ const AdminReportViewPage = () => {
             Back to Submitted Reports
           </button>
         </div>
-        <Footer />
       </DashboardLayout>
     );
   }
@@ -154,18 +146,15 @@ const AdminReportViewPage = () => {
   const canReview = session.report_status === 'submitted';
 
   return (
-    <React.Fragment>
-      <DashboardLayout>
-        <Header title={`View Report - ${user.firstName} ${user.lastName}`} />
-
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white shadow-md rounded-lg p-6">
-            {/* Session Information */}
-            <div className="mb-6 border-b pb-4">
-              <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold mb-2">
-                  Session Report
-                </h1>
+    <DashboardLayout title={`View Report - ${user.firstName} ${user.lastName}`}>
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-white shadow-md rounded-lg p-6">
+          {/* Session Information */}
+          <div className="mb-6 border-b pb-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold mb-2">
+                Session Report
+              </h1>
               <button
                 onClick={() => navigate('/admin/submitted-reports')}
                 className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
@@ -332,10 +321,7 @@ const AdminReportViewPage = () => {
           )}
         </div>
       </div>
-
-      <Footer />
     </DashboardLayout>
-    </React.Fragment>
   );
 };
 

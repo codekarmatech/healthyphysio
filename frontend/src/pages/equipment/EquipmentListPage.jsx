@@ -2,7 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import equipmentService from '../../services/equipmentService';
 import { useAuth } from '../../contexts/AuthContext';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 
+/**
+ * EquipmentListPage component
+ *
+ * This page displays a list of equipment items with filtering by category.
+ * It uses the standardized DashboardLayout for consistent UI across the application.
+ */
 const EquipmentListPage = () => {
   const [equipment, setEquipment] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -11,7 +18,7 @@ const EquipmentListPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryFilter = searchParams.get('category') || '';
-  
+
   // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
@@ -22,10 +29,10 @@ const EquipmentListPage = () => {
         console.error('Error fetching categories:', err);
       }
     };
-    
+
     fetchCategories();
   }, []);
-  
+
   // Fetch equipment
   useEffect(() => {
     const fetchEquipment = async () => {
@@ -41,14 +48,17 @@ const EquipmentListPage = () => {
         setLoading(false);
       }
     };
-    
+
     fetchEquipment();
   }, [categoryFilter]);
-  
+
   return (
-    <div className="container mx-auto px-4 py-8">
+    <DashboardLayout title="Equipment Management">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Equipment Management</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Equipment Management</h1>
+          <p className="text-sm text-gray-500 mt-1">View and manage all equipment items</p>
+        </div>
         {user?.role === 'admin' && (
           <div className="flex space-x-4">
             <Link
@@ -73,7 +83,7 @@ const EquipmentListPage = () => {
           </div>
         )}
       </div>
-      
+
       {/* Category Filter */}
       {categories.length > 0 && (
         <div className="mb-6 bg-white shadow overflow-hidden sm:rounded-lg p-4">
@@ -117,7 +127,7 @@ const EquipmentListPage = () => {
             {categoryFilter && (
               <div className="mt-4 sm:mt-0 sm:ml-4">
                 <div className="text-sm font-medium text-gray-700">
-                  Showing equipment in category: 
+                  Showing equipment in category:
                   <span className="ml-1 text-primary-600">
                     {categories.find(c => c.id.toString() === categoryFilter)?.name || 'Unknown'}
                   </span>
@@ -127,7 +137,7 @@ const EquipmentListPage = () => {
           </div>
         </div>
       )}
-      
+
       {loading ? (
         <div className="flex justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
@@ -167,9 +177,9 @@ const EquipmentListPage = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         {item.photo ? (
-                          <img 
-                            src={item.photo} 
-                            alt={item.name} 
+                          <img
+                            src={item.photo}
+                            alt={item.name}
                             className="h-12 w-12 rounded-md object-cover mr-4"
                           />
                         ) : (
@@ -185,8 +195,8 @@ const EquipmentListPage = () => {
                           </p>
                           <div className="mt-1 flex items-center text-sm text-gray-500">
                             <span className="truncate mr-2">
-                              {item.has_serial_number 
-                                ? `Serial: ${item.serial_number || 'N/A'}` 
+                              {item.has_serial_number
+                                ? `Serial: ${item.serial_number || 'N/A'}`
                                 : `Tracking ID: ${item.tracking_id || 'N/A'}`}
                             </span>
                             {item.category && (
@@ -228,7 +238,7 @@ const EquipmentListPage = () => {
           </ul>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 };
 

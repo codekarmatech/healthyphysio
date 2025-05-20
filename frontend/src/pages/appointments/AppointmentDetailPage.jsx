@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import appointmentService from '../../services/appointmentService';
 import sessionService from '../../services/sessionService';
 
@@ -20,11 +21,11 @@ const AppointmentDetailPage = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Fetch appointment details
         const response = await appointmentService.getById(id);
         setAppointment(response.data);
-        
+
         // Try to fetch associated session if it exists
         try {
           const sessionResponse = await sessionService.getByAppointment(id);
@@ -34,7 +35,7 @@ const AppointmentDetailPage = () => {
         } catch (sessionError) {
           console.log('No session found or error fetching session:', sessionError);
         }
-        
+
         setLoading(false);
       } catch (err) {
         console.error('Error fetching appointment:', err);
@@ -42,7 +43,7 @@ const AppointmentDetailPage = () => {
         setLoading(false);
       }
     };
-    
+
     if (id) {
       fetchAppointmentData();
     }
@@ -53,16 +54,16 @@ const AppointmentDetailPage = () => {
       alert('Please provide a reason for cancellation');
       return;
     }
-    
+
     try {
       setProcessingAction(true);
       await appointmentService.cancelWithReason(id, cancelReason);
       setShowCancelModal(false);
-      
+
       // Refresh appointment data
       const response = await appointmentService.getById(id);
       setAppointment(response.data);
-      
+
       setProcessingAction(false);
     } catch (err) {
       console.error('Error cancelling appointment:', err);
@@ -75,11 +76,11 @@ const AppointmentDetailPage = () => {
     try {
       setProcessingAction(true);
       await appointmentService.confirmAppointment(id);
-      
+
       // Refresh appointment data
       const response = await appointmentService.getById(id);
       setAppointment(response.data);
-      
+
       setProcessingAction(false);
     } catch (err) {
       console.error('Error confirming appointment:', err);
@@ -91,29 +92,29 @@ const AppointmentDetailPage = () => {
   const handleStartSession = async () => {
     try {
       setProcessingAction(true);
-      
+
       // Check if user is admin
       if (!user.is_admin) {
         alert('Only administrators can start new sessions.');
         setProcessingAction(false);
         return;
       }
-      
+
       // Create a session if it doesn't exist
       if (!session) {
         const response = await sessionService.create({ appointment: id });
         setSession(response.data);
-        
+
         // Inform the admin that the session was created
         alert('Session created successfully.');
       } else {
         // Session already exists
         alert('Session already exists for this appointment.');
       }
-      
+
       // Refresh the page to show updated session information
       window.location.reload();
-      
+
       setProcessingAction(false);
     } catch (err) {
       console.error('Error starting session:', err);
@@ -147,52 +148,58 @@ const AppointmentDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        <p className="ml-3 text-gray-700">Loading appointment details...</p>
-      </div>
+      <DashboardLayout title="Appointment Details">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <p className="ml-3 text-gray-700">Loading appointment details...</p>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-          <div className="flex items-center justify-center text-red-500 mb-4">
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="text-center text-xl font-semibold text-gray-900 mb-2">Error</h2>
-          <p className="text-center text-gray-600">{error}</p>
-          <div className="mt-6 flex justify-center">
-            <Link to="/appointments" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-              Back to Appointments
-            </Link>
+      <DashboardLayout title="Appointment Details">
+        <div className="flex items-center justify-center py-12">
+          <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+            <div className="flex items-center justify-center text-red-500 mb-4">
+              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-center text-xl font-semibold text-gray-900 mb-2">Error</h2>
+            <p className="text-center text-gray-600">{error}</p>
+            <div className="mt-6 flex justify-center">
+              <Link to={user?.role === 'admin' ? '/admin/appointments' : user?.role === 'therapist' ? '/therapist/appointments' : '/appointments'} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                Back to Appointments
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   if (!appointment) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-          <div className="flex items-center justify-center text-yellow-500 mb-4">
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-center text-xl font-semibold text-gray-900 mb-2">Appointment Not Found</h2>
-          <p className="text-center text-gray-600">The appointment you're looking for doesn't exist or you don't have permission to view it.</p>
-          <div className="mt-6 flex justify-center">
-            <Link to="/appointments" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-              Back to Appointments
-            </Link>
+      <DashboardLayout title="Appointment Details">
+        <div className="flex items-center justify-center py-12">
+          <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+            <div className="flex items-center justify-center text-yellow-500 mb-4">
+              <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-center text-xl font-semibold text-gray-900 mb-2">Appointment Not Found</h2>
+            <p className="text-center text-gray-600">The appointment you're looking for doesn't exist or you don't have permission to view it.</p>
+            <div className="mt-6 flex justify-center">
+              <Link to={user?.role === 'admin' ? '/admin/appointments' : user?.role === 'therapist' ? '/therapist/appointments' : '/appointments'} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                Back to Appointments
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -255,7 +262,7 @@ const AppointmentDetailPage = () => {
               </div>
               <div className="mt-4 flex md:mt-0 md:ml-4">
                 <Link
-                  to="/appointments"
+                  to={user?.role === 'admin' ? '/admin/appointments' : user?.role === 'therapist' ? '/therapist/appointments' : '/appointments'}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Back to Appointments
@@ -288,16 +295,16 @@ const AppointmentDetailPage = () => {
                     <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500">Patient</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {appointment.patient_details ? 
-                          `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` : 
+                        {appointment.patient_details ?
+                          `${appointment.patient_details.user.first_name} ${appointment.patient_details.user.last_name}` :
                           'Unknown Patient'}
                       </dd>
                     </div>
                     <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500">Therapist</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {appointment.therapist_details ? 
-                          `${appointment.therapist_details.user.first_name} ${appointment.therapist_details.user.last_name}` : 
+                        {appointment.therapist_details ?
+                          `${appointment.therapist_details.user.first_name} ${appointment.therapist_details.user.last_name}` :
                           'Unknown Therapist'}
                       </dd>
                     </div>
@@ -343,7 +350,7 @@ const AppointmentDetailPage = () => {
                     )}
                   </dl>
                 </div>
-                
+
                 {/* Action buttons */}
                 <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
                   <div className="flex justify-end space-x-3">
@@ -367,16 +374,16 @@ const AppointmentDetailPage = () => {
                         </button>
                       </>
                     )}
-                    
+
                     {(appointment.status === 'SCHEDULED' || appointment.status === 'RESCHEDULED') && (
                       <Link
-                        to={`/appointments/${id}/edit`}
+                        to={user?.role === 'admin' ? `/admin/appointments/${id}/edit` : user?.role === 'therapist' ? `/therapist/appointments/${id}/edit` : `/appointments/${id}/edit`}
                         className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
                         Reschedule
                       </Link>
                     )}
-                    
+
                     {appointment.status === 'CONFIRMED' && user.is_admin && (
                       <button
                         type="button"
@@ -387,7 +394,7 @@ const AppointmentDetailPage = () => {
                         Start Session
                       </button>
                     )}
-                    
+
                     {appointment.status === 'CONFIRMED' && !user.is_admin && (
                       <div className="text-sm text-gray-500 italic">
                         Session will be started by an administrator

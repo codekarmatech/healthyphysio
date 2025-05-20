@@ -252,7 +252,10 @@ const Header = ({ title, userName }) => {
                     color: hasRole('therapist') || hasRole('admin') || hasRole('doctor') ? 'white' : '#0284c7'
                   }}
                 >
-                  {userName || user?.firstName?.charAt(0) || 'U'}
+                  {userName ||
+                    (hasRole('admin') ? 'RD' :
+                      (user?.first_name && user?.last_name ? `${user.first_name.charAt(0)}${user.last_name.charAt(0)}` :
+                        (user?.first_name?.charAt(0) || user?.firstName?.charAt(0) || 'U')))}
                 </div>
               </button>
             </div>
@@ -338,12 +341,17 @@ const Header = ({ title, userName }) => {
                     color: hasRole('therapist') || hasRole('admin') || hasRole('doctor') ? 'white' : '#0284c7'
                   }}
                 >
-                  {userName || user?.firstName?.charAt(0) || 'U'}
+                  {userName ||
+                    (hasRole('admin') ? 'RD' :
+                      (user?.first_name && user?.last_name ? `${user.first_name.charAt(0)}${user.last_name.charAt(0)}` :
+                        (user?.first_name?.charAt(0) || user?.firstName?.charAt(0) || 'U')))}
                 </div>
               </div>
               <div className="ml-3">
                 <div className="text-base font-medium text-gray-800">
-                  {userName || `${user?.firstName || ''} ${user?.lastName || ''}`}
+                  {userName ||
+                    (hasRole('admin') ? 'Rajavi Dixit' :
+                      `${user?.first_name || user?.firstName || ''} ${user?.last_name || user?.lastName || ''}`)}
                 </div>
                 <div className="text-sm font-medium text-gray-500 capitalize">{userRole}</div>
               </div>

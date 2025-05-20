@@ -16,7 +16,7 @@ const AppointmentList = () => {
     try {
       setLoading(true);
       let response;
-      
+
       if (user?.role === 'patient') {
         response = await appointmentService.getByPatient(user.id);
       } else if (user?.role === 'therapist') {
@@ -24,19 +24,19 @@ const AppointmentList = () => {
       } else {
         response = await appointmentService.getAll();
       }
-      
+
       // Extract the data array from the response
       const data = response.data.results || response.data || [];
-      
+
       // Filter appointments based on selected filter
       let filteredData = [...data];
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       if (filter === 'upcoming') {
         filteredData = filteredData.filter(appointment => {
           const appointmentDate = new Date(appointment.datetime || appointment.date);
-          return appointmentDate >= today && 
+          return appointmentDate >= today &&
                  appointment.status.toLowerCase() !== 'cancelled' &&
                  appointment.status.toLowerCase() !== 'pending_reschedule';
         });
@@ -46,21 +46,21 @@ const AppointmentList = () => {
           return appointmentDate < today || appointment.status.toLowerCase() === 'completed';
         });
       } else if (filter === 'cancelled') {
-        filteredData = filteredData.filter(appointment => 
+        filteredData = filteredData.filter(appointment =>
           appointment.status.toLowerCase() === 'cancelled');
       } else if (filter === 'pending') {
-        filteredData = filteredData.filter(appointment => 
-          appointment.status.toLowerCase() === 'pending_reschedule' || 
+        filteredData = filteredData.filter(appointment =>
+          appointment.status.toLowerCase() === 'pending_reschedule' ||
           appointment.status.toLowerCase() === 'pending');
       }
-      
+
       // Sort appointments by date (newest first for upcoming, oldest first for past)
       filteredData.sort((a, b) => {
         const dateA = new Date(a.datetime || a.date);
         const dateB = new Date(b.datetime || b.date);
         return filter === 'past' ? dateA - dateB : dateB - dateA;
       });
-      
+
       // Format the appointments for display
       const formattedAppointments = filteredData.map(appointment => ({
         id: appointment.id,
@@ -73,7 +73,7 @@ const AppointmentList = () => {
         status: appointment.status.toLowerCase(),
         type: appointment.issue || appointment.type || 'Consultation'
       }));
-      
+
       setAppointments(formattedAppointments);
       setLoading(false);
     } catch (error) {
@@ -106,21 +106,21 @@ const AppointmentList = () => {
       console.error('Error confirming appointment:', error);
     }
   };
-  
+
   const handleApproveReschedule = async (id) => {
     if (window.confirm('Are you sure you want to approve this reschedule request?')) {
       try {
         // Get the reschedule request for this appointment
         const response = await rescheduleRequestService.getByAppointment(id);
         const requests = response.data || [];
-        
+
         if (requests.length > 0) {
           // Get the most recent pending request
           const pendingRequests = requests.filter(req => req.status === 'pending');
           if (pendingRequests.length > 0) {
-            const latestRequest = pendingRequests.sort((a, b) => 
+            const latestRequest = pendingRequests.sort((a, b) =>
               new Date(b.created_at) - new Date(a.created_at))[0];
-            
+
             // Approve the request
             await rescheduleRequestService.approve(latestRequest.id);
             fetchAppointments();
@@ -131,7 +131,7 @@ const AppointmentList = () => {
       }
     }
   };
-  
+
   const handleRejectReschedule = async (id) => {
     const reason = prompt('Please provide a reason for rejecting this reschedule request:');
     if (reason) {
@@ -139,14 +139,14 @@ const AppointmentList = () => {
         // Get the reschedule request for this appointment
         const response = await rescheduleRequestService.getByAppointment(id);
         const requests = response.data || [];
-        
+
         if (requests.length > 0) {
           // Get the most recent pending request
           const pendingRequests = requests.filter(req => req.status === 'pending');
           if (pendingRequests.length > 0) {
-            const latestRequest = pendingRequests.sort((a, b) => 
+            const latestRequest = pendingRequests.sort((a, b) =>
               new Date(b.created_at) - new Date(a.created_at))[0];
-            
+
             // Reject the request
             await rescheduleRequestService.reject(latestRequest.id, reason);
             fetchAppointments();
@@ -161,21 +161,21 @@ const AppointmentList = () => {
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
   };
-  
+
   // Function to check if a therapist can request rescheduling (1-2 days before the appointment)
   const canRequestReschedule = (appointment) => {
     // For testing purposes, always return true to make the button visible
     // In production, uncomment the code below and remove the return true statement
     return true;
-    
+
     /* Production code:
     const appointmentDate = new Date(appointment.date || appointment.datetime);
     const today = new Date();
-    
+
     // Calculate the difference in days
     const timeDiff = appointmentDate.getTime() - today.getTime();
     const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-    
+
     // Therapists can request rescheduling 1-2 days before the appointment
     return daysDiff >= 1 && daysDiff <= 2;
     */
@@ -186,9 +186,9 @@ const AppointmentList = () => {
     const patientName = `${appointment.patientFirstName} ${appointment.patientLastName}`.toLowerCase();
     const therapistName = `${appointment.therapistFirstName} ${appointment.therapistLastName}`.toLowerCase();
     const appointmentType = appointment.type.toLowerCase();
-    
-    return patientName.includes(searchString) || 
-           therapistName.includes(searchString) || 
+
+    return patientName.includes(searchString) ||
+           therapistName.includes(searchString) ||
            appointmentType.includes(searchString);
   });
 
@@ -198,7 +198,7 @@ const AppointmentList = () => {
         <div>
           <h3 className="text-lg leading-6 font-medium text-gray-900">Appointments</h3>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            {filter === 'upcoming' ? 'Your upcoming appointments' : 
+            {filter === 'upcoming' ? 'Your upcoming appointments' :
              filter === 'past' ? 'Your past appointments' : 'Cancelled appointments'}
           </p>
         </div>
@@ -223,7 +223,7 @@ const AppointmentList = () => {
           )}
         </div>
       </div>
-      
+
       <div className="border-t border-gray-200">
         <div className="bg-gray-50 px-4 py-3">
           <div className="flex space-x-4 overflow-x-auto pb-2">
@@ -269,7 +269,7 @@ const AppointmentList = () => {
             </button>
           </div>
         </div>
-        
+
         {loading ? (
           <div className="px-4 py-5 sm:p-6 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
@@ -284,14 +284,14 @@ const AppointmentList = () => {
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
                         <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-600 font-semibold">
-                          {user.role === 'patient' 
+                          {user.role === 'patient'
                             ? appointment.therapistFirstName.charAt(0)
                             : appointment.patientFirstName.charAt(0)}
                         </div>
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-primary-600">
-                          {user.role === 'patient' 
+                          {user.role === 'patient'
                             ? `${appointment.therapistFirstName} ${appointment.therapistLastName}`
                             : `${appointment.patientFirstName} ${appointment.patientLastName}`}
                         </div>
@@ -304,7 +304,7 @@ const AppointmentList = () => {
                       <AppointmentStatusBadge status={appointment.status} />
                     </div>
                   </div>
-                  
+
                   <div className="mt-2 sm:flex sm:justify-between">
                     <div className="sm:flex">
                       <div className="flex items-center text-sm text-gray-500">
@@ -322,12 +322,16 @@ const AppointmentList = () => {
                     </div>
                     <div className="mt-2 flex sm:mt-0">
                       <Link
-                        to={`/therapist/appointments/${appointment.id}`}
+                        to={user.role === 'admin'
+                            ? `/admin/appointments/${appointment.id}`
+                            : user.role === 'therapist'
+                              ? `/therapist/appointments/${appointment.id}`
+                              : `/patient/appointments/${appointment.id}`}
                         className="text-primary-600 hover:text-primary-900 mr-4"
                       >
                         View details
                       </Link>
-                      
+
                       {/* Confirm button for therapists */}
                       {user.role === 'therapist' && appointment.status === 'pending' && (
                         <button
@@ -337,7 +341,7 @@ const AppointmentList = () => {
                           Confirm
                         </button>
                       )}
-                      
+
                       {/* Reschedule button for therapists */}
                       {user.role === 'therapist' && appointment.status !== 'cancelled' && appointment.status !== 'pending_reschedule' && canRequestReschedule(appointment) && (
                         <Link
@@ -347,24 +351,24 @@ const AppointmentList = () => {
                           Request Reschedule
                         </Link>
                       )}
-                      
+
                       {/* Disabled reschedule button for therapists */}
                       {user.role === 'therapist' && appointment.status !== 'cancelled' && appointment.status !== 'pending_reschedule' && !canRequestReschedule(appointment) && (
                         <span className="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-400 bg-gray-50 mr-2 cursor-not-allowed" title="Reschedule requests must be made at least 1 day before the appointment">
                           Request Reschedule
                         </span>
                       )}
-                      
+
                       {/* Reschedule button for admins */}
                       {user.role === 'admin' && appointment.status !== 'cancelled' && (
                         <Link
-                          to={`/appointments/${appointment.id}/edit`}
+                          to={`/admin/appointments/${appointment.id}/edit`}
                           className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mr-2"
                         >
                           Reschedule
                         </Link>
                       )}
-                      
+
                       {/* Reschedule button for patients */}
                       {user.role === 'patient' && appointment.status !== 'cancelled' && appointment.status !== 'pending_reschedule' && (
                         <Link
@@ -374,7 +378,7 @@ const AppointmentList = () => {
                           Request Reschedule
                         </Link>
                       )}
-                      
+
                       {/* Cancel button for admins and patients */}
                       {(user.role === 'admin' || user.role === 'patient') && appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
                         <button
@@ -384,7 +388,7 @@ const AppointmentList = () => {
                           Cancel
                         </button>
                       )}
-                      
+
                       {/* Approve/Reject buttons for admins */}
                       {appointment.status === 'pending_reschedule' && user.role === 'admin' && (
                         <>
@@ -415,10 +419,10 @@ const AppointmentList = () => {
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900">No appointments found</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {filter === 'upcoming' 
-                ? 'You have no upcoming appointments.' 
-                : filter === 'past' 
-                  ? 'You have no past appointments.' 
+              {filter === 'upcoming'
+                ? 'You have no upcoming appointments.'
+                : filter === 'past'
+                  ? 'You have no past appointments.'
                   : filter === 'cancelled'
                     ? 'You have no cancelled appointments.'
                     : 'You have no pending approval appointments.'}
@@ -426,7 +430,7 @@ const AppointmentList = () => {
             <div className="mt-6">
               {user.role === 'admin' && (
                 <Link
-                  to="/appointments/new"
+                  to="/admin/appointments/new"
                   className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">

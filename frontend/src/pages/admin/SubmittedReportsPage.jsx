@@ -5,8 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import sessionService from '../../services/sessionService';
 import { toast } from 'react-toastify';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import Header from '../../components/layout/Header';
-import Footer from '../../components/layout/Footer';
 import Spinner from '../../components/common/Spinner';
 import { formatDate } from '../../utils/dateUtils';
 
@@ -76,26 +74,19 @@ const SubmittedReportsPage = () => {
 
   if (loading) {
     return (
-      <React.Fragment>
-        <DashboardLayout>
-          <Header title={`Submitted Reports - ${user.firstName} ${user.lastName}`} />
-          <div className="flex justify-center items-center h-64">
-            <Spinner size="lg" />
-          </div>
-          <Footer />
-        </DashboardLayout>
-      </React.Fragment>
+      <DashboardLayout title={`Submitted Reports - ${user.firstName} ${user.lastName}`}>
+        <div className="flex justify-center items-center h-64">
+          <Spinner size="lg" />
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <React.Fragment>
-      <DashboardLayout>
-        <Header title={`Submitted Reports - ${user.firstName} ${user.lastName}`} />
-
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <h1 className="text-2xl font-bold mb-6">Submitted Session Reports</h1>
+    <DashboardLayout title={`Submitted Reports - ${user.firstName} ${user.lastName}`}>
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <h1 className="text-2xl font-bold mb-6">Submitted Session Reports</h1>
 
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -222,10 +213,7 @@ const SubmittedReportsPage = () => {
           </div>
         </div>
       )}
-
-      <Footer />
     </DashboardLayout>
-    </React.Fragment>
   );
 };
 
