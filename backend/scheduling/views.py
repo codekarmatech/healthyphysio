@@ -15,6 +15,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
+from datetime import datetime, timedelta
 
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
@@ -213,13 +214,165 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        appointment.status = 'CANCELLED'
+        appointment.status = Appointment.Status.CANCELLED
         appointment.save()
 
         return Response(
             {"message": "Appointment cancelled successfully"},
             status=status.HTTP_200_OK
         )
+
+    @action(detail=False, methods=['get'], url_path='available-slots')
+    def available_slots(self, request):
+        """
+        Get available time slots for a therapist on a specific date
+
+        Query parameters:
+        - therapist: ID of the therapist
+        - date: Date in YYYY-MM-DD format
+
+        Returns a list of available time slots in HH:MM format
+        """
+        print("Available slots endpoint called")
+        print(f"Request query params: {request.query_params}")
+
+        therapist_id = request.query_params.get('therapist')
+        date_str = request.query_params.get('date')
+
+        print(f"Therapist ID: {therapist_id}, Date: {date_str}")
+
+        if not therapist_id or not date_str:
+            print("Missing required parameters")
+            return Response(
+                {"error": "Both therapist and date parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Parse the date
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+            # Get all appointments for this therapist on this date
+            start_datetime = timezone.make_aware(datetime.combine(date_obj, datetime.min.time()))
+            end_datetime = timezone.make_aware(datetime.combine(date_obj, datetime.max.time()))
+
+            # Get booked appointments - using status values from Appointment.Status
+            booked_appointments = Appointment.objects.filter(
+                therapist_id=therapist_id,
+                datetime__range=(start_datetime, end_datetime),
+                status__in=[
+                    Appointment.Status.PENDING,
+                    Appointment.Status.SCHEDULED,
+                    Appointment.Status.RESCHEDULED,
+                    Appointment.Status.PENDING_RESCHEDULE
+                ]
+            )
+
+            # Get booked time slots
+            booked_slots = []
+            for appointment in booked_appointments:
+                # Get the start and end times of the appointment
+                appt_start_time = appointment.datetime
+                appt_end_time = appt_start_time + timedelta(minutes=appointment.duration_minutes)
+
+                # Store the appointment time range to check for overlaps
+                booked_slots.append({
+                    'start_datetime': appt_start_time,
+                    'end_datetime': appt_end_time
+                })
+
+            # Generate all possible time slots from 8:00 AM to 7:30 PM
+            # This ensures no appointments extend beyond 8:30 PM (assuming 60-minute appointments)
+            all_slots = []
+
+            # Get the appointment duration (default to 60 minutes if not specified)
+            appointment_duration = request.query_params.get('duration', 60)
+            try:
+                appointment_duration = int(appointment_duration)
+            except ValueError:
+                appointment_duration = 60
+
+            # Add all slots from 8:00 AM to 7:30 PM in 30-minute increments
+            for hour in range(8, 20):  # 8 AM to 7 PM
+                # Add the :00 slot
+                if hour < 20:  # Up to 8 PM
+                    start_time = f"{hour:02d}:00"
+                    # Calculate end time based on appointment duration
+                    end_hour = hour + (appointment_duration // 60)
+                    end_minute = appointment_duration % 60
+
+                    # If end time would be after 8:30 PM, skip this slot
+                    if end_hour > 20 or (end_hour == 20 and end_minute > 30):
+                        continue
+
+                    end_time = f"{end_hour:02d}:{end_minute:02d}"
+                    all_slots.append({"start_time": start_time, "end_time": end_time})
+
+                # Add the :30 slot
+                if hour < 19 or (hour == 19 and appointment_duration <= 60):  # Before 7:30 PM
+                    start_time = f"{hour:02d}:30"
+                    # Calculate end time based on appointment duration
+                    end_hour = hour + (appointment_duration // 60)
+                    end_minute = 30 + (appointment_duration % 60)
+
+                    # Adjust if minutes exceed 60
+                    if end_minute >= 60:
+                        end_hour += 1
+                        end_minute -= 60
+
+                    # If end time would be after 8:30 PM, skip this slot
+                    if end_hour > 20 or (end_hour == 20 and end_minute > 30):
+                        continue
+
+                    end_time = f"{end_hour:02d}:{end_minute:02d}"
+                    all_slots.append({"start_time": start_time, "end_time": end_time})
+
+            # Filter out slots that overlap with booked appointments
+            available_slots = []
+            for slot in all_slots:
+                # Convert slot times to datetime objects for comparison
+                slot_start_time_str = slot["start_time"]
+                slot_end_time_str = slot["end_time"]
+
+                slot_start_hour, slot_start_minute = map(int, slot_start_time_str.split(':'))
+                slot_end_hour, slot_end_minute = map(int, slot_end_time_str.split(':'))
+
+                slot_start_datetime = timezone.make_aware(datetime.combine(
+                    date_obj,
+                    datetime.min.time().replace(hour=slot_start_hour, minute=slot_start_minute)
+                ))
+
+                slot_end_datetime = timezone.make_aware(datetime.combine(
+                    date_obj,
+                    datetime.min.time().replace(hour=slot_end_hour, minute=slot_end_minute)
+                ))
+
+                # Check if this slot overlaps with any booked appointment
+                is_available = True
+                for booked_slot in booked_slots:
+                    # Check for overlap
+                    if (slot_start_datetime < booked_slot['end_datetime'] and
+                        slot_end_datetime > booked_slot['start_datetime']):
+                        is_available = False
+                        break
+
+                if is_available:
+                    available_slots.append(slot)
+
+            print(f"Returning {len(available_slots)} available slots")
+            print(f"Sample slot: {available_slots[0] if available_slots else 'No slots available'}")
+            return Response(available_slots)
+
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class RescheduleRequestViewSet(viewsets.ModelViewSet):
     queryset = RescheduleRequest.objects.all()
