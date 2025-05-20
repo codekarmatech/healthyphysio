@@ -5,7 +5,7 @@ Connected to: Area models and API views
 
 from rest_framework import serializers
 from .models import Area, TherapistServiceArea, PatientArea, DoctorArea, AreaRelationship
-from users.serializers import TherapistSerializer, PatientSerializer, DoctorSerializer, UserSerializer
+# No need to import unused serializers
 
 
 class AreaSerializer(serializers.ModelSerializer):
@@ -105,10 +105,8 @@ class AreaAnalyticsSerializer(serializers.ModelSerializer):
                  'latitude', 'longitude']
 
     def get_display_name(self, obj):
-        """Return a proper display name for the area, clearly identifying cities"""
-        # If name is the same as city, add a city indicator
-        if obj.name.lower() == obj.city.lower() and obj.city:
-            return f"{obj.name} (City)"
+        """Return the area name as the display name"""
+        # Simply return the name without any special handling
         return obj.name
 
     def get_therapist_count(self, obj):
@@ -139,10 +137,8 @@ class AreaDetailSerializer(serializers.ModelSerializer):
                  'latitude', 'longitude', 'created_at', 'updated_at']
 
     def get_display_name(self, obj):
-        """Return a proper display name for the area, clearly identifying cities"""
-        # If name is the same as city, add a city indicator
-        if obj.name.lower() == obj.city.lower() and obj.city:
-            return f"{obj.name} (City)"
+        """Return the area name as the display name"""
+        # Simply return the name without any special handling
         return obj.name
 
     def get_therapist_count(self, obj):

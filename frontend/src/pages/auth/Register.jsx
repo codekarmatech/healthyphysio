@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 
@@ -31,6 +31,9 @@ const Register = () => {
     area: '', // Area ID for selection
     customArea: false, // Flag for custom area entry
     customAreaInput: '', // Custom area text input
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    emergencyContactRelationship: '',
     // Therapist-specific fields
     specialization: '',
     licenseNumber: '',
@@ -45,131 +48,45 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  // We don't need the areas state anymore since we're using hardcodedAreas directly
+  // State for managing areas loaded from the API
   const [loadingAreas, setLoadingAreas] = useState(false);
+  const [areas, setAreas] = useState([]);
   const navigate = useNavigate();
-
-  // Fetch areas when component mounts
-  // Define the hardcoded list of areas
-  const hardcodedAreas = [
-    { id: 1, name: 'Ahmedabad Cantonment', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 2, name: 'Alam Roza', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 3, name: 'Ambawadi', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 4, name: 'Amraiwadi', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 5, name: 'Asarwa', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 6, name: 'Asarwa Chakla', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 7, name: 'Badarkha', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 8, name: 'Bahiyal', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 9, name: 'Bapunagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 10, name: 'Behrampura', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 11, name: 'Bhaipura Hatkeswar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 12, name: 'Bhairavnath Road', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 13, name: 'Bodakdev', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 14, name: 'Bopal', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 15, name: 'Chaloda', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 16, name: 'Chandkheda', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 17, name: 'Chandlodiya', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 18, name: 'Dabhoda', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 19, name: 'Danilimda', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 20, name: 'Dariapur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 21, name: 'Detroj', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 22, name: 'Ellis Bridge', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 23, name: 'Ghatlodiya', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 24, name: 'Ghodasar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 25, name: 'Girdharnagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 26, name: 'Gita Mandir Road', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 27, name: 'Gomtipur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 28, name: 'Gota', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 29, name: 'Indrapuri', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 30, name: 'Isanpur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 31, name: 'Jagatpur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 32, name: 'Jamalpur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 33, name: 'Jawahar Chowk', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 34, name: 'Jholapur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 35, name: 'Jodhpur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 36, name: 'Juhapura', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 37, name: 'Kalupur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 38, name: 'Kalyanpura', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 39, name: 'Khadia', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 40, name: 'Kharna', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 41, name: 'Khodiyarnagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 42, name: 'Khokhra', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 43, name: 'Kubernagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 44, name: 'Lambha', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 45, name: 'Makarba', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 46, name: 'Maninagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 47, name: 'Memnagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 48, name: 'Mithakali', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 49, name: 'Motera', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 50, name: 'Nagoda', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 51, name: 'Naroda', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 52, name: 'Nava Vadaj', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 53, name: 'Navarangpura', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 54, name: 'Nikol', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 55, name: 'Odhav', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 56, name: 'Paldi', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 57, name: 'Polarpur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 58, name: 'Rajpur Gomtipur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 59, name: 'Ramol', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 60, name: 'Ramol Hathijan', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 61, name: 'Ranip', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 62, name: 'Sabarmati', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 63, name: 'Saraspur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 64, name: 'Sardarnagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 65, name: 'Saijpur Bogha', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 66, name: 'Sarkhej', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 67, name: 'Shahibaug', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 68, name: 'Shahpur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 69, name: 'Shardanagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 70, name: 'Shastri Nagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 71, name: 'Subhash Bridge', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 72, name: 'Sukhrampura', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 73, name: 'Thakkar Bapanagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 74, name: 'Thaltej', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 75, name: 'Usmanpura', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 76, name: 'Vastral', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 77, name: 'Vastrapur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 78, name: 'Vatva', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 79, name: 'Vejalpur', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 80, name: 'Viratnagar', city: 'Ahmedabad', state: 'Gujarat' },
-    { id: 81, name: 'Virat Nagar', city: 'Ahmedabad', state: 'Gujarat' }
-  ];
 
   // Add state for search term
   const [searchTerm, setSearchTerm] = useState('');
 
   // Filter areas based on search term
   const filteredAreas = searchTerm
-    ? hardcodedAreas.filter(area =>
+    ? areas.filter(area =>
         area.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         area.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
         area.state.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    : hardcodedAreas;
+    : areas;
 
   useEffect(() => {
     const fetchAreas = async () => {
-      if (formData.role === 'patient') {
-        setLoadingAreas(true);
-        try {
-          // Try to get areas from API first
-          const response = await api.get('/areas/areas/');
-          // Merge API areas with hardcoded areas to ensure we have all 81 areas
-          const apiAreas = response.data;
+      // Fetch areas for all user roles
+      setLoadingAreas(true);
+      try {
+        // Get areas from API
+        const response = await api.get('/areas/areas/');
+        const apiAreas = response.data;
 
-          // Log the number of areas from API vs hardcoded
-          console.log(`Loaded ${apiAreas.length} areas from API and ${hardcodedAreas.length} hardcoded areas`);
-        } catch (err) {
-          console.error('Error fetching areas:', err);
-          // No need to set areas since we're using hardcodedAreas directly
-        } finally {
-          setLoadingAreas(false);
-        }
+        // Set the areas from the API
+        setAreas(apiAreas);
+        console.log(`Loaded ${apiAreas.length} areas from API`);
+      } catch (err) {
+        console.error('Error fetching areas:', err);
+        setError('Failed to load areas. Please try again later.');
+      } finally {
+        setLoadingAreas(false);
       }
     };
 
     fetchAreas();
-  }, [formData.role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // Only fetch once when component mounts
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -239,6 +156,11 @@ const Register = () => {
           treatmentLocation: formData.treatmentLocation,
           disease: formData.disease,
           medicalHistory: formData.medicalHistory,
+          // Emergency contact information
+          emergency_contact_name: formData.emergencyContactName,
+          emergency_contact_phone: formData.emergencyContactPhone,
+          emergency_contact_relationship: formData.emergencyContactRelationship,
+          // Area information
           area_id: formData.customArea ? null : formData.area, // Add area_id for patient registration
           custom_area: formData.customArea ? formData.customAreaInput : null, // Add custom area if entered
         });
@@ -257,7 +179,7 @@ const Register = () => {
           medicalLicenseNumber: formData.medicalLicenseNumber,
           hospitalAffiliation: formData.hospitalAffiliation,
           yearsOfExperience: formData.yearsOfExperience,
-          area: formData.doctorPracticeArea, // Use the doctorPracticeArea field but keep 'area' as the key for the backend
+          area_id: formData.doctorPracticeArea, // Use area_id to match the backend expectation
         });
       }
 
@@ -270,11 +192,20 @@ const Register = () => {
       navigate('/login');
     } catch (err) {
       console.error('Registration error payload:', err.response?.data);
-      setError(
-        typeof err.response?.data === 'string'
-          ? err.response.data
-          : JSON.stringify(err.response.data)
-      );
+      // Handle error message in a more user-friendly way
+      if (err.response?.data) {
+        if (typeof err.response.data === 'string') {
+          setError(err.response.data);
+        } else if (err.response.data.error) {
+          // If there's a specific error message from the backend
+          setError(err.response.data.error);
+        } else {
+          // Fallback to JSON string for other error formats
+          setError(JSON.stringify(err.response.data));
+        }
+      } else {
+        setError('Registration failed. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }
@@ -611,6 +542,57 @@ const Register = () => {
                 onChange={handleChange}
               />
             </div>
+
+            {/* Emergency Contact Information */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Emergency Contact Information</h3>
+              <p className="mt-1 text-sm text-gray-500">Please provide emergency contact details</p>
+
+              <div className="mt-3">
+                <label htmlFor="emergencyContactName" className="block text-sm font-medium text-gray-700">
+                  Emergency Contact Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="emergencyContactName"
+                  name="emergencyContactName"
+                  type="text"
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  value={formData.emergencyContactName}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="mt-3">
+                <label htmlFor="emergencyContactPhone" className="block text-sm font-medium text-gray-700">
+                  Emergency Contact Phone <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="emergencyContactPhone"
+                  name="emergencyContactPhone"
+                  type="tel"
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  value={formData.emergencyContactPhone}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="mt-3">
+                <label htmlFor="emergencyContactRelationship" className="block text-sm font-medium text-gray-700">
+                  Relationship to Patient <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="emergencyContactRelationship"
+                  name="emergencyContactRelationship"
+                  type="text"
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  value={formData.emergencyContactRelationship}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
             <div>
               <label htmlFor="areaSearch" className="block text-sm font-medium text-gray-700">
                 Residential Area <span className="text-red-500">*</span>
@@ -664,7 +646,7 @@ const Register = () => {
                       </div>
                       <div className="mt-2">
                         <p className="text-sm text-gray-500">
-                          {formData.area ? `Selected: ${hardcodedAreas.find(a => a.id === parseInt(formData.area))?.name || 'Unknown area'}` : 'No area selected'}
+                          {formData.area ? `Selected: ${areas.find(a => a.id === parseInt(formData.area))?.name || 'Unknown area'}` : 'No area selected'}
                         </p>
                       </div>
                     </div>
@@ -797,17 +779,67 @@ const Register = () => {
               />
             </div>
             <div>
-              <label htmlFor="preferredAreas" className="block text-sm font-medium text-gray-700">
-                Preferred Areas
+              <label htmlFor="areaSearch" className="block text-sm font-medium text-gray-700">
+                Preferred Areas <span className="text-red-500">*</span>
               </label>
-              <input
-                id="preferredAreas"
-                name="preferredAreas"
-                type="text"
-                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                value={formData.preferredAreas}
-                onChange={handleChange}
-              />
+              <div className="relative">
+                {loadingAreas ? (
+                  <div className="flex items-center px-3 py-2 border border-gray-300 rounded-md">
+                    <svg className="animate-spin h-5 w-5 mr-3 text-blue-500" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="text-gray-500">Loading areas...</span>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="mb-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          id="areaSearch"
+                          name="areaSearch"
+                          placeholder="Search for your preferred areas..."
+                          className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        {searchTerm && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                            {filteredAreas.length > 0 ? (
+                              filteredAreas.map((area) => (
+                                <div
+                                  key={area.id}
+                                  className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      preferredAreas: area.id.toString()
+                                    });
+                                    setSearchTerm(`${area.name}, ${area.city}, ${area.state}`);
+                                  }}
+                                >
+                                  {area.name}, {area.city}, {area.state}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-4 py-2 text-gray-500">No areas found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          {formData.preferredAreas ? `Selected: ${areas.find(a => a.id === parseInt(formData.preferredAreas))?.name || 'Unknown area'}` : 'No area selected'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Select the areas where you prefer to work
+              </p>
             </div>
           </div>
         );
@@ -872,18 +904,67 @@ const Register = () => {
               />
             </div>
             <div>
-              <label htmlFor="doctorPracticeArea" className="block text-sm font-medium text-gray-700">
-                Practice Area
+              <label htmlFor="areaSearch" className="block text-sm font-medium text-gray-700">
+                Practice Area <span className="text-red-500">*</span>
               </label>
-              <input
-                id="doctorPracticeArea"
-                name="doctorPracticeArea"
-                type="text"
-                required
-                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                value={formData.doctorPracticeArea}
-                onChange={handleChange}
-              />
+              <div className="relative">
+                {loadingAreas ? (
+                  <div className="flex items-center px-3 py-2 border border-gray-300 rounded-md">
+                    <svg className="animate-spin h-5 w-5 mr-3 text-blue-500" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="text-gray-500">Loading areas...</span>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="mb-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          id="areaSearch"
+                          name="areaSearch"
+                          placeholder="Search for your practice area..."
+                          className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        {searchTerm && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                            {filteredAreas.length > 0 ? (
+                              filteredAreas.map((area) => (
+                                <div
+                                  key={area.id}
+                                  className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      doctorPracticeArea: area.id.toString()
+                                    });
+                                    setSearchTerm(`${area.name}, ${area.city}, ${area.state}`);
+                                  }}
+                                >
+                                  {area.name}, {area.city}, {area.state}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-4 py-2 text-gray-500">No areas found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          {formData.doctorPracticeArea ? `Selected: ${areas.find(a => a.id === parseInt(formData.doctorPracticeArea))?.name || 'Unknown area'}` : 'No area selected'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Select the area where you primarily practice
+              </p>
             </div>
           </div>
         );

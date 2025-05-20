@@ -257,6 +257,7 @@ class AreaDashboardViewSet(viewsets.ViewSet):
         areas_with_therapists = Area.objects.filter(therapists__isnull=False).distinct().count()
 
         # Count areas that have at least one patient (using both direct and relationship)
+        # Use Q objects to combine the conditions
         areas_with_patients_rel = Area.objects.filter(patients__isnull=False).distinct()
         areas_with_patients_direct = Area.objects.filter(direct_patients__isnull=False).distinct()
         areas_with_patients = (areas_with_patients_rel | areas_with_patients_direct).distinct().count()
@@ -264,16 +265,10 @@ class AreaDashboardViewSet(viewsets.ViewSet):
         # Count areas that have at least one doctor
         areas_with_doctors = Area.objects.filter(doctors__isnull=False).distinct().count()
 
-        # Count distinct therapists, patients, and doctors
-        distinct_therapists = Therapist.objects.filter(service_areas__isnull=False).distinct().count()
-
-        # Count patients using both direct reference and relationship for completeness
-        patients_with_direct_area = Patient.objects.filter(area__isnull=False).distinct()
-        patients_with_relationship = Patient.objects.filter(residential_area__isnull=False).distinct()
-        # Combine both querysets and get distinct count
-        distinct_patients = (patients_with_direct_area | patients_with_relationship).distinct().count()
-
-        distinct_doctors = Doctor.objects.filter(clinic_areas__isnull=False).distinct().count()
+        # Count all users by role, not just those with areas
+        distinct_therapists = Therapist.objects.count()
+        distinct_patients = Patient.objects.count()
+        distinct_doctors = Doctor.objects.count()
 
         # Get therapist counts and their areas
         therapist_count = Therapist.objects.count()
@@ -281,26 +276,9 @@ class AreaDashboardViewSet(viewsets.ViewSet):
         avg_areas_per_therapist = therapist_area_count / therapist_count if therapist_count > 0 else 0
 
         # Get top areas by user count - count distinct users in each area
-        # First, clean up area names to ensure uniqueness
-        # We'll normalize area names by splitting comma-separated values and creating a mapping
+        # Create a simple mapping of area IDs to their names
         all_areas = Area.objects.all()
-        area_name_mapping = {}
-
-        for area in all_areas:
-            # Skip areas where name is the same as city (like "AMD")
-            # These are not actual areas but cities incorrectly stored as areas
-            if area.name.lower() == area.city.lower() and area.city:
-                # Mark city entries to be filtered out later
-                area_name_mapping[area.id] = f"__CITY__{area.city}"
-                continue
-
-            # Split area name if it contains commas (e.g., "ghatlodia, vastrapur, ranip")
-            if ',' in area.name:
-                # Create a canonical version of the area name
-                canonical_name = area.name.split(',')[0].strip()
-                area_name_mapping[area.id] = canonical_name
-            else:
-                area_name_mapping[area.id] = area.name.strip()
+        area_name_mapping = {area.id: area.name for area in all_areas}
 
         # Get top areas by user count with distinct counting
         # Include both direct patient references and patient area relationships
@@ -334,10 +312,8 @@ class AreaDashboardViewSet(viewsets.ViewSet):
             canonical_name = area_name_mapping.get(area.id, area.name)
 
             if canonical_name not in grouped_areas:
-                # Create a display name that clearly identifies cities
+                # Use the area name directly as the display name
                 display_name = canonical_name
-                if canonical_name.lower() == area.city.lower() and area.city:
-                    display_name = f"{canonical_name} (City)"
 
                 grouped_areas[canonical_name] = {
                     'id': area.id,
@@ -360,6 +336,9 @@ class AreaDashboardViewSet(viewsets.ViewSet):
         # Convert the grouped areas dictionary to a list
         top_areas_list = list(grouped_areas.values())
 
+        # Filter out areas where name is the same as city (these are cities, not areas)
+        top_areas_list = [area for area in top_areas_list if not (area['name'].lower() == area['city'].lower() and area['city'])]
+
         # Sort by total users
         top_areas_list.sort(key=lambda x: x['total_users'], reverse=True)
 
@@ -380,12 +359,8 @@ class AreaDashboardViewSet(viewsets.ViewSet):
         for therapist in therapists_with_areas:
             areas = []
             for area in therapist.service_areas.all().select_related('area'):
-                # Create a display name that properly identifies city vs area
+                # Use the area name directly as the display name
                 display_name = area.area.name
-
-                # Add a city indicator if the name is the same as the city
-                if area.area.name.lower() == area.area.city.lower() and area.area.city:
-                    display_name = f"{area.area.name} (City)"
 
                 areas.append({
                     'id': area.area.id,

@@ -70,9 +70,14 @@ class EarningsService extends BaseService {
    * @returns {Promise} API response
    */
   getEarningsByDateRange(therapistId, startDate, endDate) {
-    // Ensure basePath ends with a slash for consistent URL construction
-    const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
-    return api.get(`${basePath}range/${therapistId}/?start_date=${startDate}&end_date=${endDate}`);
+    try {
+      // Ensure basePath ends with a slash for consistent URL construction
+      const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
+      return api.get(`${basePath}range/${therapistId}/?start_date=${startDate}&end_date=${endDate}`);
+    } catch (error) {
+      // Throw a proper Error object instead of a string literal
+      throw new Error(`Failed to fetch earnings by date range: ${error.message}`);
+    }
   }
 
   /**
@@ -145,7 +150,7 @@ class EarningsService extends BaseService {
    * @param {number} month - Month (1-12)
    * @returns {Object} Basic mock earnings data with minimal information
    */
-  getSimpleMockPatientEarnings(patientId, year, month) {
+  getSimpleMockPatientEarningsData(patientId, year, month) {
     return {
       data: {
         isMockData: true,

@@ -172,9 +172,36 @@ class Doctor(models.Model):
     hospital_affiliation = models.CharField(max_length=200, blank=True)
     years_of_experience = models.PositiveIntegerField(default=0)
     area = models.CharField(max_length=100, blank=True)
+    # Add direct reference to area for easier access (optional)
+    practice_area = models.ForeignKey('areas.Area', on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='direct_doctors',
+                                    help_text="Doctor's practice area")
 
     def __str__(self):
         return f"Doctor: {self.user.username}"
+
+    def save(self, *args, **kwargs):
+        """
+        Override save method to ensure DoctorArea relationship is maintained
+        whenever the direct practice_area reference is set or changed
+        """
+        # First save the doctor to ensure it has an ID
+        super().save(*args, **kwargs)
+
+        # If practice_area is set, ensure the DoctorArea relationship exists
+        if self.practice_area:
+            from areas.models import DoctorArea
+            # Get or create the DoctorArea relationship
+            doctor_area, created = DoctorArea.objects.get_or_create(
+                doctor=self,
+                defaults={'area': self.practice_area}
+            )
+
+            # If the relationship already existed but with a different area,
+            # update it to match the direct reference
+            if not created and doctor_area.area != self.practice_area:
+                doctor_area.area = self.practice_area
+                doctor_area.save()
 
 
 class ProfileChangeRequest(models.Model):

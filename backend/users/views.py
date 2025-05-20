@@ -619,64 +619,66 @@ def register_user(request):
                     'treatment_location': data.get('treatmentLocation', ''),
                     'disease': data.get('disease', ''),
                     'medical_history': data.get('medicalHistory', ''),
+                    # Emergency contact information
+                    'emergency_contact_name': data.get('emergency_contact_name', ''),
+                    'emergency_contact_phone': data.get('emergency_contact_phone', ''),
+                    'emergency_contact_relationship': data.get('emergency_contact_relationship', ''),
                 }
 
                 # If the patient is being added by a doctor, set the referred_by field
                 if request.user.is_authenticated and request.user.role == 'doctor':
                     patient_data['referred_by'] = f"{request.user.first_name} {request.user.last_name}"
 
-                # Create the patient directly without using the serializer
-                patient = Patient.objects.create(user=user, **patient_data)
-
-                # Handle area selection or creation
+                # Handle area selection or creation before creating patient
                 area_id = data.get('area_id')
                 custom_area = data.get('custom_area')
+                area = None
 
                 if area_id:
                     # Use existing area
                     try:
                         area = Area.objects.get(id=area_id)
-                        patient.area = area
-                        patient.save()
-
-                        # Create PatientArea relationship
-                        PatientArea.objects.create(patient=patient, area=area)
-                        print(f"Associated patient {patient.id} with existing area {area.id} ({area.name})")
-
+                        print(f"Found area with ID {area_id} ({area.name})")
                     except Area.DoesNotExist:
                         print(f"Area with ID {area_id} not found")
-                        # Continue without setting area - it's not critical to fail the registration
-
+                        return Response({'error': f'Area with ID {area_id} not found'}, status=status.HTTP_400_BAD_REQUEST)
                 elif custom_area:
                     # Create a new area with the custom name
                     try:
                         # Default to Ahmedabad, Gujarat, India
-                        new_area = Area.objects.create(
+                        area = Area.objects.create(
                             name=custom_area,
                             city='Ahmedabad',
                             state='Gujarat',
                             zip_code='380000',  # Default zip code for Ahmedabad
                             description=f'Custom area created during patient registration: {custom_area}'
                         )
-
-                        # Associate the new area with the patient
-                        patient.area = new_area
-                        patient.save()
-
-                        # Create PatientArea relationship
-                        PatientArea.objects.create(patient=patient, area=new_area)
-
-                        print(f"Created new area '{custom_area}' and associated with patient {patient.id}")
-
+                        print(f"Created new area '{custom_area}' with ID {area.id}")
                     except Exception as e:
                         print(f"Error creating custom area: {str(e)}")
-                        # Continue without setting area - it's not critical to fail the registration
+                        return Response({'error': f'Error creating custom area: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    # Area is required for patients
+                    print("No area_id or custom_area provided for patient registration")
+                    return Response({'error': 'Area selection is required for patient registration'}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Use serializer for the response instead of raw objects
-                return Response({
-                    'message': 'Patient registered successfully',
-                    'user': UserSerializer(user).data
-                }, status=status.HTTP_201_CREATED)
+                # Add area to patient_data
+                patient_data['area'] = area
+
+                # Create the patient with all data including area
+                # The Patient.save() method will automatically handle the PatientArea relationship
+                try:
+                    patient = Patient.objects.create(user=user, **patient_data)
+                    print(f"Created patient {patient.id} with area {area.id} ({area.name})")
+                    # No need to create PatientArea relationship explicitly - the Patient.save() method handles this
+                except Exception as e:
+                    if "duplicate key value violates unique constraint" in str(e) and "patient_id, area_id" in str(e):
+                        print(f"Patient already has this area assigned: {str(e)}")
+                        return Response({'error': 'You are already registered with this area. Please choose a different area or contact support.'},
+                                       status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        # Re-raise other exceptions
+                        raise
 
             elif user.role == 'therapist':
                 # Convert years_of_experience to integer
@@ -709,19 +711,77 @@ def register_user(request):
                     # Handle cases where conversion fails (e.g., non-numeric string)
                     return Response({'error': 'Invalid value provided for years of experience.'}, status=status.HTTP_400_BAD_REQUEST)
 
+                # Handle area selection for doctor - similar to patient
+                area_id = data.get('area_id')
+                practice_area_text = data.get('area', '')
+                area = None
+
+                # Prepare doctor data without area first
                 doctor_data = {
                     'license_number': data.get('licenseNumber', '') or data.get('medicalLicenseNumber', ''),
                     'specialization': data.get('specialization', ''),
                     'hospital_affiliation': data.get('hospitalAffiliation', ''),
                     'years_of_experience': years_exp_int, # Use the converted integer
-                    'area': data.get('area', ''),
                 }
 
-                # Create the doctor directly
+                # First try to use area_id if provided
+                if area_id:
+                    try:
+                        area = Area.objects.get(id=area_id)
+                        print(f"Found area with ID {area_id} ({area.name})")
+                        # Store the text name for backward compatibility
+                        doctor_data['area'] = area.name
+                        # Set the foreign key relationship
+                        doctor_data['practice_area'] = area
+                    except Area.DoesNotExist:
+                        print(f"Area with ID {area_id} not found")
+                        return Response({'error': f'Area with ID {area_id} not found'}, status=status.HTTP_400_BAD_REQUEST)
+                # Fall back to practice_area_text for backward compatibility
+                elif practice_area_text:
+                    try:
+                        # First try to find an exact match
+                        area = Area.objects.filter(name__iexact=practice_area_text).first()
+
+                        # If not found, create a new area
+                        if not area:
+                            # Default to Ahmedabad, Gujarat, India
+                            area = Area.objects.create(
+                                name=practice_area_text,
+                                city='Ahmedabad',
+                                state='Gujarat',
+                                zip_code='380000',  # Default zip code for Ahmedabad
+                                description=f'Practice area created during doctor registration: {practice_area_text}'
+                            )
+                            print(f"Created new area '{practice_area_text}' with ID {area.id}")
+                        else:
+                            print(f"Found existing area '{practice_area_text}' with ID {area.id}")
+
+                        # Store both text and foreign key
+                        doctor_data['area'] = practice_area_text
+                        doctor_data['practice_area'] = area
+                    except Exception as e:
+                        print(f"Error handling doctor practice area: {str(e)}")
+                        # Continue without setting the area relationship
+
+                # Create the doctor with all data including area
                 doctor = Doctor.objects.create(user=user, **doctor_data)
+                print(f"Created doctor {doctor.id}")
+
+                # The Doctor.save() method will automatically handle the DoctorArea relationship
+                # No need to create DoctorArea relationship explicitly
+
+            # Create a response based on the user role
+            if user.role == 'patient':
+                message = 'Patient registered successfully'
+            elif user.role == 'therapist':
+                message = 'Therapist registered successfully'
+            elif user.role == 'doctor':
+                message = 'Doctor registered successfully'
+            else:
+                message = 'User registered successfully'
 
             return Response({
-                'message': 'User registered successfully',
+                'message': message,
                 'user': UserSerializer(user).data
             }, status=status.HTTP_201_CREATED)
 

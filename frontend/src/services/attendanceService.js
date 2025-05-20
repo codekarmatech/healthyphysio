@@ -49,57 +49,7 @@ function generateMockPatientAttendance(patientId, year, month) {
   return mockData;
 }
 
-/**
- * Generate mock attendance data for a patient-therapist relationship
- * @param {string|number} therapistId - Therapist ID
- * @param {string|number} patientId - Patient ID
- * @param {number} year - Year
- * @param {number} month - Month (1-12)
- * @returns {Object} Mock attendance data
- */
-function generateMockPatientTherapistAttendance(therapistId, patientId, year, month) {
-  // Generate mock attendance data for a patient-therapist relationship
-  const mockData = {
-    data: {
-      therapist_id: therapistId,
-      patient_id: patientId,
-      summary: {
-        present: Math.floor(Math.random() * 10) + 5,
-        absent: Math.floor(Math.random() * 3),
-        total_sessions: Math.floor(Math.random() * 15) + 10,
-        completion_rate: Math.floor(Math.random() * 30) + 70
-      },
-      days: []
-    }
-  };
-
-  // Generate days data for the month
-  const daysInMonth = new Date(year, month, 0).getDate();
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    const isWeekend = new Date(date).getDay() % 6 === 0;
-
-    let status;
-    if (isWeekend) {
-      status = 'no_session';
-    } else if (day < new Date().getDate() || month < new Date().getMonth() + 1) {
-      // Past days have attendance
-      const statuses = ['present', 'present', 'present', 'absent', 'no_session'];
-      status = statuses[Math.floor(Math.random() * statuses.length)];
-    } else {
-      status = 'upcoming';
-    }
-
-    mockData.data.days.push({
-      date,
-      status,
-      notes: status === 'absent' ? 'Patient did not attend' : null,
-      therapist_notes: status === 'present' ? 'Good progress' : null
-    });
-  }
-
-  return mockData;
-}
+// This function was removed because it was defined but never used (ESLint warning)
 
 /**
  * Service for managing attendance
@@ -231,11 +181,38 @@ class AttendanceService extends BaseService {
         console.log('API returned empty data, using mock monthly attendance data');
 
         // Check if we have patient-specific data to generate
-        // This is where we use the generateMockPatientTherapistAttendance function
         const patientId = response.data?.patient_id;
         if (patientId) {
           console.log(`Generating patient-specific attendance data for patient ${patientId} and therapist ${therapistId}`);
-          return generateMockPatientTherapistAttendance(therapistId, patientId, year, month);
+          // Generate mock data for patient-therapist attendance
+          return {
+            data: {
+              therapist_id: therapistId,
+              patient_id: patientId,
+              summary: {
+                present: Math.floor(Math.random() * 10) + 5,
+                absent: Math.floor(Math.random() * 3),
+                total_sessions: Math.floor(Math.random() * 15) + 10,
+                completion_rate: Math.floor(Math.random() * 30) + 70
+              },
+              days: Array.from({ length: new Date(year, month, 0).getDate() }, (_, i) => {
+                const day = i + 1;
+                const date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                const isWeekend = new Date(date).getDay() % 6 === 0;
+                let status = isWeekend ? 'no_session' :
+                  (day < new Date().getDate() || month < new Date().getMonth() + 1) ?
+                    ['present', 'present', 'present', 'absent', 'no_session'][Math.floor(Math.random() * 5)] :
+                    'upcoming';
+
+                return {
+                  date,
+                  status,
+                  notes: status === 'absent' ? 'Patient did not attend' : null,
+                  therapist_notes: status === 'present' ? 'Good progress' : null
+                };
+              })
+            }
+          };
         }
 
         // Generate mock monthly attendance data for general therapist attendance
