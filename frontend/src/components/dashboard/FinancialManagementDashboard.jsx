@@ -6,7 +6,7 @@ import {
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from './StatCard';
 import DashboardSection from './DashboardSection';
-import AdvancedRevenueCalculator from './AdvancedRevenueCalculator';
+import EnhancedRevenueCalculator from './EnhancedRevenueCalculator';
 import { useAuth } from '../../contexts/AuthContext';
 import financialDashboardService from '../../services/financialDashboardService';
 
@@ -98,6 +98,8 @@ const FinancialManagementDashboard = () => {
       const totalRevenue = financialData.monthly_revenue.map(item => item.total || 0);
       const adminRevenue = financialData.monthly_revenue.map(item => item.admin || 0);
       const therapistRevenue = financialData.monthly_revenue.map(item => item.therapist || 0);
+      const doctorRevenue = financialData.monthly_revenue.map(item => item.doctor || 0);
+      const platformFee = financialData.monthly_revenue.map(item => item.platform_fee || 0);
 
       return {
         labels: months,
@@ -121,6 +123,20 @@ const FinancialManagementDashboard = () => {
             data: therapistRevenue,
             borderColor: COLORS[2],
             backgroundColor: `${COLORS[2]}20`,
+            fill: true,
+          },
+          {
+            label: 'Doctor Revenue',
+            data: doctorRevenue,
+            borderColor: COLORS[3],
+            backgroundColor: `${COLORS[3]}20`,
+            fill: true,
+          },
+          {
+            label: 'Platform Fee',
+            data: platformFee,
+            borderColor: COLORS[4],
+            backgroundColor: `${COLORS[4]}20`,
             fill: true,
           }
         ]
@@ -150,6 +166,20 @@ const FinancialManagementDashboard = () => {
           data: [7200, 9000, 10800, 9600, 12600, 14400],
           borderColor: COLORS[2],
           backgroundColor: `${COLORS[2]}20`,
+          fill: true,
+        },
+        {
+          label: 'Doctor Revenue',
+          data: [1440, 1800, 2160, 1920, 2520, 2880],
+          borderColor: COLORS[3],
+          backgroundColor: `${COLORS[3]}20`,
+          fill: true,
+        },
+        {
+          label: 'Platform Fee',
+          data: [360, 450, 540, 480, 630, 720],
+          borderColor: COLORS[4],
+          backgroundColor: `${COLORS[4]}20`,
           fill: true,
         }
       ]
@@ -329,6 +359,8 @@ const FinancialManagementDashboard = () => {
                       total: getMonthlyRevenueData().datasets[0].data[index],
                       admin: getMonthlyRevenueData().datasets[1].data[index],
                       therapist: getMonthlyRevenueData().datasets[2].data[index],
+                      doctor: getMonthlyRevenueData().datasets[3].data[index],
+                      platform_fee: getMonthlyRevenueData().datasets[4].data[index],
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
@@ -354,6 +386,18 @@ const FinancialManagementDashboard = () => {
                         stroke={COLORS[2]}
                         name="Therapist Revenue"
                       />
+                      <Line
+                        type="monotone"
+                        dataKey="doctor"
+                        stroke={COLORS[3]}
+                        name="Doctor Revenue"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="platform_fee"
+                        stroke={COLORS[4]}
+                        name="Platform Fee"
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -361,9 +405,9 @@ const FinancialManagementDashboard = () => {
             </div>
           </DashboardSection>
 
-          {/* Advanced Revenue Distribution Calculator */}
-          <DashboardSection title="Revenue Distribution Calculator">
-            <AdvancedRevenueCalculator />
+          {/* Enhanced Revenue Distribution Calculator */}
+          <DashboardSection title="Enhanced Revenue Distribution Calculator">
+            <EnhancedRevenueCalculator />
           </DashboardSection>
 
           {/* Therapist Earnings Breakdown */}

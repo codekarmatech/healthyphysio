@@ -13,6 +13,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
     therapist_details = TherapistSerializer(source='therapist', read_only=True)
     local_datetime = serializers.SerializerMethodField()
     reason_for_visit = serializers.CharField(source='issue', required=False, allow_blank=True)
+    payment_status = serializers.SerializerMethodField()
+    attendance_status = serializers.SerializerMethodField()
+    fee = serializers.SerializerMethodField()
+    start_time = serializers.SerializerMethodField()
+    end_time = serializers.SerializerMethodField()
+    date = serializers.SerializerMethodField()
+    therapist_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -21,12 +29,76 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'duration_minutes', 'status', 'reschedule_count', 'type', 'issue',
             'reason_for_visit', 'notes', 'previous_treatments', 'pain_level',
             'mobility_issues', 'changes_log', 'created_at', 'updated_at',
-            'patient_details', 'therapist_details'
+            'patient_details', 'therapist_details', 'payment_status', 'attendance_status',
+            'fee', 'start_time', 'end_time', 'date', 'therapist_name', 'doctor_name'
         ]
         read_only_fields = ['id', 'session_code', 'created_at', 'updated_at']
 
     def get_local_datetime(self, obj):
         return timezone.localtime(obj.datetime).strftime('%Y-%m-%dT%H:%M:%S%z')
+
+    def get_payment_status(self, obj):
+        # Check if there's an associated EarningRecord
+        try:
+            from earnings.models import EarningRecord
+            earning = EarningRecord.objects.filter(appointment=obj).first()
+            if earning:
+                return earning.payment_status
+            return "pending"  # Default if no earning record exists
+        except ImportError:
+            return "pending"
+
+    def get_attendance_status(self, obj):
+        # Map appointment status to attendance status
+        status_map = {
+            'completed': 'attended',
+            'missed': 'missed',
+            'scheduled': 'scheduled',
+            'pending': 'scheduled',
+            'rescheduled': 'scheduled',
+            'pending_reschedule': 'scheduled',
+            'cancelled': 'cancelled'
+        }
+        return status_map.get(obj.status, 'scheduled')
+
+    def get_fee(self, obj):
+        # Try to get fee from EarningRecord
+        try:
+            from earnings.models import EarningRecord
+            earning = EarningRecord.objects.filter(appointment=obj).first()
+            if earning:
+                return earning.amount
+            # Default fee if no earning record
+            return 1000
+        except ImportError:
+            return 1000
+
+    def get_start_time(self, obj):
+        return timezone.localtime(obj.datetime).strftime('%H:%M:%S')
+
+    def get_end_time(self, obj):
+        end_time = obj.datetime + timezone.timedelta(minutes=obj.duration_minutes)
+        return timezone.localtime(end_time).strftime('%H:%M:%S')
+
+    def get_date(self, obj):
+        return timezone.localtime(obj.datetime).strftime('%Y-%m-%d')
+
+    def get_therapist_name(self, obj):
+        if obj.therapist and obj.therapist.user:
+            return f"{obj.therapist.user.first_name} {obj.therapist.user.last_name}"
+        return ""
+
+    def get_doctor_name(self, obj):
+        # Try to get doctor from EarningRecord
+        try:
+            from earnings.models import EarningRecord
+            earning = EarningRecord.objects.filter(appointment=obj).first()
+            if earning and hasattr(earning, 'doctor') and earning.doctor and earning.doctor.user:
+                return f"Dr. {earning.doctor.user.first_name} {earning.doctor.user.last_name}"
+            # Default doctor name if no earning record
+            return "Dr. Vikram Desai"
+        except (ImportError, AttributeError):
+            return "Dr. Vikram Desai"
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
