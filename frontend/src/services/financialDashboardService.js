@@ -278,6 +278,205 @@ class FinancialDashboardService extends BaseService {
   }
 
   /**
+   * Get attendance impact analysis data
+   * @param {Date|null} startDate - Start date for filtering
+   * @param {Date|null} endDate - End date for filtering
+   * @param {number|null} therapistId - Filter by therapist ID
+   * @returns {Promise} API response
+   */
+  async getAttendanceImpactData(startDate = null, endDate = null, therapistId = null) {
+    const params = {};
+
+    if (startDate) {
+      params.start_date = startDate.toISOString().split('T')[0];
+    }
+    if (endDate) {
+      params.end_date = endDate.toISOString().split('T')[0];
+    }
+    if (therapistId) {
+      params.therapist_id = therapistId;
+    }
+
+    try {
+      const response = await api.get(`${this.basePath}attendance-impact/`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching attendance impact data:', error);
+      // Return mock data with a flag indicating it's mock data
+      return {
+        revenue_loss_by_reason: [
+          {
+            therapist_id: 1,
+            therapist_name: 'Rajesh Sharma',
+            reason: 'absent',
+            count: 3,
+            revenue_loss: 12000
+          },
+          {
+            therapist_id: 1,
+            therapist_name: 'Rajesh Sharma',
+            reason: 'half_day',
+            count: 2,
+            revenue_loss: 4000
+          },
+          {
+            therapist_id: 2,
+            therapist_name: 'Priya Patel',
+            reason: 'sick_leave',
+            count: 4,
+            revenue_loss: 16000
+          }
+        ],
+        attendance_trends: [
+          {
+            month: 'Jan 2023',
+            present: 65,
+            absent: 10,
+            half_day: 5,
+            leave: 4
+          },
+          {
+            month: 'Feb 2023',
+            present: 70,
+            absent: 8,
+            half_day: 4,
+            leave: 3
+          }
+        ],
+        absence_distribution: [
+          { reason: 'absent', count: 20 },
+          { reason: 'half_day', count: 15 },
+          { reason: 'sick_leave', count: 12 },
+          { reason: 'emergency_leave', count: 8 }
+        ],
+        is_mock_data: true
+      };
+    }
+  }
+
+  /**
+   * Get therapist consistency report data
+   * @param {Date|null} startDate - Start date for filtering
+   * @param {Date|null} endDate - End date for filtering
+   * @returns {Promise} API response
+   */
+  async getTherapistConsistencyData(startDate = null, endDate = null) {
+    const params = {};
+
+    if (startDate) {
+      params.start_date = startDate.toISOString().split('T')[0];
+    }
+    if (endDate) {
+      params.end_date = endDate.toISOString().split('T')[0];
+    }
+
+    try {
+      const response = await api.get(`${this.basePath}therapist-consistency/`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching therapist consistency data:', error);
+      // Return mock data with a flag indicating it's mock data
+      return {
+        consistency_scores: [
+          {
+            therapist_id: 1,
+            therapist_name: 'Rajesh Sharma',
+            attendance_rate: 92.5,
+            on_time_percentage: 95.2,
+            consistency_score: 93.31,
+            revenue_loss: 8000,
+            absence_reasons: [
+              { reason: 'absent', count: 2 },
+              { reason: 'half_day', count: 1 }
+            ]
+          },
+          {
+            therapist_id: 2,
+            therapist_name: 'Priya Patel',
+            attendance_rate: 88.7,
+            on_time_percentage: 90.5,
+            consistency_score: 89.24,
+            revenue_loss: 12000,
+            absence_reasons: [
+              { reason: 'sick_leave', count: 3 },
+              { reason: 'half_day', count: 2 }
+            ]
+          }
+        ],
+        is_mock_data: true
+      };
+    }
+  }
+
+  /**
+   * Get patient behavior analysis data
+   * @param {Date|null} startDate - Start date for filtering
+   * @param {Date|null} endDate - End date for filtering
+   * @returns {Promise} API response
+   */
+  async getPatientBehaviorData(startDate = null, endDate = null) {
+    const params = {};
+
+    if (startDate) {
+      params.start_date = startDate.toISOString().split('T')[0];
+    }
+    if (endDate) {
+      params.end_date = endDate.toISOString().split('T')[0];
+    }
+
+    try {
+      const response = await api.get(`${this.basePath}patient-behavior/`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching patient behavior data:', error);
+      // Return mock data with a flag indicating it's mock data
+      return {
+        patient_behaviors: [
+          {
+            patient_id: 1,
+            patient_name: 'Rahul Mehta',
+            total_appointments: 15,
+            cancelled_appointments: 3,
+            missed_appointments: 1,
+            rescheduled_appointments: 2,
+            cancellation_rate: 26.67,
+            reschedule_rate: 13.33,
+            revenue_impact: 6000
+          },
+          {
+            patient_id: 2,
+            patient_name: 'Anita Sharma',
+            total_appointments: 12,
+            cancelled_appointments: 1,
+            missed_appointments: 0,
+            rescheduled_appointments: 3,
+            cancellation_rate: 8.33,
+            reschedule_rate: 25.0,
+            revenue_impact: 1500
+          }
+        ],
+        cancellation_trends: [
+          {
+            month: 'Jan 2023',
+            total: 60,
+            cancelled: 5,
+            missed: 3,
+            rescheduled: 8
+          },
+          {
+            month: 'Feb 2023',
+            total: 65,
+            cancelled: 4,
+            missed: 2,
+            rescheduled: 7
+          }
+        ],
+        is_mock_data: true
+      };
+    }
+  }
+
+  /**
    * Get earnings report
    * @param {Date|null} startDate - Start date for filtering
    * @param {Date|null} endDate - End date for filtering
@@ -1009,6 +1208,286 @@ class FinancialDashboardService extends BaseService {
         }
       ]
     };
+  }
+
+  /**
+   * Get earnings records with filters for payment status management
+   * @param {Object} filters - Filter parameters
+   * @param {string} filters.patient - Filter by patient name
+   * @param {string} filters.therapist - Filter by therapist name
+   * @param {string} filters.status - Filter by payment status
+   * @param {string} filters.start_date - Filter by start date
+   * @param {string} filters.end_date - Filter by end date
+   * @param {number} filters.page - Page number for pagination
+   * @param {number} filters.page_size - Number of items per page
+   * @returns {Promise} API response with earnings records
+   */
+  async getEarningsRecords(filters = {}) {
+    const params = { ...filters };
+
+    try {
+      const response = await api.get(`${this.basePath}records/`, { params });
+
+      // Check if the response is an array or an object with results property
+      let formattedData;
+      if (Array.isArray(response.data)) {
+        formattedData = {
+          results: response.data,
+          count: response.data.length,
+          is_mock_data: false
+        };
+      } else {
+        formattedData = response.data;
+      }
+
+      return formattedData;
+    } catch (error) {
+      console.error('Error fetching earnings records:', error);
+      // Return mock data with a flag indicating it's mock data
+      const mockData = {
+        results: this.getMockEarningsRecords(),
+        count: this.getMockEarningsRecords().length,
+        is_mock_data: true
+      };
+      return mockData;
+    }
+  }
+
+  /**
+   * Update payment status for a single earnings record
+   * @param {number} recordId - Earnings record ID
+   * @param {string} newStatus - New payment status (paid, unpaid, partial)
+   * @returns {Promise} API response
+   */
+  async updatePaymentStatus(recordId, newStatus) {
+    if (!recordId || !newStatus) {
+      throw new Error('Record ID and new status are required');
+    }
+
+    const payload = {
+      payment_status: newStatus,
+      payment_date: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null
+    };
+
+    try {
+      const response = await api.patch(`${this.basePath}${recordId}/update-payment-status/`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      // If in development or testing, return mock success response
+      if (process.env.NODE_ENV !== 'production') {
+        return {
+          id: recordId,
+          payment_status: newStatus,
+          payment_date: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null,
+          is_mock_data: true
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Update payment status for multiple earnings records
+   * @param {Array<number>} recordIds - Array of earnings record IDs
+   * @param {string} newStatus - New payment status (paid, unpaid, partial)
+   * @returns {Promise} API response
+   */
+  async bulkUpdatePaymentStatus(recordIds, newStatus) {
+    if (!recordIds || !recordIds.length || !newStatus) {
+      throw new Error('Record IDs and new status are required');
+    }
+
+    const payload = {
+      record_ids: recordIds,
+      payment_status: newStatus,
+      payment_date: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : null
+    };
+
+    try {
+      const response = await api.post(`${this.basePath}bulk-update-payment-status/`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating payment statuses:', error);
+      // If in development or testing, return mock success response
+      if (process.env.NODE_ENV !== 'production') {
+        return {
+          updated_count: recordIds.length,
+          payment_status: newStatus,
+          is_mock_data: true
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get mock earnings records for testing
+   * @returns {Array} Mock earnings records
+   */
+  getMockEarningsRecords() {
+    return [
+      {
+        id: 1001,
+        patient_id: 1,
+        patient_name: 'Rahul Mehta',
+        therapist_id: 1,
+        therapist_name: 'Rajesh Sharma',
+        doctor_id: 2,
+        doctor_name: 'Dr. Anjali Gupta',
+        appointment_id: 101,
+        date: '2023-06-15',
+        session_type: 'Physical Therapy',
+        amount: 1200,
+        admin_amount: 300,
+        therapist_amount: 720,
+        doctor_amount: 180,
+        status: 'completed',
+        payment_status: 'unpaid',
+        payment_date: null,
+        notes: 'Initial assessment'
+      },
+      {
+        id: 1002,
+        patient_id: 1,
+        patient_name: 'Rahul Mehta',
+        therapist_id: 1,
+        therapist_name: 'Rajesh Sharma',
+        doctor_id: 2,
+        doctor_name: 'Dr. Anjali Gupta',
+        appointment_id: 102,
+        date: '2023-06-18',
+        session_type: 'Physical Therapy',
+        amount: 1000,
+        admin_amount: 250,
+        therapist_amount: 600,
+        doctor_amount: 150,
+        status: 'completed',
+        payment_status: 'unpaid',
+        payment_date: null,
+        notes: 'Follow-up session'
+      },
+      {
+        id: 1003,
+        patient_id: 2,
+        patient_name: 'Anita Sharma',
+        therapist_id: 2,
+        therapist_name: 'Priya Patel',
+        doctor_id: 1,
+        doctor_name: 'Dr. Vikram Desai',
+        appointment_id: 103,
+        date: '2023-06-18',
+        session_type: 'Rehabilitation',
+        amount: 1500,
+        admin_amount: 375,
+        therapist_amount: 900,
+        doctor_amount: 225,
+        status: 'completed',
+        payment_status: 'paid',
+        payment_date: '2023-06-18',
+        notes: 'Shoulder exercises'
+      },
+      {
+        id: 1004,
+        patient_id: 3,
+        patient_name: 'Vikram Patel',
+        therapist_id: 3,
+        therapist_name: 'Amit Singh',
+        doctor_id: 2,
+        doctor_name: 'Dr. Anjali Gupta',
+        appointment_id: 104,
+        date: '2023-06-20',
+        session_type: 'Rehabilitation',
+        amount: 1800,
+        admin_amount: 450,
+        therapist_amount: 1080,
+        doctor_amount: 270,
+        status: 'completed',
+        payment_status: 'unpaid',
+        payment_date: null,
+        notes: 'Post-surgery progress'
+      },
+      {
+        id: 1005,
+        patient_id: 4,
+        patient_name: 'Meera Desai',
+        therapist_id: 2,
+        therapist_name: 'Priya Patel',
+        doctor_id: 1,
+        doctor_name: 'Dr. Vikram Desai',
+        appointment_id: 105,
+        date: '2023-06-12',
+        session_type: 'Sports Rehabilitation',
+        amount: 1200,
+        admin_amount: 300,
+        therapist_amount: 720,
+        doctor_amount: 180,
+        status: 'completed',
+        payment_status: 'paid',
+        payment_date: '2023-06-12',
+        notes: 'Ankle strengthening'
+      },
+      {
+        id: 1006,
+        patient_id: 5,
+        patient_name: 'Suresh Joshi',
+        therapist_id: 1,
+        therapist_name: 'Rajesh Sharma',
+        doctor_id: 2,
+        doctor_name: 'Dr. Anjali Gupta',
+        appointment_id: 106,
+        date: '2023-06-19',
+        session_type: 'Geriatric Therapy',
+        amount: 1000,
+        admin_amount: 250,
+        therapist_amount: 600,
+        doctor_amount: 150,
+        status: 'completed',
+        payment_status: 'paid',
+        payment_date: '2023-06-19',
+        notes: 'Arthritis management'
+      },
+      {
+        id: 1007,
+        patient_id: 3,
+        patient_name: 'Vikram Patel',
+        therapist_id: 2,
+        therapist_name: 'Priya Patel',
+        doctor_id: 2,
+        doctor_name: 'Dr. Anjali Gupta',
+        appointment_id: 108,
+        date: '2023-06-15',
+        session_type: 'Rehabilitation',
+        amount: 1800,
+        admin_amount: 450,
+        therapist_amount: 1080,
+        doctor_amount: 270,
+        status: 'completed',
+        payment_status: 'partial',
+        payment_date: '2023-06-15',
+        notes: 'Partial payment received'
+      },
+      {
+        id: 1008,
+        patient_id: 1,
+        patient_name: 'Rahul Mehta',
+        therapist_id: 3,
+        therapist_name: 'Amit Singh',
+        doctor_id: 1,
+        doctor_name: 'Dr. Vikram Desai',
+        appointment_id: 109,
+        date: '2023-06-10',
+        session_type: 'Physical Therapy',
+        amount: 1000,
+        admin_amount: 250,
+        therapist_amount: 600,
+        doctor_amount: 150,
+        status: 'completed',
+        payment_status: 'unpaid',
+        payment_date: null,
+        notes: 'Back pain treatment'
+      }
+    ];
   }
 }
 

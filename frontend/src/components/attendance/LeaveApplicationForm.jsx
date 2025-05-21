@@ -27,34 +27,34 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
   // Validate the form
   const validateForm = () => {
     const errors = {};
-    
+
     if (!startDate) {
       errors.startDate = 'Start date is required';
     }
-    
+
     if (!endDate) {
       errors.endDate = 'End date is required';
     }
-    
+
     if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
       errors.endDate = 'End date cannot be before start date';
     }
-    
+
     if (!reason.trim()) {
       errors.reason = 'Reason is required';
     } else if (reason.trim().length < 10) {
       errors.reason = 'Please provide a more detailed reason (at least 10 characters)';
     }
-    
+
     // Check if leave is being applied at least 48 hours in advance
     const now = new Date();
     const start = new Date(startDate);
     const hoursUntilLeave = (start - now) / (1000 * 60 * 60);
-    
+
     if (hoursUntilLeave < 48 && leaveType !== 'sick') {
       errors.startDate = 'Leave must be applied at least 48 hours in advance (except for sick leave)';
     }
-    
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -62,23 +62,23 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       // For therapists, the user.id is the therapist ID
       const therapistId = user?.id;
       console.log('Applying for leave with therapist ID:', therapistId);
       console.log('User object:', user);
-      
+
       // Pass the therapistId to the service method
       await attendanceService.applyForLeave(startDate, endDate, reason, leaveType, therapistId);
-      
+
       // Call the success callback
       if (onSuccess) {
         onSuccess();
@@ -92,31 +92,31 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
   };
 
   // Calculate the number of days
-  const leaveDuration = startDate && endDate 
-    ? differenceInCalendarDays(new Date(endDate), new Date(startDate)) + 1 
+  const leaveDuration = startDate && endDate
+    ? differenceInCalendarDays(new Date(endDate), new Date(startDate)) + 1
     : 0;
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-xl font-semibold text-gray-800 mb-4">Apply for Leave</h2>
-      
+
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
-      
 
-      
+
+
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           {/* Start Date */}
           <div>
-            <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="leave-start-date" className="block text-sm font-medium text-gray-700 mb-1">
               Start Date *
             </label>
             <input
-              id="start-date"
+              id="leave-start-date"
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
@@ -128,14 +128,14 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
               <p className="mt-1 text-sm text-red-600">{validationErrors.startDate}</p>
             )}
           </div>
-          
+
           {/* End Date */}
           <div>
-            <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="leave-end-date" className="block text-sm font-medium text-gray-700 mb-1">
               End Date *
             </label>
             <input
-              id="end-date"
+              id="leave-end-date"
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
@@ -148,14 +148,14 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
             )}
           </div>
         </div>
-        
+
         {/* Leave Duration */}
         <div className="mb-4">
           <p className="text-sm text-gray-600">
             Duration: <span className="font-medium">{leaveDuration} day{leaveDuration !== 1 ? 's' : ''}</span>
           </p>
         </div>
-        
+
         {/* Leave Type */}
         <div className="mb-4">
           <label htmlFor="leave-type" className="block text-sm font-medium text-gray-700 mb-1">
@@ -166,7 +166,7 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
             value={leaveType}
             onChange={(e) => {
               setLeaveType(e.target.value);
-              
+
               // If changing to sick or emergency leave, update validation
               if (e.target.value === 'sick' || e.target.value === 'emergency') {
                 // For sick and emergency leave, we can start from today
@@ -190,7 +190,7 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
             <option value="emergency">Emergency Leave (Unpaid)</option>
           </select>
         </div>
-        
+
         {/* Reason */}
         <div className="mb-6">
           <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">
@@ -209,7 +209,7 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
             <p className="mt-1 text-sm text-red-600">{validationErrors.reason}</p>
           )}
         </div>
-        
+
         {/* Important Notes */}
         <div className="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
           <h3 className="text-sm font-medium text-yellow-800 mb-1">Important Notes:</h3>
@@ -220,7 +220,7 @@ const LeaveApplicationForm = ({ initialStartDate = null, onSuccess, onCancel }) 
             <li>Excessive leave may affect your performance evaluation.</li>
           </ul>
         </div>
-        
+
         {/* Form Actions */}
         <div className="flex justify-end space-x-3">
           <button

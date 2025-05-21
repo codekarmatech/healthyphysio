@@ -683,6 +683,12 @@ const AdminDashboard = () => {
               title: "Collection Rate",
               value: `${dashboardData?.earnings_stats?.collection_rate || 92}%`,
               trend: (dashboardData?.earnings_stats?.collection_rate || 92) > 90 ? "up" : "down"
+            },
+            {
+              title: "Payment Status",
+              value: `${dashboardData?.earnings_stats?.paid_percentage || 85}% Paid`,
+              linkText: "Manage payment status",
+              linkUrl: "/admin/payment-status"
             }
           ]}
           loading={loading}

@@ -223,7 +223,8 @@ class AttendanceService extends BaseService {
               absent: Math.floor(Math.random() * 5),
               half_day: Math.floor(Math.random() * 3),
               approved_leaves: Math.floor(Math.random() * 2),
-              holidays: Math.floor(Math.random() * 3)
+              holidays: Math.floor(Math.random() * 3),
+              available: Math.floor(Math.random() * 4)
             },
             days: []
           },
@@ -241,7 +242,7 @@ class AttendanceService extends BaseService {
             status = 'holiday';
           } else if (day < new Date().getDate() || month < new Date().getMonth() + 1) {
             // Past days have attendance
-            const statuses = ['present', 'present', 'present', 'present', 'half_day', 'absent', 'approved_leave'];
+            const statuses = ['present', 'present', 'present', 'present', 'half_day', 'absent', 'approved_leave', 'available', 'free_day'];
             status = statuses[Math.floor(Math.random() * statuses.length)];
           } else {
             status = 'upcoming';
@@ -288,7 +289,8 @@ class AttendanceService extends BaseService {
             absent: Math.floor(Math.random() * 5),
             half_day: Math.floor(Math.random() * 3),
             approved_leaves: Math.floor(Math.random() * 2),
-            holidays: Math.floor(Math.random() * 3)
+            holidays: Math.floor(Math.random() * 3),
+            available: Math.floor(Math.random() * 4)
           },
           days: []
         },
@@ -306,7 +308,7 @@ class AttendanceService extends BaseService {
           status = 'holiday';
         } else if (day < new Date().getDate() || month < new Date().getMonth() + 1) {
           // Past days have attendance
-          const statuses = ['present', 'present', 'present', 'present', 'half_day', 'absent', 'approved_leave'];
+          const statuses = ['present', 'present', 'present', 'present', 'half_day', 'absent', 'approved_leave', 'available', 'free_day'];
           status = statuses[Math.floor(Math.random() * statuses.length)];
         } else {
           status = 'upcoming';
@@ -612,6 +614,160 @@ class AttendanceService extends BaseService {
       charge_fee: chargeFee
     };
     return api.post(`${this.basePath}patient-cancellation/`, data);
+  }
+
+  /**
+   * Submit availability for a day with no appointments
+   * @param {string} date - Date in YYYY-MM-DD format (defaults to today)
+   * @param {string} notes - Optional notes for the availability record
+   * @returns {Promise} API response
+   */
+  async submitAvailability(date = null, notes = '') {
+    const formattedDate = date || new Date().toISOString().split('T')[0];
+
+    console.log(`Submitting availability for date: ${formattedDate}`);
+
+    // Create the data object with the required fields
+    const data = {
+      date: formattedDate
+    };
+
+    // Add notes if provided (only if not empty)
+    if (notes && notes.trim()) {
+      data.notes = notes;
+      console.log(`Including notes: ${notes}`);
+    }
+
+    console.log('Submitting availability data:', data);
+
+    try {
+      // Make the API call to the availability endpoint
+      const response = await api.post(`${this.basePath}availability/`, data);
+      console.log('Availability submission successful:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error submitting availability:', error);
+
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Get monthly availability for a therapist
+   * @param {number} year - Year
+   * @param {number} month - Month (1-12)
+   * @param {string|number} therapistId - Therapist ID
+   * @returns {Promise} API response or mock data
+   */
+  async getMonthlyAvailability(year, month, therapistId) {
+    try {
+      // Try to call the real API endpoint
+      console.log(`Fetching monthly availability data from: ${this.basePath}availability/monthly-summary?year=${year}&month=${month}&therapist_id=${therapistId}`);
+      const response = await api.get(`${this.basePath}availability/monthly-summary?year=${year}&month=${month}&therapist_id=${therapistId}`);
+
+      // If we get a successful response with data, return it
+      if (response.data && response.data.days?.length > 0) {
+        console.log('Using real monthly availability data');
+        return response;
+      } else {
+        // If the response is empty or doesn't have the expected structure, use mock data
+        console.log('API returned empty data, using mock monthly availability data');
+
+        // Generate mock monthly availability data
+        const mockData = {
+          data: {
+            available_days: Math.floor(Math.random() * 10) + 5,
+            holidays: Math.floor(Math.random() * 3),
+            days: []
+          },
+          isMockData: true
+        };
+
+        // Generate days data for the month
+        const daysInMonth = new Date(year, month, 0).getDate();
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          const isWeekend = new Date(date).getDay() % 6 === 0;
+
+          let status;
+          if (isWeekend) {
+            status = 'weekend';
+          } else if (day < new Date().getDate() || month < new Date().getMonth() + 1) {
+            // Past days have availability or no_availability
+            const statuses = ['available', 'no_availability', 'no_availability', 'available', 'available'];
+            status = statuses[Math.floor(Math.random() * statuses.length)];
+          } else {
+            status = 'upcoming';
+          }
+
+          mockData.data.days.push({
+            date,
+            status,
+            submitted_at: status === 'available' ? new Date(date).toISOString() : null,
+            has_appointments: Math.random() > 0.7 // 30% chance of having appointments
+          });
+        }
+
+        return mockData;
+      }
+    } catch (error) {
+      // If the API call fails, log detailed information and use mock data
+      console.error('Error fetching monthly availability:', error);
+
+      // Log more detailed information about the error
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+      } else if (error.request) {
+        console.error('No response received from server. Request details:', error.request);
+      } else {
+        console.error('Error message:', error.message);
+      }
+
+      console.log('Using mock data instead');
+
+      // Generate mock monthly availability data
+      const mockData = {
+        data: {
+          available_days: Math.floor(Math.random() * 10) + 5,
+          holidays: Math.floor(Math.random() * 3),
+          days: []
+        },
+        isMockData: true
+      };
+
+      // Generate days data for the month
+      const daysInMonth = new Date(year, month, 0).getDate();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+        const isWeekend = new Date(date).getDay() % 6 === 0;
+
+        let status;
+        if (isWeekend) {
+          status = 'weekend';
+        } else if (day < new Date().getDate() || month < new Date().getMonth() + 1) {
+          // Past days have availability or no_availability
+          const statuses = ['available', 'no_availability', 'no_availability', 'available', 'available'];
+          status = statuses[Math.floor(Math.random() * statuses.length)];
+        } else {
+          status = 'upcoming';
+        }
+
+        mockData.data.days.push({
+          date,
+          status,
+          submitted_at: status === 'available' ? new Date(date).toISOString() : null,
+          has_appointments: Math.random() > 0.7 // 30% chance of having appointments
+        });
+      }
+
+      return mockData;
+    }
   }
 }
 

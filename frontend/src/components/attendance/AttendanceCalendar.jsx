@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, isBefore } from 'date-fns';
 // Use the imported utilities from dateUtils
-import { dayFormat, isSameDay } from '../../utils/dateUtils'; 
+import { dayFormat, isSameDay } from '../../utils/dateUtils';
 import attendanceService from '../../services/attendanceService';
 
 const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData = false }) => {
@@ -13,23 +13,23 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
   const [selectedDate, setSelectedDate] = useState(null);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState(null);
-  
+
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const startDate = monthStart;
   const endDate = monthEnd;
-  
+
   const dateFormat = "d";
   const days_of_week = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  
+
   const daysInMonth = eachDayOfInterval({
     start: startDate,
     end: endDate
   });
-  
+
   // Calculate the day of the week for the first day of the month (0-6)
   const startDay = getDay(monthStart);
-  
+
   // Function to get status color
   const getStatusColor = (status, isApproved) => {
     switch (status) {
@@ -45,6 +45,10 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
         return isApproved ? 'bg-orange-100 border-orange-500' : 'bg-orange-50 border-orange-300';
       case 'emergency_leave':
         return isApproved ? 'bg-pink-100 border-pink-500' : 'bg-pink-50 border-pink-300';
+      case 'available':
+        return isApproved ? 'bg-teal-100 border-teal-500' : 'bg-teal-50 border-teal-300';
+      case 'free_day':
+        return 'bg-teal-50 border-teal-300';
       case 'holiday':
         return 'bg-blue-100 border-blue-500';
       case 'weekend':
@@ -53,30 +57,30 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
         return 'bg-gray-100 border-gray-300';
     }
   };
-  
+
   // Function to get day data from the API response
   const getDayData = (date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     return days.find(day => day.date === formattedDate);
   };
-  
+
   // Function to handle day click
   const handleDayClick = (date) => {
     setSelectedDate(date);
-    
+
     // Check if attendance already submitted
     const dayData = getDayData(date);
     if (dayData && dayData.status !== 'upcoming') {
       // Already submitted
       return;
     }
-    
+
     // For today, show attendance submission options
     if (isSameDay(date, new Date())) {
       setShowSubmitModal(true);
       return;
     }
-    
+
     // For future dates, show leave application option
     const today = new Date();
     if (isBefore(today, date)) {
@@ -91,36 +95,55 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
       }
     }
   };
-  
+
   // Function to submit attendance
   const handleSubmitAttendance = async () => {
     try {
       setSubmitting(true);
       setError(null);
-      
+
       // Format the selected date as YYYY-MM-DD
       const formattedDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
-      
-      // Call the submitAttendance method with status, date, and notes
-      const response = await attendanceService.submitAttendance(selectedStatus, formattedDate, notes);
-      
-      // Close the modal and clear form
-      setShowSubmitModal(false);
-      setNotes('');
-      
-      // Refresh attendance data to update the calendar and summary
-      if (onAttendanceUpdated) {
-        onAttendanceUpdated();
+
+      // Get the day data for the selected date
+      const selectedDayData = selectedDate ? getDayData(selectedDate) : null;
+
+      // Check if this is an availability submission or attendance submission
+      if (selectedStatus === 'available' && !selectedDayData?.has_appointments) {
+        // Call the onAttendanceUpdated with 'availability' action
+        // The parent component will handle the API call
+        if (onAttendanceUpdated) {
+          onAttendanceUpdated('availability', selectedDate, notes);
+        }
+
+        // Close the modal and clear form
+        setShowSubmitModal(false);
+        setNotes('');
+
+        // Return a mock response
+        return { data: { status: 'available', date: formattedDate } };
+      } else {
+        // Call the submitAttendance method with status, date, and notes
+        const response = await attendanceService.submitAttendance(selectedStatus, formattedDate, notes);
+
+        // Close the modal and clear form
+        setShowSubmitModal(false);
+        setNotes('');
+
+        // Refresh attendance data to update the calendar and summary
+        if (onAttendanceUpdated) {
+          onAttendanceUpdated('submit', selectedDate, notes);
+        }
+
+        // Return the response for any additional processing
+        return response;
       }
-      
-      // Return the response for any additional processing
-      return response;
     } catch (error) {
       console.error('Error submitting attendance:', error);
-      
+
       // Set a user-friendly error message
       let errorMessage = 'Failed to submit attendance. Please try again.';
-      
+
       if (error.response) {
         // Handle specific error responses from the server
         if (error.response.status === 400) {
@@ -131,16 +154,16 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           errorMessage = 'Attendance already submitted for this date.';
         }
       }
-      
+
       setError(errorMessage);
-      
+
       // Re-throw the error for the caller to handle if needed
       throw error;
     } finally {
       setSubmitting(false);
     }
   };
-  
+
   // Function to handle leave application
   const handleLeaveApplication = () => {
     setShowLeaveModal(false);
@@ -150,13 +173,13 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
       onAttendanceUpdated('leave_application', selectedDate);
     }
   };
-  
+
   // Function to handle patient cancellation
   const handlePatientCancellation = () => {
     setShowLeaveModal(false);
     setShowCancellationModal(true);
   };
-  
+
   return (
     <div className="bg-white rounded-lg shadow p-4">
       {/* Mock data indicator */}
@@ -170,7 +193,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           </p>
         </div>
       )}
-      
+
       {/* Calendar header with day names */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {days_of_week.map((day, index) => (
@@ -179,14 +202,14 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           </div>
         ))}
       </div>
-      
+
       {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-1">
         {/* Empty cells for days before the start of the month */}
         {Array.from({ length: startDay }).map((_, index) => (
           <div key={`empty-${index}`} className="h-16 p-1 border border-gray-200 rounded"></div>
         ))}
-        
+
         {/* Days of the month */}
         {daysInMonth.map((day, index) => {
           const dayData = getDayData(day);
@@ -195,7 +218,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           const statusColor = getStatusColor(status, isApproved);
           // Replace isToday with isSameDay
           const isCurrentDay = isSameDay(day, new Date());
-          
+
           return (
             <div
               key={index}
@@ -209,10 +232,17 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
                 <span className={`text-sm font-semibold ${isCurrentDay ? 'text-primary-700' : 'text-gray-700'}`}>
                   {format(day, dateFormat)}
                 </span>
-                
+
                 {status !== 'upcoming' && (
                   <div className="mt-1 text-xs">
-                    <span className="font-medium capitalize">{status}</span>
+                    <span className="font-medium capitalize">
+                      {dayData?.display_status || status.replace(/_/g, ' ')}
+                    </span>
+                    {dayData?.has_appointments && status === 'free_day' && (
+                      <div className="text-xs text-red-500 mt-1 truncate">
+                        Has appointments
+                      </div>
+                    )}
                     {dayData?.submitted_at && (
                       <div className="text-xs text-gray-500 mt-1 truncate" title={`Submitted at ${dayData.submitted_at}`}>
                         {dayData.submitted_at}
@@ -225,7 +255,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           );
         })}
       </div>
-      
+
       {/* Attendance submission modal */}
       {showSubmitModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -233,42 +263,52 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               Submit Attendance for {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Today'}
             </h3>
-            
+
             {/* Error message */}
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded-md">
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
-            
+
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="attendance-status" className="block text-sm font-medium text-gray-700 mb-2">
                 Select Status
               </label>
               <select
+                id="attendance-status"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 disabled={submitting}
               >
-                <option value="present">Present</option>
-                <option value="absent">Absent</option>
-                <option value="half_day">Half Day</option>
-                {/* Only show sick leave and emergency leave options for today or past dates */}
-                {selectedDate && selectedDate <= new Date() && (
+                {selectedDate && getDayData(selectedDate)?.has_appointments ? (
+                  // If the day has appointments, show attendance options
                   <>
-                    <option value="sick_leave">Sick Leave (Unpaid)</option>
-                    <option value="emergency_leave">Emergency Leave (Unpaid)</option>
+                    <option value="present">Present</option>
+                    <option value="absent">Absent</option>
+                    <option value="half_day">Half Day</option>
+                    {/* Only show sick leave and emergency leave options for today or past dates */}
+                    {selectedDate && selectedDate <= new Date() && (
+                      <>
+                        <option value="sick_leave">Sick Leave (Unpaid)</option>
+                        <option value="emergency_leave">Emergency Leave (Unpaid)</option>
+                      </>
+                    )}
                   </>
+                ) : (
+                  // If the day has no appointments, only show availability option
+                  <option value="available">Available (No Assignments)</option>
                 )}
               </select>
             </div>
-            
+
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="attendance-notes" className="block text-sm font-medium text-gray-700 mb-2">
                 Notes (Optional)
               </label>
               <textarea
+                id="attendance-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
@@ -277,7 +317,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
                 disabled={submitting}
               ></textarea>
             </div>
-            
+
             {selectedStatus === 'absent' && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <p className="text-sm text-yellow-700">
@@ -285,7 +325,15 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
                 </p>
               </div>
             )}
-            
+
+            {selectedStatus === 'available' && (
+              <div className="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-md">
+                <p className="text-sm text-teal-700">
+                  <strong>Note:</strong> Marking yourself as available means you are ready to be assigned patients on this day. You will only be paid after appointments are assigned, completed, and attendance is verified.
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
@@ -318,7 +366,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           </div>
         </div>
       )}
-      
+
       {/* Leave Options Modal */}
       {showLeaveModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -326,11 +374,11 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               Options for {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Selected Date'}
             </h3>
-            
+
             <p className="mb-4 text-sm text-gray-600">
               What would you like to do for this date?
             </p>
-            
+
             <div className="space-y-3 mb-6">
               <button
                 type="button"
@@ -342,7 +390,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
                 </svg>
                 Apply for Leave
               </button>
-              
+
               <button
                 type="button"
                 onClick={handlePatientCancellation}
@@ -354,7 +402,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
                 Record Patient Cancellation
               </button>
             </div>
-            
+
             <div className="flex justify-end">
               <button
                 type="button"
@@ -367,7 +415,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           </div>
         </div>
       )}
-      
+
       {/* Patient Cancellation Modal */}
       {showCancellationModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -375,16 +423,17 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               Record Patient Cancellation for {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Selected Date'}
             </h3>
-            
+
             <p className="mb-4 text-sm text-gray-600">
               This will mark the appointment as cancelled by the patient. You will not be paid for this session.
             </p>
-            
+
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="cancellation-notes" className="block text-sm font-medium text-gray-700 mb-2">
                 Cancellation Reason *
               </label>
               <textarea
+                id="cancellation-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
@@ -393,13 +442,13 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
                 required
               ></textarea>
             </div>
-            
+
             <div className="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
               <p className="text-sm text-yellow-700">
                 <strong>Note:</strong> Patient cancellations will affect your earnings. You will not be paid for sessions cancelled by patients.
               </p>
             </div>
-            
+
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
@@ -429,7 +478,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           </div>
         </div>
       )}
-      
+
       {/* Legend */}
       <div className="mt-4 flex flex-wrap gap-3">
         <div className="flex items-center">
@@ -447,6 +496,14 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
         <div className="flex items-center">
           <div className="w-4 h-4 bg-purple-100 border border-purple-500 rounded mr-1"></div>
           <span className="text-xs text-gray-600">Approved Leave</span>
+        </div>
+        <div className="flex items-center">
+          <div className="w-4 h-4 bg-teal-100 border border-teal-500 rounded mr-1"></div>
+          <span className="text-xs text-gray-600">Available</span>
+        </div>
+        <div className="flex items-center">
+          <div className="w-4 h-4 bg-teal-50 border border-teal-300 rounded mr-1"></div>
+          <span className="text-xs text-gray-600">Free Day</span>
         </div>
         <div className="flex items-center">
           <div className="w-4 h-4 bg-blue-100 border border-blue-500 rounded mr-1"></div>

@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
-  Cell, ResponsiveContainer, CartesianGrid, PieChart, Pie
+  Cell, ResponsiveContainer, CartesianGrid, PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from './StatCard';
 import DashboardSection from './DashboardSection';
 import EnhancedRevenueCalculator from './EnhancedRevenueCalculator';
+import AttendanceImpactAnalysis from './AttendanceImpactAnalysis';
+import TherapistConsistencyReport from './TherapistConsistencyReport';
+import PatientBehaviorAnalysis from './PatientBehaviorAnalysis';
 import { useAuth } from '../../contexts/AuthContext';
 import financialDashboardService from '../../services/financialDashboardService';
 
@@ -42,7 +46,9 @@ const FinancialManagementDashboard = () => {
   });
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-
+  const [revenueChartType, setRevenueChartType] = useState('pie');
+  const [paymentChartType, setPaymentChartType] = useState('pie');
+  const [monthlyChartType, setMonthlyChartType] = useState('line');
 
 
 
@@ -74,10 +80,25 @@ const FinancialManagementDashboard = () => {
 
   // Prepare data for revenue distribution chart
   const getRevenueDistributionData = () => {
+    // Ensure all values are non-negative for the pie chart
+    const adminRevenue = Math.max(0, financialData.admin_revenue || 0);
+    const therapistRevenue = Math.max(0, financialData.therapist_revenue || 0);
+    const doctorRevenue = Math.max(0, financialData.doctor_revenue || 0);
+
+    // If all values are zero, return sample data to avoid empty chart
+    if (adminRevenue === 0 && therapistRevenue === 0 && doctorRevenue === 0) {
+      console.warn('All revenue values are zero or negative, using sample data');
+      return [
+        { name: 'Admin', value: 45 },
+        { name: 'Therapists', value: 45 },
+        { name: 'Doctors', value: 10 },
+      ];
+    }
+
     return [
-      { name: 'Admin', value: financialData.admin_revenue },
-      { name: 'Therapists', value: financialData.therapist_revenue },
-      { name: 'Doctors', value: financialData.doctor_revenue },
+      { name: 'Admin', value: adminRevenue },
+      { name: 'Therapists', value: therapistRevenue },
+      { name: 'Doctors', value: doctorRevenue },
     ];
   };
 
@@ -96,10 +117,10 @@ const FinancialManagementDashboard = () => {
       // Extract month names and revenue values from API data
       const months = financialData.monthly_revenue.map(item => item.month_name || item.month);
       const totalRevenue = financialData.monthly_revenue.map(item => item.total || 0);
-      const adminRevenue = financialData.monthly_revenue.map(item => item.admin || 0);
-      const therapistRevenue = financialData.monthly_revenue.map(item => item.therapist || 0);
-      const doctorRevenue = financialData.monthly_revenue.map(item => item.doctor || 0);
-      const platformFee = financialData.monthly_revenue.map(item => item.platform_fee || 0);
+      const adminRevenue = financialData.monthly_revenue.map(item => Math.max(0, item.admin || 0));
+      const therapistRevenue = financialData.monthly_revenue.map(item => Math.max(0, item.therapist || 0));
+      const doctorRevenue = financialData.monthly_revenue.map(item => Math.max(0, item.doctor || 0));
+      const platformFee = financialData.monthly_revenue.map(item => Math.max(0, item.platform_fee || 0));
 
       return {
         labels: months,
@@ -260,11 +281,11 @@ const FinancialManagementDashboard = () => {
           <DashboardSection title="Date Filter">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <div>
-                <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="financial-start-date" className="block text-sm font-medium text-gray-700 mb-1">
                   Start Date
                 </label>
                 <input
-                  id="start-date"
+                  id="financial-start-date"
                   type="date"
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                   value={startDate ? startDate.toISOString().split('T')[0] : ''}
@@ -272,11 +293,11 @@ const FinancialManagementDashboard = () => {
                 />
               </div>
               <div>
-                <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="financial-end-date" className="block text-sm font-medium text-gray-700 mb-1">
                   End Date
                 </label>
                 <input
-                  id="end-date"
+                  id="financial-end-date"
                   type="date"
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                   value={endDate ? endDate.toISOString().split('T')[0] : ''}
@@ -302,103 +323,395 @@ const FinancialManagementDashboard = () => {
           <DashboardSection title="Financial Visualizations">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white rounded-lg shadow p-5">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Revenue Distribution</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Revenue Distribution</h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setRevenueChartType('pie')}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        revenueChartType === 'pie'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Pie Chart
+                    </button>
+                    <button
+                      onClick={() => setRevenueChartType('bar')}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        revenueChartType === 'bar'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Bar Chart
+                    </button>
+                  </div>
+                </div>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={getRevenueDistributionData()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {getRevenueDistributionData().map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                      <Legend />
-                    </PieChart>
+                    {revenueChartType === 'pie' ? (
+                      <PieChart>
+                        <Pie
+                          data={getRevenueDistributionData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {getRevenueDistributionData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => `₹${value.toLocaleString()}`}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const total = getRevenueDistributionData().reduce((sum, item) => sum + item.value, 0);
+                              return (
+                                <div className="bg-white p-3 border border-gray-200 shadow-md rounded-md">
+                                  <p className="font-medium text-gray-900">{data.name}</p>
+                                  <p className="text-gray-700">₹{data.value.toLocaleString()}</p>
+                                  <p className="text-gray-600 text-sm">
+                                    {total > 0 ? (data.value / total * 100).toFixed(1) : 0}% of total
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                      </PieChart>
+                    ) : (
+                      <BarChart data={getRevenueDistributionData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value) => `₹${value.toLocaleString()}`}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const total = getRevenueDistributionData().reduce((sum, item) => sum + item.value, 0);
+                              return (
+                                <div className="bg-white p-3 border border-gray-200 shadow-md rounded-md">
+                                  <p className="font-medium text-gray-900">{data.name}</p>
+                                  <p className="text-gray-700">₹{data.value.toLocaleString()}</p>
+                                  <p className="text-gray-600 text-sm">
+                                    {total > 0 ? (data.value / total * 100).toFixed(1) : 0}% of total
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                        <Bar dataKey="value" name="Revenue (₹)" radius={[4, 4, 0, 0]}>
+                          {getRevenueDistributionData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow p-5">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Status</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Payment Status</h3>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setPaymentChartType('pie')}
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          paymentChartType === 'pie'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Pie Chart
+                      </button>
+                      <button
+                        onClick={() => setPaymentChartType('bar')}
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          paymentChartType === 'bar'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Bar Chart
+                      </button>
+                    </div>
+                    <Link
+                      to="/admin/payment-status"
+                      className="text-sm text-primary-600 hover:text-primary-800 font-medium flex items-center ml-4"
+                    >
+                      Manage
+                      <svg className="ml-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </Link>
+                  </div>
+                </div>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={getPaymentStatusData()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        <Cell fill={COLORS[1]} /> {/* Green for Paid */}
-                        <Cell fill={COLORS[2]} /> {/* Amber for Pending */}
-                      </Pie>
-                      <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                      <Legend />
-                    </PieChart>
+                    {paymentChartType === 'pie' ? (
+                      <PieChart>
+                        <Pie
+                          data={getPaymentStatusData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          <Cell fill={COLORS[1]} /> {/* Green for Paid */}
+                          <Cell fill={COLORS[2]} /> {/* Amber for Pending */}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => `₹${value.toLocaleString()}`}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const total = financialData.total_revenue || 0;
+                              return (
+                                <div className="bg-white p-3 border border-gray-200 shadow-md rounded-md">
+                                  <p className="font-medium text-gray-900">{data.name}</p>
+                                  <p className="text-gray-700">₹{data.value.toLocaleString()}</p>
+                                  <p className="text-gray-600 text-sm">
+                                    {total > 0 ? (data.value / total * 100).toFixed(1) : 0}% of total revenue
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                      </PieChart>
+                    ) : (
+                      <BarChart data={getPaymentStatusData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value) => `₹${value.toLocaleString()}`}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const total = financialData.total_revenue || 0;
+                              return (
+                                <div className="bg-white p-3 border border-gray-200 shadow-md rounded-md">
+                                  <p className="font-medium text-gray-900">{data.name}</p>
+                                  <p className="text-gray-700">₹{data.value.toLocaleString()}</p>
+                                  <p className="text-gray-600 text-sm">
+                                    {total > 0 ? (data.value / total * 100).toFixed(1) : 0}% of total revenue
+                                  </p>
+                                  <p className="text-gray-600 text-sm">
+                                    Collection rate: {financialData.collection_rate || 0}%
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                        <Bar dataKey="value" name="Amount (₹)" radius={[4, 4, 0, 0]}>
+                          <Cell fill={COLORS[1]} /> {/* Green for Paid */}
+                          <Cell fill={COLORS[2]} /> {/* Amber for Pending */}
+                        </Bar>
+                      </BarChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow p-5 col-span-1 md:col-span-2">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Monthly Revenue Trends</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Monthly Revenue Trends</h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setMonthlyChartType('line')}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        monthlyChartType === 'line'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Line Chart
+                    </button>
+                    <button
+                      onClick={() => setMonthlyChartType('bar')}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        monthlyChartType === 'bar'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Bar Chart
+                    </button>
+                    <button
+                      onClick={() => setMonthlyChartType('area')}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        monthlyChartType === 'area'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Area Chart
+                    </button>
+                  </div>
+                </div>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={getMonthlyRevenueData().labels.map((month, index) => ({
-                      month,
-                      total: getMonthlyRevenueData().datasets[0].data[index],
-                      admin: getMonthlyRevenueData().datasets[1].data[index],
-                      therapist: getMonthlyRevenueData().datasets[2].data[index],
-                      doctor: getMonthlyRevenueData().datasets[3].data[index],
-                      platform_fee: getMonthlyRevenueData().datasets[4].data[index],
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke={COLORS[0]}
-                        activeDot={{ r: 8 }}
-                        name="Total Revenue"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="admin"
-                        stroke={COLORS[1]}
-                        name="Admin Revenue"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="therapist"
-                        stroke={COLORS[2]}
-                        name="Therapist Revenue"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="doctor"
-                        stroke={COLORS[3]}
-                        name="Doctor Revenue"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="platform_fee"
-                        stroke={COLORS[4]}
-                        name="Platform Fee"
-                      />
-                    </LineChart>
+                    {monthlyChartType === 'line' && (
+                      <LineChart data={getMonthlyRevenueData().labels.map((month, index) => ({
+                        month,
+                        total: getMonthlyRevenueData().datasets[0].data[index],
+                        admin: getMonthlyRevenueData().datasets[1].data[index],
+                        therapist: getMonthlyRevenueData().datasets[2].data[index],
+                        doctor: getMonthlyRevenueData().datasets[3].data[index],
+                        platform_fee: getMonthlyRevenueData().datasets[4].data[index],
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value) => `₹${value.toLocaleString()}`}
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white p-3 border border-gray-200 shadow-md rounded-md">
+                                  <p className="font-medium text-gray-900">{label}</p>
+                                  {payload.map((entry, index) => (
+                                    <p key={`item-${index}`} style={{ color: entry.color }}>
+                                      {entry.name}: ₹{entry.value.toLocaleString()}
+                                    </p>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="total"
+                          stroke={COLORS[0]}
+                          activeDot={{ r: 8 }}
+                          name="Total Revenue"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="admin"
+                          stroke={COLORS[1]}
+                          name="Admin Revenue"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="therapist"
+                          stroke={COLORS[2]}
+                          name="Therapist Revenue"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="doctor"
+                          stroke={COLORS[3]}
+                          name="Doctor Revenue"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="platform_fee"
+                          stroke={COLORS[4]}
+                          name="Platform Fee"
+                        />
+                      </LineChart>
+                    )}
+
+                    {monthlyChartType === 'bar' && (
+                      <BarChart data={getMonthlyRevenueData().labels.map((month, index) => ({
+                        month,
+                        admin: getMonthlyRevenueData().datasets[1].data[index],
+                        therapist: getMonthlyRevenueData().datasets[2].data[index],
+                        doctor: getMonthlyRevenueData().datasets[3].data[index],
+                        platform_fee: getMonthlyRevenueData().datasets[4].data[index],
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value) => `₹${value.toLocaleString()}`}
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white p-3 border border-gray-200 shadow-md rounded-md">
+                                  <p className="font-medium text-gray-900">{label}</p>
+                                  {payload.map((entry, index) => (
+                                    <p key={`item-${index}`} style={{ color: entry.color }}>
+                                      {entry.name}: ₹{entry.value.toLocaleString()}
+                                    </p>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                        <Bar dataKey="admin" name="Admin Revenue" fill={COLORS[1]} stackId="a" />
+                        <Bar dataKey="therapist" name="Therapist Revenue" fill={COLORS[2]} stackId="a" />
+                        <Bar dataKey="doctor" name="Doctor Revenue" fill={COLORS[3]} stackId="a" />
+                        <Bar dataKey="platform_fee" name="Platform Fee" fill={COLORS[4]} stackId="a" />
+                      </BarChart>
+                    )}
+
+                    {monthlyChartType === 'area' && (
+                      <AreaChart data={getMonthlyRevenueData().labels.map((month, index) => ({
+                        month,
+                        total: getMonthlyRevenueData().datasets[0].data[index],
+                        admin: getMonthlyRevenueData().datasets[1].data[index],
+                        therapist: getMonthlyRevenueData().datasets[2].data[index],
+                        doctor: getMonthlyRevenueData().datasets[3].data[index],
+                        platform_fee: getMonthlyRevenueData().datasets[4].data[index],
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value) => `₹${value.toLocaleString()}`}
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white p-3 border border-gray-200 shadow-md rounded-md">
+                                  <p className="font-medium text-gray-900">{label}</p>
+                                  {payload.map((entry, index) => (
+                                    <p key={`item-${index}`} style={{ color: entry.color }}>
+                                      {entry.name}: ₹{entry.value.toLocaleString()}
+                                    </p>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                        <Area type="monotone" dataKey="total" name="Total Revenue" stroke={COLORS[0]} fill={COLORS[0]} fillOpacity={0.2} />
+                        <Area type="monotone" dataKey="admin" name="Admin Revenue" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={0.2} />
+                        <Area type="monotone" dataKey="therapist" name="Therapist Revenue" stroke={COLORS[2]} fill={COLORS[2]} fillOpacity={0.2} />
+                        <Area type="monotone" dataKey="doctor" name="Doctor Revenue" stroke={COLORS[3]} fill={COLORS[3]} fillOpacity={0.2} />
+                        <Area type="monotone" dataKey="platform_fee" name="Platform Fee" stroke={COLORS[4]} fill={COLORS[4]} fillOpacity={0.2} />
+                      </AreaChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -408,6 +721,21 @@ const FinancialManagementDashboard = () => {
           {/* Enhanced Revenue Distribution Calculator */}
           <DashboardSection title="Enhanced Revenue Distribution Calculator">
             <EnhancedRevenueCalculator />
+          </DashboardSection>
+
+          {/* Attendance Impact Analysis */}
+          <DashboardSection title="Attendance Impact Analysis">
+            <AttendanceImpactAnalysis />
+          </DashboardSection>
+
+          {/* Therapist Consistency Report */}
+          <DashboardSection title="Therapist Consistency Report">
+            <TherapistConsistencyReport />
+          </DashboardSection>
+
+          {/* Patient Behavior Analysis */}
+          <DashboardSection title="Patient Behavior Analysis">
+            <PatientBehaviorAnalysis />
           </DashboardSection>
 
           {/* Therapist Earnings Breakdown */}

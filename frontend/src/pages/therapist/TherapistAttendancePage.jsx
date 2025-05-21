@@ -22,9 +22,13 @@ const TherapistAttendancePage = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [attendanceSummary, setAttendanceSummary] = useState(null);
   const [attendanceDays, setAttendanceDays] = useState([]);
+  const [availabilityDays, setAvailabilityDays] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true); // eslint-disable-line no-unused-vars
   const [error, setError] = useState(null);
+  const [availabilityError, setAvailabilityError] = useState(null); // eslint-disable-line no-unused-vars
   const [isAttendanceMockData, setIsAttendanceMockData] = useState(false);
+  const [isAvailabilityMockData, setIsAvailabilityMockData] = useState(false); // eslint-disable-line no-unused-vars
 
   // State for attendance history
   const [attendanceHistory, setAttendanceHistory] = useState([]);
@@ -138,14 +142,52 @@ const TherapistAttendancePage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentYear, currentMonth]);
 
+  // Fetch availability data
+  const fetchAvailabilityData = useCallback(async () => {
+    setAvailabilityLoading(true);
+    setAvailabilityError(null);
+
+    try {
+      // Use therapist profile ID if available, otherwise fall back to user ID
+      const therapistId = therapistProfile?.id || user?.id;
+      console.log(`Fetching availability data for therapist ID: ${therapistId}, year: ${currentYear}, month: ${currentMonth}`);
+      const response = await attendanceService.getMonthlyAvailability(currentYear, currentMonth, therapistId);
+
+      // Check if we got mock data
+      if (response.isMockData) {
+        console.log('Using mock availability data for display');
+        setIsAvailabilityMockData(true);
+      } else {
+        setIsAvailabilityMockData(false);
+      }
+
+      // Update the availability days
+      setAvailabilityDays(response.data?.days || []);
+
+      // Return the response data for any additional processing
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching availability data:', err);
+      setAvailabilityError('Failed to load availability data. Please try again.');
+      throw err;
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  // We use 'user' and 'therapistProfile' inside this function, but we intentionally omit them from the dependency array
+  // because they're stable and including them would cause unnecessary re-renders
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentYear, currentMonth]);
+
   // Fetch data on component mount and when month/year changes
   useEffect(() => {
     fetchAttendanceData();
+    fetchAvailabilityData();
 
     // Set up an interval to refresh data every 30 seconds
     const refreshInterval = setInterval(() => {
-      console.log('Auto-refreshing attendance data...');
+      console.log('Auto-refreshing attendance and availability data...');
       fetchAttendanceData();
+      fetchAvailabilityData();
       if (activeTab === 'history') {
         fetchAttendanceHistory();
       }
@@ -153,7 +195,7 @@ const TherapistAttendancePage = () => {
 
     // Clean up the interval when the component unmounts
     return () => clearInterval(refreshInterval);
-  }, [fetchAttendanceData, fetchAttendanceHistory, activeTab]);
+  }, [fetchAttendanceData, fetchAvailabilityData, fetchAttendanceHistory, activeTab]);
 
   // Fetch attendance history when tab changes to history or when component mounts
   useEffect(() => {
@@ -245,8 +287,9 @@ const TherapistAttendancePage = () => {
 
   // Force refresh data when the component mounts or when the user navigates to this page
   useEffect(() => {
-    // Immediately fetch attendance data and history
+    // Immediately fetch attendance data, availability data, and history
     fetchAttendanceData();
+    fetchAvailabilityData();
     fetchAttendanceHistory();
 
     // Try to check change request status, but don't worry if it fails
@@ -261,6 +304,7 @@ const TherapistAttendancePage = () => {
       // Refresh data based on active tab
       if (activeTab === 'calendar') {
         fetchAttendanceData();
+        fetchAvailabilityData();
       } else if (activeTab === 'history') {
         fetchAttendanceHistory();
       }
@@ -305,9 +349,46 @@ const TherapistAttendancePage = () => {
         date: date.toISOString().split('T')[0]
       });
       setShowCancellationForm(true);
+    } else if (action === 'availability') {
+      // Handle availability submission
+      handleSubmitAvailability(date, notes);
     } else {
       // Regular attendance update
       fetchAttendanceData();
+    }
+  };
+
+  // Handle availability submission
+  const handleSubmitAvailability = async (date, notes = '') => {
+    try {
+      setSubmitting(true);
+
+      // Format the date for the API call
+      const formattedDate = format(date, 'yyyy-MM-dd');
+
+      console.log(`Submitting availability for date: ${formattedDate}`);
+
+      // Call the API to submit availability
+      const response = await attendanceService.submitAvailability(formattedDate, notes);
+
+      console.log('Availability submission successful:', response.data);
+
+      // Show success message
+      toast.success('Availability submitted successfully');
+
+      // Refresh availability data
+      fetchAvailabilityData();
+    } catch (error) {
+      console.error('Error submitting availability:', error);
+
+      // Show error message
+      if (error.response && error.response.data && error.response.data.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error('Failed to submit availability. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -357,6 +438,52 @@ const TherapistAttendancePage = () => {
     }
 
     return null;
+  };
+
+  // Function to check if availability already exists for a date
+  // eslint-disable-next-line no-unused-vars
+  const checkExistingAvailability = (date) => {
+    // Format the date to match the format in availabilityDays
+    const formattedDate = format(date, 'yyyy-MM-dd');
+
+    console.log(`Checking for existing availability on ${formattedDate}`);
+    console.log('Available availability days:', availabilityDays);
+
+    // Find if there's an existing availability record for this date
+    const existingAvailability = availabilityDays.find(day =>
+      day.date === formattedDate && day.status === 'available'
+    );
+
+    // If we found an availability record, make sure it has all the necessary properties
+    if (existingAvailability) {
+      console.log('Found existing availability record:', existingAvailability);
+      return existingAvailability;
+    } else {
+      console.log(`No existing availability found for date ${formattedDate}`);
+    }
+
+    return null;
+  };
+
+  // Function to check if a date has appointments
+  // eslint-disable-next-line no-unused-vars
+  const checkHasAppointments = (date) => {
+    // Format the date to match the format in attendanceDays and availabilityDays
+    const formattedDate = format(date, 'yyyy-MM-dd');
+
+    // Check in attendance days
+    const attendanceDay = attendanceDays.find(day => day.date === formattedDate);
+    if (attendanceDay && attendanceDay.has_appointments) {
+      return true;
+    }
+
+    // Check in availability days
+    const availabilityDay = availabilityDays.find(day => day.date === formattedDate);
+    if (availabilityDay && availabilityDay.has_appointments) {
+      return true;
+    }
+
+    return false;
   };
 
   // Function to handle attendance change request

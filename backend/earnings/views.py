@@ -616,8 +616,23 @@ def admin_earnings_summary(request):
         # Verify total matches sum of parts (handle legacy records)
         calculated_total = admin_revenue + therapist_revenue + doctor_revenue
         if calculated_total != total_revenue:
-            # For legacy records, adjust therapist amount (most common case)
-            therapist_revenue = total_revenue - admin_revenue - doctor_revenue
+            # Calculate the difference
+            difference = total_revenue - calculated_total
+
+            # Distribute the difference proportionally to maintain relative ratios
+            if calculated_total > Decimal('0.00'):
+                admin_ratio = admin_revenue / calculated_total
+                therapist_ratio = therapist_revenue / calculated_total
+                doctor_ratio = doctor_revenue / calculated_total
+
+                admin_revenue += difference * admin_ratio
+                therapist_revenue += difference * therapist_ratio
+                doctor_revenue += difference * doctor_ratio
+            else:
+                # If calculated_total is zero, distribute evenly
+                admin_revenue = total_revenue / Decimal('3.00')
+                therapist_revenue = total_revenue / Decimal('3.00')
+                doctor_revenue = total_revenue / Decimal('3.00')
 
         paid_amount = earnings_records.filter(
             payment_status=EarningRecord.PaymentStatus.PAID
@@ -681,8 +696,23 @@ def admin_earnings_summary(request):
             # Verify total matches sum of parts (handle legacy records)
             calculated_total = month_admin + month_therapist + month_doctor
             if calculated_total != month_total:
-                # For legacy records, adjust therapist amount (most common case)
-                month_therapist = month_total - month_admin - month_doctor
+                # Calculate the difference
+                difference = month_total - calculated_total
+
+                # Distribute the difference proportionally to maintain relative ratios
+                if calculated_total > Decimal('0.00'):
+                    admin_ratio = month_admin / calculated_total
+                    therapist_ratio = month_therapist / calculated_total
+                    doctor_ratio = month_doctor / calculated_total
+
+                    month_admin += difference * admin_ratio
+                    month_therapist += difference * therapist_ratio
+                    month_doctor += difference * doctor_ratio
+                else:
+                    # If calculated_total is zero, distribute evenly
+                    month_admin = month_total / Decimal('3.00')
+                    month_therapist = month_total / Decimal('3.00')
+                    month_doctor = month_total / Decimal('3.00')
 
             monthly_revenue.append({
                 'month': month_date.month,
@@ -1033,8 +1063,23 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
         # Verify total matches sum of parts (handle legacy records)
         calculated_total = admin_revenue + therapist_revenue + doctor_revenue
         if calculated_total != total_revenue:
-            # For legacy records, adjust therapist amount (most common case)
-            therapist_revenue = total_revenue - admin_revenue - doctor_revenue
+            # Calculate the difference
+            difference = total_revenue - calculated_total
+
+            # Distribute the difference proportionally to maintain relative ratios
+            if calculated_total > Decimal('0.00'):
+                admin_ratio = admin_revenue / calculated_total
+                therapist_ratio = therapist_revenue / calculated_total
+                doctor_ratio = doctor_revenue / calculated_total
+
+                admin_revenue += difference * admin_ratio
+                therapist_revenue += difference * therapist_ratio
+                doctor_revenue += difference * doctor_ratio
+            else:
+                # If calculated_total is zero, distribute evenly
+                admin_revenue = total_revenue / Decimal('3.00')
+                therapist_revenue = total_revenue / Decimal('3.00')
+                doctor_revenue = total_revenue / Decimal('3.00')
 
         paid_amount = earnings_records.filter(
             payment_status=EarningRecord.PaymentStatus.PAID
@@ -1098,8 +1143,23 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
             # Verify total matches sum of parts (handle legacy records)
             calculated_total = month_admin + month_therapist + month_doctor
             if calculated_total != month_total:
-                # For legacy records, adjust therapist amount (most common case)
-                month_therapist = month_total - month_admin - month_doctor
+                # Calculate the difference
+                difference = month_total - calculated_total
+
+                # Distribute the difference proportionally to maintain relative ratios
+                if calculated_total > Decimal('0.00'):
+                    admin_ratio = month_admin / calculated_total
+                    therapist_ratio = month_therapist / calculated_total
+                    doctor_ratio = month_doctor / calculated_total
+
+                    month_admin += difference * admin_ratio
+                    month_therapist += difference * therapist_ratio
+                    month_doctor += difference * doctor_ratio
+                else:
+                    # If calculated_total is zero, distribute evenly
+                    month_admin = month_total / Decimal('3.00')
+                    month_therapist = month_total / Decimal('3.00')
+                    month_doctor = month_total / Decimal('3.00')
 
             monthly_revenue.append({
                 'month': month_date.month,

@@ -1,9 +1,9 @@
 import React from 'react';
 // Update imports to use Heroicons v2 syntax
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  ClockIcon, 
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
   CalendarIcon,
   ExclamationCircleIcon as ExclamationIcon,
   ExclamationTriangleIcon,
@@ -12,14 +12,15 @@ import {
 
 const AttendanceSummary = ({ summary, loading = false, isMockData = false }) => {
   // Default values when data is loading or not available
-  const { 
-    present = 0, 
-    absent = 0, 
-    half_day = 0, 
-    approved_leaves = 0, 
+  const {
+    present = 0,
+    absent = 0,
+    half_day = 0,
+    approved_leaves = 0,
     sick_leaves = 0,
     emergency_leaves = 0,
-    holidays = 0 
+    available = 0,
+    holidays = 0
   } = summary || {};
 
   const summaryItems = [
@@ -68,6 +69,14 @@ const AttendanceSummary = ({ summary, loading = false, isMockData = false }) => 
       tooltip: 'Unpaid'
     },
     {
+      title: 'Available',
+      count: available,
+      icon: <CheckCircleIcon className="h-8 w-8 text-teal-500" />,
+      bgColor: 'bg-teal-100',
+      textColor: 'text-teal-800',
+      tooltip: 'Unpaid until assigned & completed'
+    },
+    {
       title: 'Holidays',
       count: holidays,
       icon: <CalendarIcon className="h-8 w-8 text-blue-500" />,
@@ -86,7 +95,7 @@ const AttendanceSummary = ({ summary, loading = false, isMockData = false }) => 
           </span>
         )}
       </div>
-      
+
       {isMockData && (
         <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-md">
           <p className="text-sm text-blue-700 flex items-center">
@@ -100,7 +109,7 @@ const AttendanceSummary = ({ summary, loading = false, isMockData = false }) => 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {loading ? (
           // Skeleton loader using Tailwind's animate-pulse
-          Array(7).fill(0).map((_, index) => (
+          Array(8).fill(0).map((_, index) => (
             <div key={index} className="bg-gray-100 p-4 rounded-lg shadow-sm animate-pulse">
               <div className="flex items-center">
                 <div className="rounded-full bg-gray-200 h-8 w-8 mr-4"></div>
@@ -113,8 +122,8 @@ const AttendanceSummary = ({ summary, loading = false, isMockData = false }) => 
           ))
         ) : (
           summaryItems.map((item, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className={`${item.bgColor} p-4 rounded-lg shadow-sm flex items-center`}
             >
               <div className="mr-4">

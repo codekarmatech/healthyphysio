@@ -65,6 +65,7 @@ import LocationMonitoringPage from './pages/admin/LocationMonitoringPage';
 import TherapistDashboardView from './pages/admin/TherapistDashboardView';
 import TherapistAnalyticsDashboard from './pages/admin/TherapistAnalyticsDashboard';
 import AuditDashboardPage from './pages/admin/AuditDashboardPage';
+import PaymentStatusManagement from './pages/admin/PaymentStatusManagement';
 
 // Dashboard Components
 import AreaManagementDashboard from './components/dashboard/AreaManagementDashboard';
@@ -161,6 +162,7 @@ function App() {
             <Route path="/admin/financial-dashboard" element={<FinancialManagementDashboard />} />
             <Route path="/admin/session-fees" element={<SessionFeeManagement />} />
             <Route path="/admin/revenue-distribution" element={<RevenueDistributionConfig />} />
+            <Route path="/admin/payment-status" element={<PaymentStatusManagement />} />
             {/* Audit Dashboard */}
             <Route path="/admin/audit-dashboard" element={<AuditDashboardPage />} />
           </Route>
