@@ -15,7 +15,7 @@ from .views import (
     UserViewSet, PatientViewSet, TherapistViewSet, DoctorViewSet,
     PatientDashboardSummaryViewSet, DoctorDashboardSummaryViewSet,
     TherapistDashboardSummaryViewSet, AdminDashboardSummaryViewSet,
-    ProfileChangeRequestViewSet
+    TherapistAnalyticsViewSet, ProfileChangeRequestViewSet
 )
 # Import update_therapist_approvals from views.py directly
 # from .views.therapist_approvals import update_therapist_approvals
@@ -64,4 +64,7 @@ urlpatterns = [
     path('patient/dashboard/summary/', PatientDashboardSummaryViewSet.as_view({'get': 'list'}), name='patient-dashboard-summary'),
     path('doctor/dashboard/summary/', DoctorDashboardSummaryViewSet.as_view({'get': 'list'}), name='doctor-dashboard-summary'),
     path('admin/dashboard/summary/', AdminDashboardSummaryViewSet.as_view({'get': 'list'}), name='admin-dashboard-summary'),
+
+    # Therapist analytics endpoint
+    path('therapist-analytics/', TherapistAnalyticsViewSet.as_view({'get': 'list'}), name='therapist-analytics'),
 ]

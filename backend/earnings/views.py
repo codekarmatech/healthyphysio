@@ -461,25 +461,266 @@ def therapist_monthly_earnings(request, therapist_id):
 def doctor_monthly_earnings(request, doctor_id):
     """
     Get monthly earnings for a doctor
-    This is a placeholder for future implementation
     """
-    return Response(
-        {"detail": "Doctor earnings API not yet implemented."},
-        status=status.HTTP_501_NOT_IMPLEMENTED
-    )
+    try:
+        # Get query parameters
+        year = int(request.query_params.get('year', timezone.now().year))
+        month = int(request.query_params.get('month', timezone.now().month))
+
+        # Get doctor
+        try:
+            doctor = Doctor.objects.get(id=doctor_id)
+        except Doctor.DoesNotExist:
+            return Response(
+                {"detail": "Doctor not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get start and end dates for the month
+        start_date = datetime(year, month, 1).date()
+        last_day = calendar.monthrange(year, month)[1]
+        end_date = datetime(year, month, last_day).date()
+
+        # Get earnings records for the specified month
+        earnings_records = EarningRecord.objects.filter(
+            date__gte=start_date,
+            date__lte=end_date
+        ).filter(doctor_amount__gt=0)  # Only include records with doctor earnings
+
+        # If no records exist, return mock data
+        if not earnings_records.exists():
+            # Generate mock data
+            mock_data = MonthlyEarningsResponseSerializer.generate_mock_data(year, month)
+            serializer = MonthlyEarningsResponseSerializer(mock_data)
+            return Response(serializer.data)
+
+        # Calculate summary statistics
+        completed_sessions = earnings_records.filter(status=Appointment.Status.COMPLETED).count()
+        cancelled_sessions = earnings_records.filter(status=Appointment.Status.CANCELLED).count()
+        missed_sessions = earnings_records.filter(status=Appointment.Status.MISSED).count()
+        attended_sessions = completed_sessions
+
+        total_earned = earnings_records.aggregate(
+            total=Sum('doctor_amount', default=Decimal('0.00'))
+        )['total']
+
+        total_potential = total_earned * Decimal('1.2')  # Estimate potential earnings
+
+        # Calculate attendance rate
+        total_sessions = attended_sessions + missed_sessions
+        attendance_rate = round((attended_sessions / total_sessions * 100), 2) if total_sessions > 0 else 0
+
+        # Calculate average per session
+        average_per_session = round((total_earned / attended_sessions), 2) if attended_sessions > 0 else Decimal('0.00')
+
+        # Get daily earnings
+        daily_earnings_data = earnings_records.values('date').annotate(
+            amount=Sum('doctor_amount'),
+            sessions=Count('id')
+        ).order_by('date')
+
+        # Prepare response data
+        serializer = EarningRecordSerializer(earnings_records, many=True)
+
+        response_data = {
+            'earnings': serializer.data,
+            'summary': {
+                'totalEarned': total_earned,
+                'totalPotential': total_potential,
+                'completedSessions': completed_sessions,
+                'cancelledSessions': cancelled_sessions,
+                'missedSessions': missed_sessions,
+                'attendedSessions': attended_sessions,
+                'attendanceRate': attendance_rate,
+                'averagePerSession': average_per_session
+            },
+            'dailyEarnings': daily_earnings_data,
+            'year': year,
+            'month': month
+        }
+
+        return Response(response_data)
+
+    except Exception as e:
+        import traceback
+        print(f"ERROR in doctor_monthly_earnings: {str(e)}")
+        print(traceback.format_exc())
+        return Response(
+            {"detail": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAuthenticated, IsAdminUser])
 def admin_earnings_summary(request):
     """
     Get earnings summary for admin dashboard
-    This is a placeholder for future implementation
     """
-    return Response(
-        {"detail": "Admin earnings summary API not yet implemented."},
-        status=status.HTTP_501_NOT_IMPLEMENTED
-    )
+    try:
+        # Get query parameters
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        # Default to current month if not provided
+        today = timezone.now().date()
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                start_date = datetime(today.year, today.month, 1).date()
+        else:
+            start_date = datetime(today.year, today.month, 1).date()
+
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                last_day = calendar.monthrange(today.year, today.month)[1]
+                end_date = datetime(today.year, today.month, last_day).date()
+        else:
+            last_day = calendar.monthrange(today.year, today.month)[1]
+            end_date = datetime(today.year, today.month, last_day).date()
+
+        # Get earnings records for the period
+        earnings_records = EarningRecord.objects.filter(
+            date__gte=start_date,
+            date__lte=end_date
+        )
+
+        # Check if we have any real data
+        if not earnings_records.exists():
+            # No real data exists, return mock data
+            mock_data = FinancialSummarySerializer.generate_mock_data(start_date, end_date)
+            serializer = FinancialSummarySerializer(mock_data)
+            return Response(serializer.data)
+
+        # Calculate summary statistics
+        total_revenue = earnings_records.aggregate(
+            total=Sum('amount', default=Decimal('0.00'))
+        )['total']
+
+        # Get revenue by role from explicit fields
+        admin_revenue = earnings_records.aggregate(
+            total=Sum('admin_amount', default=Decimal('0.00'))
+        )['total']
+
+        therapist_revenue = earnings_records.aggregate(
+            total=Sum('therapist_amount', default=Decimal('0.00'))
+        )['total']
+
+        doctor_revenue = earnings_records.aggregate(
+            total=Sum('doctor_amount', default=Decimal('0.00'))
+        )['total']
+
+        # Verify total matches sum of parts (handle legacy records)
+        calculated_total = admin_revenue + therapist_revenue + doctor_revenue
+        if calculated_total != total_revenue:
+            # For legacy records, adjust therapist amount (most common case)
+            therapist_revenue = total_revenue - admin_revenue - doctor_revenue
+
+        paid_amount = earnings_records.filter(
+            payment_status=EarningRecord.PaymentStatus.PAID
+        ).aggregate(
+            total=Sum('amount', default=Decimal('0.00'))
+        )['total']
+
+        pending_amount = total_revenue - paid_amount
+
+        total_sessions = earnings_records.count()
+
+        # Calculate collection rate
+        collection_rate = (paid_amount / total_revenue * 100) if total_revenue > 0 else Decimal('0.00')
+
+        # Calculate average fee
+        average_fee = (total_revenue / total_sessions) if total_sessions > 0 else Decimal('0.00')
+
+        # Get therapist breakdown
+        therapist_breakdown = earnings_records.values(
+            'therapist__id', 'therapist__user__first_name', 'therapist__user__last_name'
+        ).annotate(
+            total=Sum('amount'),
+            sessions=Count('id')
+        ).order_by('-total')
+
+        # Get monthly revenue data for the past 6 months
+        monthly_revenue = []
+        for i in range(5, -1, -1):  # Last 6 months
+            month_date = today.replace(day=1) - timedelta(days=1)  # Last day of previous month
+            month_date = month_date.replace(day=1)  # First day of previous month
+            month_date = month_date - timedelta(days=30*i)  # Go back i months
+
+            month_start = datetime(month_date.year, month_date.month, 1).date()
+            month_end = datetime(
+                month_date.year,
+                month_date.month,
+                calendar.monthrange(month_date.year, month_date.month)[1]
+            ).date()
+
+            month_records = EarningRecord.objects.filter(
+                date__gte=month_start,
+                date__lte=month_end
+            )
+
+            month_total = month_records.aggregate(
+                total=Sum('amount', default=Decimal('0.00'))
+            )['total']
+
+            month_admin = month_records.aggregate(
+                total=Sum('admin_amount', default=Decimal('0.00'))
+            )['total']
+
+            month_therapist = month_records.aggregate(
+                total=Sum('therapist_amount', default=Decimal('0.00'))
+            )['total']
+
+            month_doctor = month_records.aggregate(
+                total=Sum('doctor_amount', default=Decimal('0.00'))
+            )['total']
+
+            # Verify total matches sum of parts (handle legacy records)
+            calculated_total = month_admin + month_therapist + month_doctor
+            if calculated_total != month_total:
+                # For legacy records, adjust therapist amount (most common case)
+                month_therapist = month_total - month_admin - month_doctor
+
+            monthly_revenue.append({
+                'month': month_date.month,
+                'year': month_date.year,
+                'month_name': month_date.strftime('%b'),
+                'total': month_total,
+                'admin': month_admin,
+                'therapist': month_therapist,
+                'doctor': month_doctor
+            })
+
+        # Prepare response data
+        response_data = {
+            'total_revenue': total_revenue,
+            'admin_revenue': admin_revenue,
+            'therapist_revenue': therapist_revenue,
+            'doctor_revenue': doctor_revenue,
+            'pending_amount': pending_amount,
+            'paid_amount': paid_amount,
+            'collection_rate': round(collection_rate, 2),
+            'total_sessions': total_sessions,
+            'average_fee': round(average_fee, 2),
+            'period_start': start_date,
+            'period_end': end_date,
+            'therapist_breakdown': therapist_breakdown,
+            'monthly_breakdown': monthly_revenue
+        }
+
+        return Response(response_data)
+
+    except Exception as e:
+        import traceback
+        print(f"ERROR in admin_earnings_summary: {str(e)}")
+        print(traceback.format_exc())
+        return Response(
+            {"detail": f"An error occurred: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 class SessionFeeConfigViewSet(viewsets.ModelViewSet):
@@ -498,6 +739,28 @@ class SessionFeeConfigViewSet(viewsets.ModelViewSet):
         """
         permission_classes = [IsAdminUser]
         return [permission() for permission in permission_classes]
+
+    def list(self, request, *args, **kwargs):
+        """
+        List session fee configurations with mock data fallback
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Check if we have any real data
+        if not queryset.exists():
+            # No real data exists, return mock data
+            mock_data = SessionFeeConfigSerializer.generate_mock_data()
+            serializer = self.get_serializer(mock_data, many=True)
+            return Response(serializer.data)
+
+        # Real data exists, proceed with normal processing
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         """
@@ -574,6 +837,28 @@ class FeeChangeLogViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        """
+        List fee change logs with mock data fallback
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Check if we have any real data
+        if not queryset.exists():
+            # No real data exists, return mock data
+            mock_data = FeeChangeLogSerializer.generate_mock_data()
+            serializer = self.get_serializer(mock_data, many=True)
+            return Response(serializer.data)
+
+        # Real data exists, proceed with normal processing
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
 
 class RevenueDistributionConfigViewSet(viewsets.ModelViewSet):
     """
@@ -592,6 +877,28 @@ class RevenueDistributionConfigViewSet(viewsets.ModelViewSet):
         permission_classes = [IsAdminUser]
         return [permission() for permission in permission_classes]
 
+    def list(self, request, *args, **kwargs):
+        """
+        List revenue distribution configurations with mock data fallback
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Check if we have any real data
+        if not queryset.exists():
+            # No real data exists, return mock data
+            mock_data = RevenueDistributionConfigSerializer.generate_mock_data()
+            serializer = self.get_serializer(mock_data, many=True)
+            return Response(serializer.data)
+
+        # Real data exists, proceed with normal processing
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         """
         Set created_by to current user
@@ -606,15 +913,53 @@ class RevenueDistributionConfigViewSet(viewsets.ModelViewSet):
         serializer = RevenueCalculatorSerializer(data=request.data)
         if serializer.is_valid():
             total_fee = serializer.validated_data['total_fee']
-            distribution_config = serializer.validated_data['distribution_config']
 
-            # Calculate distribution
-            distribution = distribution_config.calculate_distribution(total_fee)
+            if serializer.validated_data.get('use_manual_distribution'):
+                # Create a temporary config object for calculation
+                temp_config = RevenueDistributionConfig(
+                    name="Temporary",
+                    distribution_type=serializer.validated_data['distribution_type'],
+                    platform_fee_percentage=serializer.validated_data['platform_fee_percentage'],
+                    admin_value=serializer.validated_data['admin_value'],
+                    therapist_value=serializer.validated_data['therapist_value'],
+                    doctor_value=serializer.validated_data['doctor_value'],
+                    min_admin_amount=Decimal('400.00')  # Default threshold
+                )
 
-            return Response({
-                'distribution': distribution,
-                'config': RevenueDistributionConfigSerializer(distribution_config).data
-            })
+                # Calculate distribution
+                distribution = temp_config.calculate_distribution(total_fee)
+
+                # Save configuration if requested
+                config_data = None
+                if serializer.validated_data.get('save_configuration'):
+                    new_config = RevenueDistributionConfig.objects.create(
+                        name=serializer.validated_data['configuration_name'],
+                        distribution_type=serializer.validated_data['distribution_type'],
+                        platform_fee_percentage=serializer.validated_data['platform_fee_percentage'],
+                        admin_value=serializer.validated_data['admin_value'],
+                        therapist_value=serializer.validated_data['therapist_value'],
+                        doctor_value=serializer.validated_data['doctor_value'],
+                        created_by=request.user
+                    )
+                    config_data = RevenueDistributionConfigSerializer(new_config).data
+
+                return Response({
+                    'distribution': distribution,
+                    'config': config_data,
+                    'is_manual': True
+                })
+            else:
+                # Use existing configuration
+                distribution_config = serializer.validated_data['distribution_config']
+
+                # Calculate distribution
+                distribution = distribution_config.calculate_distribution(total_fee)
+
+                return Response({
+                    'distribution': distribution,
+                    'config': RevenueDistributionConfigSerializer(distribution_config).data,
+                    'is_manual': False
+                })
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -659,6 +1004,14 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
             date__lte=end_date
         )
 
+        # Check if we have any real data
+        if not earnings_records.exists():
+            # No real data exists, return mock data
+            mock_data = FinancialSummarySerializer.generate_mock_data(start_date, end_date)
+            serializer = FinancialSummarySerializer(mock_data)
+            return Response(serializer.data)
+
+        # Real data exists, proceed with normal processing
         # Calculate summary statistics
         total_revenue = earnings_records.aggregate(
             total=Sum('amount', default=Decimal('0.00'))
@@ -707,6 +1060,57 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
             sessions=Count('id')
         ).order_by('-total')
 
+        # Get monthly revenue data for the past 6 months
+        monthly_revenue = []
+        for i in range(5, -1, -1):  # Last 6 months
+            month_date = today.replace(day=1) - timedelta(days=1)  # Last day of previous month
+            month_date = month_date.replace(day=1)  # First day of previous month
+            month_date = month_date - timedelta(days=30*i)  # Go back i months
+
+            month_start = datetime(month_date.year, month_date.month, 1).date()
+            month_end = datetime(
+                month_date.year,
+                month_date.month,
+                calendar.monthrange(month_date.year, month_date.month)[1]
+            ).date()
+
+            month_records = EarningRecord.objects.filter(
+                date__gte=month_start,
+                date__lte=month_end
+            )
+
+            month_total = month_records.aggregate(
+                total=Sum('amount', default=Decimal('0.00'))
+            )['total']
+
+            month_admin = month_records.aggregate(
+                total=Sum('admin_amount', default=Decimal('0.00'))
+            )['total']
+
+            month_therapist = month_records.aggregate(
+                total=Sum('therapist_amount', default=Decimal('0.00'))
+            )['total']
+
+            month_doctor = month_records.aggregate(
+                total=Sum('doctor_amount', default=Decimal('0.00'))
+            )['total']
+
+            # Verify total matches sum of parts (handle legacy records)
+            calculated_total = month_admin + month_therapist + month_doctor
+            if calculated_total != month_total:
+                # For legacy records, adjust therapist amount (most common case)
+                month_therapist = month_total - month_admin - month_doctor
+
+            monthly_revenue.append({
+                'month': month_date.month,
+                'year': month_date.year,
+                'month_name': month_date.strftime('%b'),
+                'total': month_total,
+                'admin': month_admin,
+                'therapist': month_therapist,
+                'doctor': month_doctor
+            })
+
         # Prepare response data
         response_data = {
             'total_revenue': total_revenue,
@@ -720,7 +1124,8 @@ class FinancialDashboardViewSet(viewsets.ViewSet):
             'average_fee': round(average_fee, 2),
             'period_start': start_date,
             'period_end': end_date,
-            'therapist_breakdown': therapist_breakdown
+            'therapist_breakdown': therapist_breakdown,
+            'monthly_breakdown': monthly_revenue
         }
 
         return Response(response_data)

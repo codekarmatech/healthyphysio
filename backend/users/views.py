@@ -27,6 +27,7 @@ from django.utils import timezone
 from datetime import timedelta
 import json
 from scheduling.models import Appointment
+from .analytics import get_therapist_analytics
 
 # Import for CustomTokenObtainPairSerializer
 from .serializers import CustomTokenObtainPairSerializer
@@ -1458,6 +1459,67 @@ class DoctorDashboardSummaryViewSet(viewsets.ViewSet):
         }
 
         return Response(response_data)
+
+class TherapistAnalyticsViewSet(viewsets.ViewSet):
+    """
+    API endpoint for therapist analytics and performance comparison
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def list(self, request):
+        """
+        Get analytics data for comparing therapist performance
+
+        Query parameters:
+        - start_date: Start date for filtering data (YYYY-MM-DD)
+        - end_date: End date for filtering data (YYYY-MM-DD)
+        - area_id: Filter by area ID
+        - specialization: Filter by specialization
+        """
+        # Get query parameters
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        area_id = request.query_params.get('area_id')
+        specialization = request.query_params.get('specialization')
+
+        # Convert date strings to date objects if provided
+        if start_date:
+            try:
+                start_date = timezone.datetime.strptime(start_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid start_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        if end_date:
+            try:
+                end_date = timezone.datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid end_date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Get analytics data
+        try:
+            analytics_data = get_therapist_analytics(
+                start_date=start_date,
+                end_date=end_date,
+                area_id=area_id,
+                specialization=specialization
+            )
+
+            return Response({
+                "count": len(analytics_data),
+                "results": analytics_data
+            })
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class AdminDashboardSummaryViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]

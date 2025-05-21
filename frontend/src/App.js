@@ -62,6 +62,9 @@ import SubmittedReportsPage from './pages/admin/SubmittedReportsPage';
 import AdminReportViewPage from './pages/admin/AdminReportViewPage';
 import TherapistApprovalsPage from './pages/admin/TherapistApprovalsPage';
 import LocationMonitoringPage from './pages/admin/LocationMonitoringPage';
+import TherapistDashboardView from './pages/admin/TherapistDashboardView';
+import TherapistAnalyticsDashboard from './pages/admin/TherapistAnalyticsDashboard';
+import AuditDashboardPage from './pages/admin/AuditDashboardPage';
 
 // Dashboard Components
 import AreaManagementDashboard from './components/dashboard/AreaManagementDashboard';
@@ -147,12 +150,19 @@ function App() {
             <Route path="/admin/therapist-approvals" element={<TherapistApprovalsPage />} />
             {/* Location Monitoring */}
             <Route path="/admin/location-monitoring" element={<LocationMonitoringPage />} />
+            {/* Therapist Dashboard View */}
+            <Route path="/admin/therapist-dashboard" element={<TherapistDashboardView />} />
+            <Route path="/admin/therapist-dashboard/:therapistId" element={<TherapistDashboardView />} />
+            {/* Therapist Analytics */}
+            <Route path="/admin/therapist-analytics" element={<TherapistAnalyticsDashboard />} />
             {/* Area Management */}
             <Route path="/admin/area-management" element={<AreaManagementDashboard />} />
             {/* Financial Management */}
             <Route path="/admin/financial-dashboard" element={<FinancialManagementDashboard />} />
             <Route path="/admin/session-fees" element={<SessionFeeManagement />} />
             <Route path="/admin/revenue-distribution" element={<RevenueDistributionConfig />} />
+            {/* Audit Dashboard */}
+            <Route path="/admin/audit-dashboard" element={<AuditDashboardPage />} />
           </Route>
 
           {/* Basic Therapist Routes - Accessible to all therapists */}

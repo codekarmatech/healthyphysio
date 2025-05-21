@@ -113,6 +113,18 @@ class RevenueDistributionConfig(models.Model):
         help_text="Type of distribution (percentage or fixed amount)"
     )
 
+    # Platform fee
+    platform_fee_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=3.00,
+        help_text="Platform fee percentage to be deducted from total amount"
+    )
+
+    # Minimum admin amount threshold for warning
+    min_admin_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=400.00,
+        help_text="Minimum admin amount threshold for warning"
+    )
+
     # Distribution values
     admin_value = models.DecimalField(
         max_digits=10, decimal_places=2,
@@ -142,6 +154,13 @@ class RevenueDistributionConfig(models.Model):
         """
         total_fee = Decimal(str(total_fee))  # Ensure we're working with Decimal
 
+        # Calculate platform fee
+        platform_fee = (Decimal(self.platform_fee_percentage) / 100) * total_fee
+        platform_fee = round(platform_fee, 2)
+
+        # Amount left for distribution after platform fee
+        distributable_amount = total_fee - platform_fee
+
         if self.distribution_type == self.DistributionType.PERCENTAGE:
             # Ensure percentages add up to 100
             total_percentage = self.admin_value + self.therapist_value + self.doctor_value
@@ -155,21 +174,21 @@ class RevenueDistributionConfig(models.Model):
                 therapist_pct = self.therapist_value
                 doctor_pct = self.doctor_value
 
-            # Calculate amounts
-            admin_amount = (Decimal(admin_pct) / 100) * total_fee
-            therapist_amount = (Decimal(therapist_pct) / 100) * total_fee
-            doctor_amount = (Decimal(doctor_pct) / 100) * total_fee
+            # Calculate amounts from distributable amount (after platform fee)
+            admin_amount = (Decimal(admin_pct) / 100) * distributable_amount
+            therapist_amount = (Decimal(therapist_pct) / 100) * distributable_amount
+            doctor_amount = (Decimal(doctor_pct) / 100) * distributable_amount
         else:
             # Fixed amounts
             admin_amount = self.admin_value
             therapist_amount = self.therapist_value
             doctor_amount = self.doctor_value
 
-            # Adjust if fixed amounts exceed total fee
+            # Adjust if fixed amounts exceed distributable amount
             total_fixed = admin_amount + therapist_amount + doctor_amount
-            if total_fixed > total_fee:
+            if total_fixed > distributable_amount:
                 # Scale proportionally
-                scale_factor = total_fee / total_fixed
+                scale_factor = distributable_amount / total_fixed
                 admin_amount *= scale_factor
                 therapist_amount *= scale_factor
                 doctor_amount *= scale_factor
@@ -179,11 +198,11 @@ class RevenueDistributionConfig(models.Model):
         therapist_amount = round(therapist_amount, 2)
         doctor_amount = round(doctor_amount, 2)
 
-        # Ensure the sum equals the total (handle rounding errors)
+        # Ensure the sum equals the distributable amount (handle rounding errors)
         calculated_total = admin_amount + therapist_amount + doctor_amount
-        if calculated_total != total_fee:
+        if calculated_total != distributable_amount:
             # Adjust the largest amount to make the total match
-            difference = total_fee - calculated_total
+            difference = distributable_amount - calculated_total
             if admin_amount >= therapist_amount and admin_amount >= doctor_amount:
                 admin_amount += difference
             elif therapist_amount >= admin_amount and therapist_amount >= doctor_amount:
@@ -191,11 +210,17 @@ class RevenueDistributionConfig(models.Model):
             else:
                 doctor_amount += difference
 
+        # Check if admin amount is below threshold
+        below_threshold = admin_amount < self.min_admin_amount
+
         return {
             'admin': admin_amount,
             'therapist': therapist_amount,
             'doctor': doctor_amount,
-            'total': total_fee
+            'platform_fee': platform_fee,
+            'total': total_fee,
+            'distributable_amount': distributable_amount,
+            'below_threshold': below_threshold
         }
 
     class Meta:

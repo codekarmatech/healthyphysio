@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'visits',      # Visit tracking and therapist reports app
     'treatment_plans',  # Treatment plans app
     'areas',       # Area management app
+    'notifications',  # User notifications app
 ]
 
 # Add our custom middleware

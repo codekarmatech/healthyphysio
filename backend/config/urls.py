@@ -51,6 +51,8 @@ urlpatterns = [
     path('api/treatment-plans/', include('treatment_plans.urls')),
     # Area management
     path('api/areas/', include('areas.urls')),
+    # Notifications
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 # Serve media files in development

@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Grid, Card, CardContent, TextField, Button,
-         FormControl, InputLabel, Select, MenuItem, CircularProgress,
-         Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
-         Cell, ResponsiveContainer, CartesianGrid, PieChart, Pie } from 'recharts';
-// We'll use regular TextField for date input instead of DatePicker
-// import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-// import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-// import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import axios from 'axios';
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
+  Cell, ResponsiveContainer, CartesianGrid, PieChart, Pie
+} from 'recharts';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from './StatCard';
 import DashboardSection from './DashboardSection';
+import AdvancedRevenueCalculator from './AdvancedRevenueCalculator';
 import { useAuth } from '../../contexts/AuthContext';
+import financialDashboardService from '../../services/financialDashboardService';
 
 const FinancialManagementDashboard = () => {
-  const theme = useTheme();
-  const { authTokens, user } = useAuth();
+  const { user } = useAuth();
+
+  // Define colors for charts
+  const COLORS = [
+    '#3B82F6', // blue-500
+    '#10B981', // emerald-500
+    '#F59E0B', // amber-500
+    '#EF4444', // red-500
+    '#8B5CF6', // violet-500
+    '#EC4899', // pink-500
+  ];
   // Use user information for personalized dashboard
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,40 +37,22 @@ const FinancialManagementDashboard = () => {
     average_fee: 0,
     period_start: null,
     period_end: null,
-    therapist_breakdown: []
+    therapist_breakdown: [],
+    monthly_revenue: []
   });
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-  const [distributionConfigs, setDistributionConfigs] = useState([]);
-  const [selectedConfig, setSelectedConfig] = useState(null);
-  const [calculatorFee, setCalculatorFee] = useState('1000');
-  const [calculationResult, setCalculationResult] = useState(null);
 
-  // Colors for charts
-  const COLORS = [
-    theme.palette.primary.main,
-    theme.palette.secondary.main,
-    theme.palette.success.main,
-    theme.palette.error.main,
-    theme.palette.warning.main,
-    theme.palette.info.main,
-  ];
+
+
 
   // Fetch financial dashboard data
   useEffect(() => {
     const fetchFinancialData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/earnings/financial-dashboard/', {
-          params: {
-            start_date: startDate ? startDate.toISOString().split('T')[0] : undefined,
-            end_date: endDate ? endDate.toISOString().split('T')[0] : undefined
-          },
-          headers: {
-            'Authorization': `Bearer ${authTokens?.access}`
-          }
-        });
-        setFinancialData(response.data);
+        const data = await financialDashboardService.getFinancialDashboard(startDate, endDate);
+        setFinancialData(data);
         setError(null);
       } catch (err) {
         console.error('Error fetching financial data:', err);
@@ -76,51 +62,15 @@ const FinancialManagementDashboard = () => {
       }
     };
 
-    const fetchDistributionConfigs = async () => {
-      try {
-        const response = await axios.get('/api/earnings/distribution-configs/', {
-          headers: {
-            'Authorization': `Bearer ${authTokens?.access}`
-          }
-        });
-        setDistributionConfigs(response.data);
-        if (response.data.length > 0) {
-          const defaultConfig = response.data.find(config => config.is_default) || response.data[0];
-          setSelectedConfig(defaultConfig.id);
-        }
-      } catch (err) {
-        console.error('Error fetching distribution configs:', err);
-      }
-    };
-
     fetchFinancialData();
-    fetchDistributionConfigs();
-  }, [authTokens, startDate, endDate]);
+  }, [startDate, endDate]);
 
   // Handle date filter changes
   const handleDateFilterApply = () => {
     // The useEffect will trigger a new data fetch when startDate or endDate changes
   };
 
-  // Handle revenue calculation
-  const handleCalculateRevenue = async () => {
-    if (!calculatorFee || !selectedConfig) return;
 
-    try {
-      const response = await axios.post('/api/earnings/distribution-configs/calculate/', {
-        total_fee: parseFloat(calculatorFee),
-        distribution_config_id: selectedConfig
-      }, {
-        headers: {
-          'Authorization': `Bearer ${authTokens?.access}`
-        }
-      });
-      setCalculationResult(response.data.distribution);
-    } catch (err) {
-      console.error('Error calculating revenue distribution:', err);
-      setError('Failed to calculate revenue distribution. Please try again later.');
-    }
-  };
 
   // Prepare data for revenue distribution chart
   const getRevenueDistributionData = () => {
@@ -139,9 +89,45 @@ const FinancialManagementDashboard = () => {
     ];
   };
 
-  // Prepare data for monthly revenue chart (using the imported chart components)
+  // Prepare data for monthly revenue chart
   const getMonthlyRevenueData = () => {
-    // This is sample data - in a real app, this would come from the API
+    // Check if we have monthly_revenue data from the API
+    if (financialData.monthly_revenue && Array.isArray(financialData.monthly_revenue) && financialData.monthly_revenue.length > 0) {
+      // Extract month names and revenue values from API data
+      const months = financialData.monthly_revenue.map(item => item.month_name || item.month);
+      const totalRevenue = financialData.monthly_revenue.map(item => item.total || 0);
+      const adminRevenue = financialData.monthly_revenue.map(item => item.admin || 0);
+      const therapistRevenue = financialData.monthly_revenue.map(item => item.therapist || 0);
+
+      return {
+        labels: months,
+        datasets: [
+          {
+            label: 'Total Revenue',
+            data: totalRevenue,
+            borderColor: COLORS[0],
+            backgroundColor: `${COLORS[0]}20`,
+            fill: true,
+          },
+          {
+            label: 'Admin Revenue',
+            data: adminRevenue,
+            borderColor: COLORS[1],
+            backgroundColor: `${COLORS[1]}20`,
+            fill: true,
+          },
+          {
+            label: 'Therapist Revenue',
+            data: therapistRevenue,
+            borderColor: COLORS[2],
+            backgroundColor: `${COLORS[2]}20`,
+            fill: true,
+          }
+        ]
+      };
+    }
+
+    // Fallback to sample data if API data is not available
     return {
       labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
       datasets: [
@@ -172,7 +158,19 @@ const FinancialManagementDashboard = () => {
 
   // Prepare data for therapist performance chart
   const getTherapistPerformanceData = () => {
-    // This is sample data - in a real app, this would come from the API
+    // Check if we have therapist breakdown data from the API
+    if (financialData.therapist_breakdown && financialData.therapist_breakdown.length > 0) {
+      // Get top 5 therapists by earnings
+      return financialData.therapist_breakdown
+        .slice(0, 5) // Take top 5
+        .map(therapist => ({
+          name: `${therapist.therapist__user__first_name} ${therapist.therapist__user__last_name}`,
+          sessions: therapist.sessions,
+          earnings: therapist.total
+        }));
+    }
+
+    // Fallback to sample data if API data is not available
     return [
       { name: 'Dr. Sharma', sessions: 45, earnings: 54000 },
       { name: 'Dr. Patel', sessions: 38, earnings: 45600 },
@@ -185,305 +183,240 @@ const FinancialManagementDashboard = () => {
   return (
     <DashboardLayout title={`Financial Management Dashboard${user ? ` - ${user.firstName || 'Admin'}` : ''}`}>
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-          <CircularProgress />
-        </Box>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        </div>
       ) : error ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-          <Typography color="error">{error}</Typography>
-        </Box>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="text-red-600">{error}</div>
+        </div>
       ) : (
         <>
           {/* Financial Overview */}
           <DashboardSection title="Financial Overview">
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6} md={3}>
-                <StatCard
-                  title="Total Revenue"
-                  value={`₹${financialData.total_revenue.toLocaleString()}`}
-                  icon="payments"
-                  color={theme.palette.primary.main}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <StatCard
-                  title="Collection Rate"
-                  value={`${financialData.collection_rate}%`}
-                  icon="trending_up"
-                  color={theme.palette.secondary.main}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <StatCard
-                  title="Total Sessions"
-                  value={financialData.total_sessions}
-                  icon="event_available"
-                  color={theme.palette.success.main}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <StatCard
-                  title="Average Fee"
-                  value={`₹${financialData.average_fee.toLocaleString()}`}
-                  icon="attach_money"
-                  color={theme.palette.error.main}
-                />
-              </Grid>
-            </Grid>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard
+                title="Total Revenue"
+                value={`₹${typeof financialData.total_revenue === 'number' ? financialData.total_revenue.toLocaleString() : '0'}`}
+                icon="payments"
+                iconBgColor="bg-blue-100"
+                iconColor="text-blue-600"
+              />
+              <StatCard
+                title="Collection Rate"
+                value={`${typeof financialData.collection_rate === 'number' ? financialData.collection_rate : '0'}%`}
+                icon="trending_up"
+                iconBgColor="bg-green-100"
+                iconColor="text-green-600"
+              />
+              <StatCard
+                title="Total Sessions"
+                value={financialData.total_sessions || 0}
+                icon="event_available"
+                iconBgColor="bg-amber-100"
+                iconColor="text-amber-600"
+              />
+              <StatCard
+                title="Average Fee"
+                value={`₹${typeof financialData.average_fee === 'number' ? financialData.average_fee.toLocaleString() : '0'}`}
+                icon="attach_money"
+                iconBgColor="bg-purple-100"
+                iconColor="text-purple-600"
+              />
+            </div>
           </DashboardSection>
 
           {/* Date Filter */}
           <DashboardSection title="Date Filter">
-            <Grid container spacing={3} alignItems="center">
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  label="Start Date"
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+              <div>
+                <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date
+                </label>
+                <input
+                  id="start-date"
                   type="date"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                   value={startDate ? startDate.toISOString().split('T')[0] : ''}
                   onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
                 />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  label="End Date"
+              </div>
+              <div>
+                <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-1">
+                  End Date
+                </label>
+                <input
+                  id="end-date"
                   type="date"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                   value={endDate ? endDate.toISOString().split('T')[0] : ''}
                   onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
                 />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="primary"
+              </div>
+              <div>
+                <label className="invisible block text-sm font-medium text-gray-700 mb-1">
+                  &nbsp;
+                </label>
+                <button
+                  type="button"
+                  className="w-full h-10 bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                   onClick={handleDateFilterApply}
-                  sx={{ height: '56px' }}
                 >
                   Apply Filter
-                </Button>
-              </Grid>
-            </Grid>
+                </button>
+              </div>
+            </div>
           </DashboardSection>
 
           {/* Financial Visualizations */}
           <DashboardSection title="Financial Visualizations">
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>Revenue Distribution</Typography>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={getRevenueDistributionData()}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {getRevenueDistributionData().map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>Payment Status</Typography>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={getPaymentStatusData()}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          <Cell fill={theme.palette.success.main} />
-                          <Cell fill={theme.palette.warning.main} />
-                        </Pie>
-                        <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>Monthly Revenue Trends</Typography>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={getMonthlyRevenueData().labels.map((month, index) => ({
-                        month,
-                        total: getMonthlyRevenueData().datasets[0].data[index],
-                        admin: getMonthlyRevenueData().datasets[1].data[index],
-                        therapist: getMonthlyRevenueData().datasets[2].data[index],
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="total"
-                          stroke={COLORS[0]}
-                          activeDot={{ r: 8 }}
-                          name="Total Revenue"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="admin"
-                          stroke={COLORS[1]}
-                          name="Admin Revenue"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="therapist"
-                          stroke={COLORS[2]}
-                          name="Therapist Revenue"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-lg shadow p-5">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Revenue Distribution</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={getRevenueDistributionData()}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {getRevenueDistributionData().map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow p-5">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Status</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={getPaymentStatusData()}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        <Cell fill={COLORS[1]} /> {/* Green for Paid */}
+                        <Cell fill={COLORS[2]} /> {/* Amber for Pending */}
+                      </Pie>
+                      <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow p-5 col-span-1 md:col-span-2">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Monthly Revenue Trends</h3>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={getMonthlyRevenueData().labels.map((month, index) => ({
+                      month,
+                      total: getMonthlyRevenueData().datasets[0].data[index],
+                      admin: getMonthlyRevenueData().datasets[1].data[index],
+                      therapist: getMonthlyRevenueData().datasets[2].data[index],
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="total"
+                        stroke={COLORS[0]}
+                        activeDot={{ r: 8 }}
+                        name="Total Revenue"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="admin"
+                        stroke={COLORS[1]}
+                        name="Admin Revenue"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="therapist"
+                        stroke={COLORS[2]}
+                        name="Therapist Revenue"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
           </DashboardSection>
 
-          {/* Revenue Distribution Calculator */}
+          {/* Advanced Revenue Distribution Calculator */}
           <DashboardSection title="Revenue Distribution Calculator">
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  label="Session Fee (₹)"
-                  variant="outlined"
-                  type="number"
-                  value={calculatorFee}
-                  onChange={(e) => setCalculatorFee(e.target.value)}
-                  InputProps={{
-                    startAdornment: <Typography variant="body1">₹</Typography>,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth variant="outlined">
-                  <InputLabel>Distribution Configuration</InputLabel>
-                  <Select
-                    value={selectedConfig}
-                    onChange={(e) => setSelectedConfig(e.target.value)}
-                    label="Distribution Configuration"
-                  >
-                    {distributionConfigs.map((config) => (
-                      <MenuItem key={config.id} value={config.id}>
-                        {config.name} {config.is_default ? '(Default)' : ''}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  onClick={handleCalculateRevenue}
-                  sx={{ height: '56px' }}
-                >
-                  Calculate
-                </Button>
-              </Grid>
-            </Grid>
-
-            {/* Calculation Result */}
-            {calculationResult && (
-              <Box mt={3}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>Calculation Result</Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Typography variant="subtitle1">Total Fee:</Typography>
-                        <Typography variant="h6">₹{calculationResult.total.toLocaleString()}</Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Typography variant="subtitle1">Admin Amount:</Typography>
-                        <Typography variant="h6">₹{calculationResult.admin.toLocaleString()}</Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Typography variant="subtitle1">Therapist Amount:</Typography>
-                        <Typography variant="h6">₹{calculationResult.therapist.toLocaleString()}</Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={3}>
-                        <Typography variant="subtitle1">Doctor Amount:</Typography>
-                        <Typography variant="h6">₹{calculationResult.doctor.toLocaleString()}</Typography>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Box>
-            )}
+            <AdvancedRevenueCalculator />
           </DashboardSection>
 
           {/* Therapist Earnings Breakdown */}
           {financialData.therapist_breakdown && financialData.therapist_breakdown.length > 0 && (
             <DashboardSection title="Therapist Earnings Breakdown">
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={7}>
-                  <TableContainer component={Paper}>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Therapist</TableCell>
-                          <TableCell align="right">Sessions</TableCell>
-                          <TableCell align="right">Total Earnings</TableCell>
-                          <TableCell align="right">Average Per Session</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {financialData.therapist_breakdown.map((therapist) => (
-                          <TableRow key={therapist.therapist__id}>
-                            <TableCell component="th" scope="row">
-                              {therapist.therapist__user__first_name} {therapist.therapist__user__last_name}
-                            </TableCell>
-                            <TableCell align="right">{therapist.sessions}</TableCell>
-                            <TableCell align="right">₹{therapist.total.toLocaleString()}</TableCell>
-                            <TableCell align="right">
-                              ₹{(therapist.total / therapist.sessions).toFixed(2)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Grid>
-                <Grid item xs={12} md={5}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>Top Therapist Performance</Typography>
-                      <ResponsiveContainer width="100%" height={300}>
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div className="md:col-span-7">
+                  <div className="bg-white shadow overflow-hidden rounded-lg">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Therapist
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Sessions
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total Earnings
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Average Per Session
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {financialData.therapist_breakdown.map((therapist) => (
+                            <tr key={therapist.therapist__id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {therapist.therapist__user__first_name} {therapist.therapist__user__last_name}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                                {therapist.sessions}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                                ₹{therapist.total.toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                                ₹{(therapist.total / therapist.sessions).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div className="md:col-span-5">
+                  <div className="bg-white rounded-lg shadow p-5">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Top Therapist Performance</h3>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={getTherapistPerformanceData()}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="name" />
@@ -494,10 +427,10 @@ const FinancialManagementDashboard = () => {
                           <Bar dataKey="sessions" name="Sessions" fill={COLORS[1]} />
                         </BarChart>
                       </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </DashboardSection>
           )}
         </>
