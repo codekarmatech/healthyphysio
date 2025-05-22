@@ -15,6 +15,7 @@ router.register(r'change-requests', views.AttendanceChangeRequestViewSet, basena
 router.register(r'availability', views.AvailabilityViewSet, basename='availability')
 
 urlpatterns = [
+    path('availability/', views.get_availability, name='get_availability'),
     path('', include(router.urls)),
     # Add specific endpoints for leave applications
     path('leave/apply/', views.LeaveViewSet.as_view({'post': 'create'}), name='leave-apply'),

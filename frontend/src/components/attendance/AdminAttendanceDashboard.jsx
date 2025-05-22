@@ -6,6 +6,8 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from '
 import AttendanceAnalytics from './AttendanceAnalytics';
 import AttendanceReports from './AttendanceReports';
 import BulkAttendanceManager from './BulkAttendanceManager';
+import AttendanceVisualization from './AttendanceVisualization';
+import AvailabilityManager from './AvailabilityManager';
 
 /**
  * Comprehensive Admin Attendance Dashboard
@@ -336,6 +338,8 @@ const AdminAttendanceDashboard = () => {
               { id: 'requests', name: 'Change Requests' },
               { id: 'leaves', name: 'Leave Applications' },
               { id: 'analytics', name: 'Analytics' },
+              { id: 'visualization', name: 'Charts & Graphs' },
+              { id: 'availability', name: 'Availability Management' },
               { id: 'reports', name: 'Reports' },
               { id: 'bulk', name: 'Bulk Operations' }
             ].map((tab) => (
@@ -636,6 +640,20 @@ const AdminAttendanceDashboard = () => {
             end: format(endOfMonth(currentDate), 'yyyy-MM-dd')
           }}
         />
+      )}
+
+      {activeTab === 'visualization' && (
+        <AttendanceVisualization
+          therapistId={selectedTherapist}
+          dateRange={{
+            start: format(startOfMonth(currentDate), 'yyyy-MM-dd'),
+            end: format(endOfMonth(currentDate), 'yyyy-MM-dd')
+          }}
+        />
+      )}
+
+      {activeTab === 'availability' && (
+        <AvailabilityManager />
       )}
 
       {activeTab === 'reports' && (

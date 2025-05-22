@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/attendance/', include('attendance.urls')),
     path('api/audit-logs/', include('audit_logs.urls')),
     path('api/assessments/', include('assessments.urls')),
+    path('api/areas/', include('areas.urls')),
     path('api/equipment/', include('equipment.urls')),
     # Earnings API endpoints
     path('api/earnings/', include('earnings.urls')),

@@ -21,6 +21,18 @@ from scheduling.serializers import SessionSerializer
 from users.models import Therapist
 # User utilities
 from users.utils import get_therapist_from_user
+#Import local app models and serializers
+from .models import Attendance, Holiday, Leave, Availability, INDIAN_TZ
+from .admin_requests import AttendanceChangeRequest
+from .serializers import (
+    AttendanceSerializer, HolidaySerializer, AttendanceMonthSerializer,
+    LeaveSerializer, AttendanceChangeRequestSerializer, AvailabilitySerializer
+)
+from django.db.models import Count
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated, IsPatientUser])
@@ -55,14 +67,40 @@ def approve_checkin(request, session_code):
         return Response({"error": "Failed to approve check-in"},
                        status=status.HTTP_400_BAD_REQUEST)
 
-# Import local app models and serializers
-from .models import Attendance, Holiday, Leave, Availability, INDIAN_TZ
-from .admin_requests import AttendanceChangeRequest
-from .serializers import (
-    AttendanceSerializer, HolidaySerializer, AttendanceMonthSerializer,
-    LeaveSerializer, AttendanceChangeRequestSerializer, AvailabilitySerializer
-)
-from django.db.models import Count
+
+@api_view(['GET'])
+def get_availability(request):
+    """
+    Get therapist availability for a date range
+    """
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+    therapist_id = request.query_params.get('therapist_id')
+
+    if not start_date or not end_date or not therapist_id:
+        return Response({'error': 'start_date, end_date, and therapist_id are required.'}, status=400)
+
+    try:
+        start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except Exception:
+        return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+
+    try:
+        therapist = Therapist.objects.get(id=therapist_id)
+    except Therapist.DoesNotExist:
+        return Response({'error': 'Therapist not found.'}, status=404)
+
+    availabilities = Availability.objects.filter(
+        therapist=therapist,
+        date__gte=start_date_obj,
+        date__lte=end_date_obj
+    ).order_by('date')
+
+    serializer = AvailabilitySerializer(availabilities, many=True)
+    return Response(serializer.data)
+
+#
 
 class IsTherapistOrAdmin(permissions.BasePermission):
     """
@@ -270,20 +308,51 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         else:
             date = date_str
 
-        # Check if the therapist has any appointments on this date
-        has_appointments = Attendance.has_appointments(therapist, date)
+        # Get the status from the serializer data
+        status = serializer.validated_data.get('status', 'present')
 
-        # If the status is 'available' but there are appointments, change to 'present'
-        status = serializer.validated_data.get('status')
-        if status == 'available' and has_appointments:
-            serializer.validated_data['status'] = 'present'
-            serializer.validated_data['notes'] = (serializer.validated_data.get('notes') or '') + ' (Automatically changed from available to present due to existing appointments)'
+        # Validate attendance status using the enhanced validation method
+        validation_result = Attendance.validate_attendance_status(therapist, date, status)
 
-        # If the status is not 'available' and there are no appointments, suggest 'available'
-        elif status != 'available' and not has_appointments and status not in ['approved_leave', 'sick_leave', 'emergency_leave']:
-            # We'll still save with the requested status, but add a note
-            if not serializer.validated_data.get('notes'):
-                serializer.validated_data['notes'] = 'Note: No appointments found for this date. Consider marking as "available" instead.'
+        if not validation_result['valid']:
+            error_data = {
+                "error": validation_result['message'],
+                "suggested_action": validation_result['suggested_action'],
+                "appointment_count": Attendance.get_appointment_count(therapist, date),
+                "has_appointments": Attendance.has_appointments(therapist, date)
+            }
+
+            # Add suggested status based on the situation
+            if validation_result['suggested_action'] == 'mark_availability':
+                error_data['suggested_status'] = 'available'
+            elif validation_result['suggested_action'] == 'mark_attendance':
+                error_data['suggested_status'] = 'present'
+
+            raise serializers.ValidationError(error_data)
+
+        # Check for existing attendance record
+        existing_attendance = Attendance.objects.filter(
+            therapist=therapist,
+            date=date
+        ).first()
+
+        if existing_attendance:
+            raise serializers.ValidationError({
+                "error": f"Attendance already submitted for {date}",
+                "detail": "You have already submitted attendance for this date. Use the change request feature to modify it.",
+                "existing_status": existing_attendance.status
+            })
+
+        # Add validation warning to notes if applicable
+        if validation_result.get('warning'):
+            existing_notes = serializer.validated_data.get('notes', '')
+            warning_note = f"Warning: {validation_result['message']}"
+            if existing_notes:
+                serializer.validated_data['notes'] = f"{existing_notes}\n\n{warning_note}"
+            else:
+                serializer.validated_data['notes'] = warning_note
+
+        print(f"Creating attendance for therapist {therapist.id} on {date} with status '{status}'. Validation passed.")
 
         serializer.save(therapist=therapist)
 

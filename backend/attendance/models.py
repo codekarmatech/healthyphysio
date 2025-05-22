@@ -91,6 +91,99 @@ class Attendance(models.Model):
 
         return appointment_count > 0
 
+    @staticmethod
+    def get_appointment_count(therapist, date):
+        """
+        Get the number of appointments for a therapist on a given date
+
+        Args:
+            therapist: Therapist instance or ID
+            date: Date to check (datetime.date object)
+
+        Returns:
+            int: Number of appointments on the date
+        """
+        from scheduling.models import Appointment
+        from django.utils import timezone
+
+        # Convert therapist ID to therapist instance if needed
+        therapist_id = therapist.id if hasattr(therapist, 'id') else therapist
+
+        # Create datetime range for the given date
+        start_datetime = timezone.make_aware(datetime.combine(date, datetime.min.time()))
+        end_datetime = timezone.make_aware(datetime.combine(date, datetime.max.time()))
+
+        return Appointment.objects.filter(
+            therapist_id=therapist_id,
+            datetime__range=(start_datetime, end_datetime),
+            status__in=['pending', 'scheduled', 'rescheduled', 'pending_reschedule', 'completed']
+        ).count()
+
+    @staticmethod
+    def validate_attendance_status(therapist, date, status):
+        """
+        Validate if the attendance status is appropriate for the given date
+
+        Args:
+            therapist: Therapist instance or ID
+            date: Date to check (datetime.date object)
+            status: Proposed attendance status
+
+        Returns:
+            dict: Validation result with 'valid' boolean and 'message' string
+        """
+        has_appointments = Attendance.has_appointments(therapist, date)
+        appointment_count = Attendance.get_appointment_count(therapist, date)
+
+        # Check if it's a weekend (Sunday = 6)
+        is_weekend = date.weekday() == 6
+
+        # Check if it's a holiday
+        is_holiday = Holiday.objects.filter(date=date).exists()
+
+        if status == 'absent':
+            if not has_appointments:
+                return {
+                    'valid': False,
+                    'message': 'Cannot mark as absent on days without scheduled appointments. Use availability status instead.',
+                    'suggested_action': 'mark_availability'
+                }
+            if is_weekend:
+                return {
+                    'valid': False,
+                    'message': 'Cannot mark as absent on weekends.',
+                    'suggested_action': 'none'
+                }
+            if is_holiday:
+                return {
+                    'valid': False,
+                    'message': 'Cannot mark as absent on holidays.',
+                    'suggested_action': 'none'
+                }
+
+        elif status == 'present':
+            if not has_appointments:
+                return {
+                    'valid': True,
+                    'message': f'Marked as present with no scheduled appointments. Consider marking availability instead.',
+                    'suggested_action': 'mark_availability',
+                    'warning': True
+                }
+
+        elif status == 'available':
+            if has_appointments:
+                return {
+                    'valid': False,
+                    'message': f'Cannot mark as available when you have {appointment_count} scheduled appointment(s). Use attendance status instead.',
+                    'suggested_action': 'mark_attendance'
+                }
+
+        return {
+            'valid': True,
+            'message': 'Status is valid for this date.',
+            'suggested_action': 'none'
+        }
+
     def save(self, *args, **kwargs):
         # Set is_paid based on status
         if self.status in ['sick_leave', 'emergency_leave', 'absent', 'available']:
