@@ -3,7 +3,8 @@ Purpose: API views for attendance tracking
 Connected to: Session attendance management
 """
 
-from rest_framework import viewsets, permissions, status, serializers
+from rest_framework import viewsets, permissions, serializers
+from rest_framework import status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.utils import timezone

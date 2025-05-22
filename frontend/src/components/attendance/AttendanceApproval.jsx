@@ -17,15 +17,14 @@ const AttendanceApproval = ({ therapistId, year, month, onApproved }) => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Get attendance records for the therapist
-        const response = await attendanceService.getAttendanceHistory({
-          therapist_id: therapistId,
+        const response = await attendanceService.getAttendanceHistory(therapistId, {
           year: year,
           month: month,
           approved: false // Only get unapproved records
         });
-        
+
         setAttendanceRecords(response.data.results || response.data);
       } catch (err) {
         console.error('Error fetching attendance records:', err);
@@ -34,7 +33,7 @@ const AttendanceApproval = ({ therapistId, year, month, onApproved }) => {
         setLoading(false);
       }
     };
-    
+
     if (therapistId && year && month) {
       fetchAttendanceRecords();
     }
@@ -44,13 +43,13 @@ const AttendanceApproval = ({ therapistId, year, month, onApproved }) => {
   const handleApprove = async (attendanceId) => {
     try {
       setApproving(prev => ({ ...prev, [attendanceId]: true }));
-      
+
       // Call the approve endpoint
       await attendanceService.approveAttendance(attendanceId);
-      
+
       // Update the local state to remove the approved record
       setAttendanceRecords(prev => prev.filter(record => record.id !== attendanceId));
-      
+
       // Notify parent component
       if (onApproved) {
         onApproved(attendanceId);
@@ -110,7 +109,7 @@ const AttendanceApproval = ({ therapistId, year, month, onApproved }) => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="p-4 bg-red-50 border border-red-300 rounded-md">
           <p className="text-red-700">{error}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="mt-2 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200"
           >
@@ -132,7 +131,7 @@ const AttendanceApproval = ({ therapistId, year, month, onApproved }) => {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Pending Attendance Approvals</h3>
-      
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">

@@ -328,6 +328,31 @@ class AttendanceService extends BaseService {
   }
 
   /**
+   * Approve an attendance record (admin only)
+   * @param {string|number} attendanceId - ID of the attendance record to approve
+   * @returns {Promise} API response
+   */
+  async approveAttendance(attendanceId) {
+    try {
+      console.log(`Approving attendance record ID: ${attendanceId}`);
+
+      // Make the API call to approve the attendance
+      const response = await api.put(`${this.basePath}${attendanceId}/approve/`);
+      console.log('Attendance approval successful:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error approving attendance:', error);
+
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Submit attendance data
    * @param {string} status - Attendance status (present, absent, half_day)
    * @param {string} date - Date in YYYY-MM-DD format (defaults to today)
