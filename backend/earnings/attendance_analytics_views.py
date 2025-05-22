@@ -103,7 +103,7 @@ class AttendanceImpactViewSet(viewsets.ViewSet):
                 if absence_type in absence_types:
                     absence_types[absence_type]['count'] += 1
                     # For half day, count as 0.5
-                    multiplier = 0.5 if absence_type == 'half_day' else 1
+                    multiplier = Decimal('0.5') if absence_type == 'half_day' else Decimal('1')
                     absence_types[absence_type]['loss'] += avg_earnings * multiplier
 
             # Add to results
