@@ -1,16 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
+import EarningsChart from './EarningsChart';
+import { useAuth } from '../../contexts/AuthContext';
 
 const EarningsAnalytics = ({ earnings, loading }) => {
+  const { user } = useAuth();
+  const [activeChartType, setActiveChartType] = useState('line');
+  const [showAttendance, setShowAttendance] = useState(true);
+
+  // Get current date for chart
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
   if (loading) {
     return (
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-        <div className="animate-pulse flex space-x-4">
-          <div className="flex-1 space-y-4 py-1">
+      <div className="bg-white shadow-sm rounded-lg">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Earnings Analytics</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Detailed breakdown of your earnings
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="animate-pulse space-y-4">
             <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div className="space-y-2">
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-            </div>
+            <div className="h-4 bg-gray-200 rounded"></div>
+            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+            <div className="h-64 bg-gray-200 rounded"></div>
           </div>
         </div>
       </div>
@@ -19,8 +34,24 @@ const EarningsAnalytics = ({ earnings, loading }) => {
 
   if (!earnings || !earnings.length) {
     return (
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-        <p className="text-gray-500 text-center">No earnings data available for this period.</p>
+      <div className="bg-white shadow-sm rounded-lg">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Earnings Analytics</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Detailed breakdown of your earnings
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col items-center justify-center py-12">
+            <svg className="h-16 w-16 text-gray-300 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No earnings data available</h3>
+            <p className="text-gray-500 text-center max-w-md">
+              There are no earnings recorded for this period. Complete some sessions to see your earnings analytics.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -64,122 +95,201 @@ const EarningsAnalytics = ({ earnings, loading }) => {
     day.sessions > max.sessions ? day : max
   , { sessions: 0 });
 
+  // Calculate additional analytics
+  const totalEarned = dailyEarnings.reduce((sum, day) => sum + day.totalEarned, 0);
+  const totalPotential = dailyEarnings.reduce((sum, day) => sum + day.totalPotential, 0);
+  const totalSessions = dailyEarnings.reduce((sum, day) => sum + day.sessions, 0);
+  const attendedSessions = dailyEarnings.reduce((sum, day) => sum + day.attended, 0);
+  const missedSessions = totalSessions - attendedSessions;
+  const attendanceRate = totalSessions > 0 ? (attendedSessions / totalSessions) * 100 : 0;
+  const missedEarnings = totalPotential - totalEarned;
+  const averagePerSession = attendedSessions > 0 ? totalEarned / attendedSessions : 0;
+
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-      <div className="px-4 py-5 sm:px-6">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">Earnings Analytics</h3>
-        <p className="mt-1 max-w-2xl text-sm text-gray-500">
-          Detailed breakdown of your earnings for this period.
-        </p>
-      </div>
-
-      <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Highest Earning Day */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Highest Earning Day
-                </dt>
-                <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                  ₹{highestEarningDay.totalEarned.toFixed(2)}
-                </dd>
-                <dd className="mt-1 text-sm text-gray-500">
-                  {new Date(highestEarningDay.date).toLocaleDateString()}
-                </dd>
-              </dl>
+    <div className="space-y-6">
+      {/* Chart Section */}
+      <div className="bg-white shadow-sm rounded-lg">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Earnings Analytics</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Detailed breakdown of your earnings
+              </p>
             </div>
-          </div>
 
-          {/* Day with Most Sessions */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Most Sessions in a Day
-                </dt>
-                <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                  {mostSessionsDay.sessions}
-                </dd>
-                <dd className="mt-1 text-sm text-gray-500">
-                  {new Date(mostSessionsDay.date).toLocaleDateString()}
-                </dd>
-              </dl>
-            </div>
-          </div>
-
-          {/* Average Daily Earnings */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Average Daily Earnings
-                </dt>
-                <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                  ₹{(dailyEarnings.reduce((sum, day) => sum + day.totalEarned, 0) / dailyEarnings.length).toFixed(2)}
-                </dd>
-                <dd className="mt-1 text-sm text-gray-500">
-                  For days with sessions
-                </dd>
-              </dl>
+            {/* Chart Type Selector */}
+            <div className="mt-4 md:mt-0 flex space-x-2">
+              <button
+                onClick={() => setActiveChartType('line')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+                  activeChartType === 'line'
+                    ? 'bg-primary-100 text-primary-800 border border-primary-200'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                }`}
+              >
+                Line
+              </button>
+              <button
+                onClick={() => setActiveChartType('bar')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+                  activeChartType === 'bar'
+                    ? 'bg-primary-100 text-primary-800 border border-primary-200'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                }`}
+              >
+                Bar
+              </button>
+              <button
+                onClick={() => setActiveChartType('doughnut')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md ${
+                  activeChartType === 'doughnut'
+                    ? 'bg-primary-100 text-primary-800 border border-primary-200'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                }`}
+              >
+                Doughnut
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Daily Earnings Table */}
-        <div className="mt-8">
-          <h4 className="text-lg font-medium text-gray-900 mb-4">Daily Earnings Breakdown</h4>
-          <div className="flex flex-col">
-            <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-              <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Date
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Sessions
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Attended
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Earned
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Potential
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {dailyEarnings.map((day) => (
-                        <tr key={day.date}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(day.date).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {day.sessions}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {day.attended} ({Math.round(day.attended / day.sessions * 100)}%)
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ₹{day.totalEarned.toFixed(2)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ₹{day.totalPotential.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        {/* Chart */}
+        <div className="p-6">
+          <EarningsChart
+            therapistId={user?.therapist_id || user?.id}
+            year={currentYear}
+            month={currentMonth}
+            chartType={activeChartType}
+            showAttendance={showAttendance && activeChartType !== 'doughnut'}
+          />
+
+          {/* Attendance toggle */}
+          {activeChartType !== 'doughnut' && (
+            <div className="mt-4 flex items-center justify-end">
+              <label className="flex items-center cursor-pointer">
+                <span className="text-sm text-gray-600 mr-2">Show Attendance Correlation</span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={showAttendance}
+                    onChange={() => setShowAttendance(!showAttendance)}
+                  />
+                  <div className={`block w-10 h-6 rounded-full ${showAttendance ? 'bg-primary-600' : 'bg-gray-400'}`}></div>
+                  <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition ${showAttendance ? 'transform translate-x-4' : ''}`}></div>
                 </div>
-              </div>
+              </label>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Analytics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Earnings Summary */}
+        <div className="bg-white shadow-sm rounded-lg">
+          <div className="px-6 py-5 border-b border-gray-100">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Earnings Summary</h3>
           </div>
+          <div className="p-6">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Total Earned</dt>
+                <dd className="mt-1 text-2xl font-semibold text-gray-900">₹{totalEarned.toFixed(2)}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Average Per Session</dt>
+                <dd className="mt-1 text-2xl font-semibold text-gray-900">₹{averagePerSession.toFixed(2)}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Potential Earnings</dt>
+                <dd className="mt-1 text-2xl font-semibold text-gray-900">₹{totalPotential.toFixed(2)}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Missed Earnings</dt>
+                <dd className="mt-1 text-2xl font-semibold text-red-600">₹{missedEarnings.toFixed(2)}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        {/* Session Statistics */}
+        <div className="bg-white shadow-sm rounded-lg">
+          <div className="px-6 py-5 border-b border-gray-100">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Session Statistics</h3>
+          </div>
+          <div className="p-6">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Total Sessions</dt>
+                <dd className="mt-1 text-2xl font-semibold text-gray-900">{totalSessions}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Attended Sessions</dt>
+                <dd className="mt-1 text-2xl font-semibold text-green-600">{attendedSessions}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Missed Sessions</dt>
+                <dd className="mt-1 text-2xl font-semibold text-red-600">{missedSessions}</dd>
+              </div>
+              <div className="sm:col-span-1">
+                <dt className="text-sm font-medium text-gray-500">Attendance Rate</dt>
+                <dd className="mt-1 text-2xl font-semibold text-blue-600">{attendanceRate.toFixed(1)}%</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      {/* Daily Earnings Table */}
+      <div className="bg-white shadow-sm rounded-lg">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Daily Earnings Breakdown</h3>
+        </div>
+        <div className="p-6 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sessions
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Attended
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Earned
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Potential
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {dailyEarnings.map((day) => (
+                <tr key={day.date}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {new Date(day.date).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {day.sessions}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {day.attended} ({Math.round(day.attended / day.sessions * 100)}%)
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ₹{day.totalEarned.toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ₹{day.totalPotential.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

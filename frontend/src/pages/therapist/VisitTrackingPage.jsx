@@ -6,7 +6,9 @@ import useGeolocation from '../../hooks/useGeolocation';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Spinner from '../../components/common/Spinner';
 import LocationMap from '../../components/visits/LocationMap';
+import ManualVerificationForm from '../../components/visits/ManualVerificationForm';
 import { toast } from 'react-toastify';
+import { format } from 'date-fns';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -28,6 +30,8 @@ const VisitTrackingPage = () => {
   const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updateInterval, setUpdateInterval] = useState(null);
+  const [showManualVerification, setShowManualVerification] = useState(false);
+  const [verificationSubmitted, setVerificationSubmitted] = useState(false);
 
   // Initialize geolocation hook with high accuracy
   const {
@@ -373,7 +377,18 @@ const VisitTrackingPage = () => {
 
             {/* Location Map */}
             <div className="mb-6">
-              <h3 className="font-semibold mb-2">Location Map</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold">Location Map</h3>
+                {!isWatching && !verificationSubmitted && locationHistory.length === 0 && (
+                  <button
+                    onClick={() => setShowManualVerification(true)}
+                    className="text-sm text-primary-600 hover:text-primary-500"
+                  >
+                    Location tracking not working?
+                  </button>
+                )}
+              </div>
+
               {locationLoading ? (
                 <div className="flex justify-center items-center h-64">
                   <Spinner size="md" />
@@ -392,9 +407,47 @@ const VisitTrackingPage = () => {
               ) : (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center h-64">
                   <p className="text-gray-500">No location data available yet.</p>
+                  {!isWatching && !showManualVerification && !verificationSubmitted && (
+                    <button
+                      onClick={() => setShowManualVerification(true)}
+                      className="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    >
+                      Request Manual Verification
+                    </button>
+                  )}
                 </div>
               )}
             </div>
+
+            {/* Manual Verification Form */}
+            {showManualVerification && !verificationSubmitted && (
+              <ManualVerificationForm
+                visitId={id}
+                patientName={visit.patient_details?.user?.full_name || 'Patient'}
+                appointmentDate={format(new Date(visit.scheduled_start), 'MMM d, yyyy')}
+                onVerificationSubmitted={() => {
+                  setVerificationSubmitted(true);
+                  setShowManualVerification(false);
+                }}
+              />
+            )}
+
+            {verificationSubmitted && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-green-800">
+                      Manual verification request submitted successfully. An administrator will review your request.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Location History */}
             <div>

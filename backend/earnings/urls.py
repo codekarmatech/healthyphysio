@@ -40,6 +40,9 @@ urlpatterns = [
     # Role-specific earnings endpoints - using the simplified view
     path('therapist/<int:therapist_id>/monthly/', simple_views.simple_therapist_monthly_earnings, name='therapist-monthly-earnings'),
 
+    # Therapist payment history endpoint
+    path('therapist/<int:therapist_id>/payment-history/', payment_views.therapist_payment_history, name='therapist-payment-history'),
+
     # Legacy URL pattern used by TherapistDashboard.jsx
     path('monthly/<int:therapist_id>/', simple_views.simple_therapist_monthly_earnings, name='legacy-monthly-earnings'),
 

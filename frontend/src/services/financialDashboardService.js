@@ -1226,27 +1226,61 @@ class FinancialDashboardService extends BaseService {
     const params = { ...filters };
 
     try {
-      const response = await api.get(`${this.basePath}records/`, { params });
+      console.log('Fetching earnings records with params:', params);
+
+      // Add a timeout to the request to prevent hanging
+      const response = await api.get(`${this.basePath}records/`, {
+        params,
+        timeout: 10000 // 10 second timeout
+      });
+
+      console.log('Earnings records API response:', response.data);
 
       // Check if the response is an array or an object with results property
       let formattedData;
       if (Array.isArray(response.data)) {
+        console.log('API returned array of earnings records directly, formatting response');
         formattedData = {
           results: response.data,
           count: response.data.length,
           is_mock_data: false
         };
       } else {
+        // Response is already in the expected format
         formattedData = response.data;
+
+        // Check if we got mock data from the backend
+        if (formattedData.is_mock_data) {
+          console.warn('Backend returned mock earnings data');
+        }
       }
 
       return formattedData;
     } catch (error) {
       console.error('Error fetching earnings records:', error);
+
+      // Log more detailed error information
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+        console.error('Error response headers:', error.response.headers);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('No response received:', error.request);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+      }
+
+      console.warn('Using frontend mock earnings data due to API error');
+
       // Return mock data with a flag indicating it's mock data
+      const mockRecords = this.getMockEarningsRecords();
       const mockData = {
-        results: this.getMockEarningsRecords(),
-        count: this.getMockEarningsRecords().length,
+        results: mockRecords,
+        count: mockRecords.length,
         is_mock_data: true
       };
       return mockData;

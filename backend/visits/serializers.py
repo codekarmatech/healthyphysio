@@ -43,10 +43,14 @@ class VisitSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'appointment', 'therapist', 'patient', 'status',
             'scheduled_start', 'scheduled_end', 'actual_start', 'actual_end',
+            # Manual location fields
+            'manual_location_address', 'manual_location_landmark',
+            'manual_arrival_time', 'manual_departure_time',
+            'manual_location_notes', 'manual_location_verified',
             'created_at', 'updated_at', 'therapist_details', 'patient_details',
             'appointment_details', 'location_updates'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'manual_location_verified']
 
     def validate(self, data):
         """Validate visit data"""

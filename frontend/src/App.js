@@ -7,6 +7,9 @@ import TreatmentPlansApprovedRoute from './components/TreatmentPlansApprovedRout
 import ReportsApprovedRoute from './components/ReportsApprovedRoute';
 import AttendanceApprovedRoute from './components/AttendanceApprovedRoute';
 
+// Import Leaflet CSS globally to ensure it's available for all map components
+import 'leaflet/dist/leaflet.css';
+
 // Auth Pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -21,7 +24,7 @@ import DoctorDashboard from './pages/dashboard/DoctorDashboard';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 
 // Earnings Pages
-import EarningsPage from './pages/earnings/EarningsPage';
+import TherapistEarningsPage from './pages/earnings/TherapistEarningsPage';
 
 // Appointment Pages
 import AppointmentsPage from './pages/appointments/AppointmentsPage';
@@ -64,6 +67,8 @@ import TherapistApprovalsPage from './pages/admin/TherapistApprovalsPage';
 import LocationMonitoringPage from './pages/admin/LocationMonitoringPage';
 import TherapistDashboardView from './pages/admin/TherapistDashboardView';
 import TherapistAnalyticsDashboard from './pages/admin/TherapistAnalyticsDashboard';
+import ErrorBoundary from './components/common/ErrorBoundary';
+import DashboardLayout from './components/layout/DashboardLayout';
 import AuditDashboardPage from './pages/admin/AuditDashboardPage';
 import PaymentStatusManagement from './pages/admin/PaymentStatusManagement';
 
@@ -155,7 +160,33 @@ function App() {
             <Route path="/admin/therapist-dashboard" element={<TherapistDashboardView />} />
             <Route path="/admin/therapist-dashboard/:therapistId" element={<TherapistDashboardView />} />
             {/* Therapist Analytics */}
-            <Route path="/admin/therapist-analytics" element={<TherapistAnalyticsDashboard />} />
+            <Route path="/admin/therapist-analytics" element={
+              <ErrorBoundary
+                fallback={(error) => (
+                  <DashboardLayout>
+                    <div className="p-6 bg-red-50 border-l-4 border-red-500 rounded-md">
+                      <h2 className="text-xl font-semibold text-red-800 mb-4">
+                        Error in Therapist Analytics Dashboard
+                      </h2>
+                      <p className="text-red-700 mb-4">
+                        {error?.toString() || "An unexpected error occurred while loading the analytics dashboard."}
+                      </p>
+                      <p className="text-gray-700 mb-4">
+                        This could be due to a server error or data format issue. Our team has been notified.
+                      </p>
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                      >
+                        Reload Page
+                      </button>
+                    </div>
+                  </DashboardLayout>
+                )}
+              >
+                <TherapistAnalyticsDashboard />
+              </ErrorBoundary>
+            } />
             {/* Area Management */}
             <Route path="/admin/area-management" element={<AreaManagementDashboard />} />
             {/* Financial Management */}
@@ -184,7 +215,7 @@ function App() {
             <Route path="/therapist/appointments/:id/reschedule" element={<RescheduleRequestPage />} />
             <Route path="/therapist/patients" element={<TherapistPatientsPage />} />
             <Route path="/therapist/patients/:id" element={<TherapistPatientDetailPage />} />
-            <Route path="/therapist/earnings" element={<EarningsPage />} />
+            <Route path="/therapist/earnings" element={<TherapistEarningsPage />} />
             <Route path="/therapist/assessments" element={<AssessmentsPage />} />
             <Route path="/therapist/assessments/patient/:patientId" element={<PatientAssessmentPage />} />
             <Route path="/therapist/referrals" element={<NotFound />} />

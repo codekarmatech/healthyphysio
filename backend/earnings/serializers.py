@@ -9,7 +9,10 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
-from .models import EarningRecord, SessionFeeConfig, FeeChangeLog, RevenueDistributionConfig
+from .models import (
+    EarningRecord, SessionFeeConfig, FeeChangeLog,
+    RevenueDistributionConfig, PaymentSchedule, PaymentBatch
+)
 from users.serializers import TherapistSerializer, PatientSerializer, DoctorSerializer, UserSerializer
 
 
@@ -37,10 +40,50 @@ class MockDataMixin:
 class EarningRecordSerializer(MockDataMixin, serializers.ModelSerializer):
     therapist_details = TherapistSerializer(source='therapist', read_only=True)
     patient_details = PatientSerializer(source='patient', read_only=True)
+    therapist_name = serializers.SerializerMethodField()
+    patient_name = serializers.SerializerMethodField()
+    payment_processor_name = serializers.SerializerMethodField()
+    is_verified_display = serializers.SerializerMethodField()
 
     class Meta:
         model = EarningRecord
-        fields = '__all__'
+        fields = [
+            'id', 'therapist', 'therapist_name', 'therapist_details',
+            'patient', 'patient_name', 'patient_details',
+            'appointment', 'attendance', 'visit',
+            'date', 'session_type', 'amount', 'full_amount',
+            'status', 'payment_status', 'payment_date', 'payment_method',
+            'payment_reference', 'payment_processed_by', 'payment_processor_name',
+            'payment_scheduled_date', 'is_verified', 'is_verified_display',
+            'notes', 'created_at', 'updated_at',
+            'admin_amount', 'therapist_amount', 'doctor_amount'
+        ]
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'therapist_name',
+            'patient_name', 'payment_processor_name', 'is_verified_display'
+        ]
+
+    def get_therapist_name(self, obj):
+        if isinstance(obj, dict) and obj.get('is_mock_data'):
+            return obj.get('therapist_name', 'Mock Therapist')
+        return f"{obj.therapist.user.first_name} {obj.therapist.user.last_name}"
+
+    def get_patient_name(self, obj):
+        if isinstance(obj, dict) and obj.get('is_mock_data'):
+            return obj.get('patient_name', 'Mock Patient')
+        return f"{obj.patient.user.first_name} {obj.patient.user.last_name}"
+
+    def get_payment_processor_name(self, obj):
+        if isinstance(obj, dict) and obj.get('is_mock_data'):
+            return obj.get('payment_processor_name', 'Admin User')
+        if obj.payment_processed_by:
+            return f"{obj.payment_processed_by.first_name} {obj.payment_processed_by.last_name}"
+        return None
+
+    def get_is_verified_display(self, obj):
+        if isinstance(obj, dict) and obj.get('is_mock_data'):
+            return "Verified" if obj.get('is_verified', False) else "Not Verified"
+        return "Verified" if obj.is_verified else "Not Verified"
 
     @classmethod
     def generate_mock_data(cls, count=5):
@@ -51,6 +94,11 @@ class EarningRecordSerializer(MockDataMixin, serializers.ModelSerializer):
         session_types = [
             'Initial Assessment', 'Follow-up Consultation', 'Physical Therapy',
             'Rehabilitation Session', 'Pain Management', 'Post-Surgery Recovery'
+        ]
+
+        patient_names = [
+            ('Ananya', 'Sharma'), ('Vikram', 'Patel'), ('Priya', 'Desai'),
+            ('Rahul', 'Mehta'), ('Neha', 'Gupta'), ('Arjun', 'Singh')
         ]
 
         for i in range(count):
@@ -81,8 +129,38 @@ class EarningRecordSerializer(MockDataMixin, serializers.ModelSerializer):
             therapist_amount = amount * Decimal('0.45')
             doctor_amount = amount * Decimal('0.10')
 
+            # Get random patient name
+            first_name, last_name = random.choice(patient_names)
+
+            # Generate payment details for completed sessions
+            payment_method = None
+            payment_reference = None
+            payment_processed_by = None
+            payment_processor_name = None
+            payment_scheduled_date = None
+            is_verified = False
+
+            if status == 'completed':
+                payment_method = random.choice([
+                    'bank_transfer', 'cash', 'cheque', 'upi'
+                ])
+                payment_reference = f"REF-{random.randint(10000, 99999)}"
+                payment_processed_by = 1  # Admin ID
+                payment_processor_name = "Admin User"
+                is_verified = random.choice([True, False])
+            elif payment_status == 'scheduled':
+                # Schedule payment for 15th or 30th of next month
+                next_month = date.month + 1 if date.month < 12 else 1
+                next_year = date.year if date.month < 12 else date.year + 1
+                payment_day = random.choice([15, 30])
+                payment_scheduled_date = datetime(next_year, next_month, payment_day).date().isoformat()
+
             mock_records.append({
                 'id': f"mock-{i+1}",
+                'therapist': 1,
+                'therapist_name': 'Rajesh Sharma',
+                'patient': i % 5 + 1,
+                'patient_name': f"{first_name} {last_name}",
                 'date': date.isoformat(),
                 'session_type': random.choice(session_types),
                 'amount': str(amount),
@@ -90,6 +168,12 @@ class EarningRecordSerializer(MockDataMixin, serializers.ModelSerializer):
                 'status': status,
                 'payment_status': payment_status,
                 'payment_date': date.isoformat() if status == 'completed' else None,
+                'payment_method': payment_method,
+                'payment_reference': payment_reference,
+                'payment_processed_by': payment_processed_by,
+                'payment_processor_name': payment_processor_name,
+                'payment_scheduled_date': payment_scheduled_date,
+                'is_verified': is_verified,
                 'notes': 'Example data for demonstration purposes',
                 'admin_amount': str(admin_amount),
                 'therapist_amount': str(therapist_amount),
@@ -566,6 +650,81 @@ class RevenueCalculatorSerializer(serializers.Serializer):
                     raise serializers.ValidationError({"distribution_config_id": "No default distribution configuration found"})
 
         return data
+
+
+class PaymentScheduleSerializer(serializers.ModelSerializer):
+    """Serializer for the PaymentSchedule model"""
+    therapist_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    next_payment_date = serializers.SerializerMethodField()
+    reminder_dates = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PaymentSchedule
+        fields = [
+            'id', 'therapist', 'therapist_name', 'schedule_type', 'custom_day',
+            'is_active', 'send_reminders', 'reminder_days', 'created_by',
+            'created_by_name', 'created_at', 'updated_at', 'next_payment_date',
+            'reminder_dates'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'therapist_name',
+                           'created_by_name', 'next_payment_date', 'reminder_dates']
+
+    def get_therapist_name(self, obj):
+        return f"{obj.therapist.user.first_name} {obj.therapist.user.last_name}"
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}"
+        return None
+
+    def get_next_payment_date(self, obj):
+        return obj.get_next_payment_date()
+
+    def get_reminder_dates(self, obj):
+        return obj.get_reminder_dates()
+
+    def create(self, validated_data):
+        # Set created_by from the request
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        return super().create(validated_data)
+
+
+class PaymentBatchSerializer(serializers.ModelSerializer):
+    """Serializer for the PaymentBatch model"""
+    created_by_name = serializers.SerializerMethodField()
+    total_amount = serializers.SerializerMethodField()
+    payment_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PaymentBatch
+        fields = [
+            'id', 'name', 'status', 'payment_date', 'payment_method', 'notes',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'processed_at', 'total_amount', 'payment_count'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'processed_at',
+                           'created_by_name', 'total_amount', 'payment_count']
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}"
+        return None
+
+    def get_total_amount(self, obj):
+        return obj.get_total_amount()
+
+    def get_payment_count(self, obj):
+        return obj.get_payment_count()
+
+    def create(self, validated_data):
+        # Set created_by from the request
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        return super().create(validated_data)
 
 
 class FinancialSummarySerializer(MockDataMixin, serializers.Serializer):

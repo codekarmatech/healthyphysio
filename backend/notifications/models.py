@@ -26,6 +26,10 @@ class Notification(models.Model):
         TREATMENT_PLAN = 'treatment_plan', 'Treatment Plan'
         EQUIPMENT = 'equipment', 'Equipment'
         VISIT = 'visit', 'Visit'
+        PAYMENT = 'payment', 'Payment'
+        PAYMENT_REMINDER = 'payment_reminder', 'Payment Reminder'
+        PAYMENT_PROCESSED = 'payment_processed', 'Payment Processed'
+        PAYMENT_FAILED = 'payment_failed', 'Payment Failed'
         SYSTEM = 'system', 'System'
         OTHER = 'other', 'Other'
 

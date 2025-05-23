@@ -1,0 +1,153 @@
+/* Ensure the map container takes full height */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  z-index: 5; /* Increased z-index to ensure it's above other elements but below controls */
+  position: relative;
+}
+
+/* Fix for map tiles not loading properly */
+.leaflet-tile {
+  visibility: inherit !important;
+}
+
+/* Fix for map controls */
+.leaflet-control-container {
+  position: absolute;
+  z-index: 1000;
+}
+
+/* Ensure map panes are properly stacked */
+.leaflet-map-pane {
+  z-index: 2 !important;
+}
+
+.leaflet-tile-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-overlay-pane {
+  z-index: 3 !important;
+}
+
+.leaflet-marker-pane {
+  z-index: 4 !important;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 5 !important;
+}
+
+.leaflet-popup-pane {
+  z-index: 6 !important;
+}
+
+/* Custom marker styles */
+.therapist-marker {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.therapist-marker.selected div {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 0 0 6px rgba(255, 193, 7, 0.5);
+  z-index: 1000 !important;
+}
+
+.patient-marker {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Marker content styles */
+.therapist-marker div, .patient-marker div {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: white !important;
+  font-weight: bold !important;
+  border: 2px solid white !important;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4) !important;
+}
+
+.therapist-marker div {
+  background-color: #3b82f6 !important; /* Blue for therapists */
+}
+
+.therapist-marker.selected div {
+  background-color: #f59e0b !important; /* Yellow for selected therapist */
+}
+
+.patient-marker div {
+  background-color: #10b981 !important; /* Green for patients */
+}
+
+/* Focus button in popup */
+.select-therapist-btn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+}
+
+.select-therapist-btn:hover {
+  background-color: #2563eb;
+}
+
+/* Fix for map container in Tailwind environment */
+.map-container {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  min-height: 600px;
+  z-index: 1;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Map type toggle button styles */
+.map-type-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  background-color: white;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+}
+
+/* Popup styles */
+.leaflet-popup-content {
+  margin: 10px;
+}
+
+.leaflet-popup-content strong {
+  font-weight: 600;
+}
+
+/* Proximity line styles */
+.proximity-line {
+  stroke-dasharray: 5, 10;
+  animation: dash 20s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: 1000;
+  }
+}

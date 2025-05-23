@@ -48,6 +48,21 @@ class Visit(models.Model):
     scheduled_end = models.DateTimeField()
     actual_start = models.DateTimeField(null=True, blank=True)
     actual_end = models.DateTimeField(null=True, blank=True)
+
+    # Manual location verification fields
+    manual_location_address = models.TextField(blank=True, null=True,
+        help_text="Manually entered address by therapist")
+    manual_location_landmark = models.CharField(max_length=255, blank=True, null=True,
+        help_text="Nearest landmark to the visit location")
+    manual_arrival_time = models.TimeField(null=True, blank=True,
+        help_text="Manually entered arrival time")
+    manual_departure_time = models.TimeField(null=True, blank=True,
+        help_text="Manually entered departure time")
+    manual_location_notes = models.TextField(blank=True, null=True,
+        help_text="Additional notes about the location")
+    manual_location_verified = models.BooleanField(default=False,
+        help_text="Whether the manual location has been verified by admin")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -87,6 +102,50 @@ class Visit(models.Model):
             self.save()
             return True
         return False
+
+    def submit_manual_location(self, location_data):
+        """
+        Submit manual location information for a visit
+
+        Args:
+            location_data (dict): Dictionary containing manual location fields
+                - manual_location_address: Address of the visit
+                - manual_location_landmark: Nearest landmark
+                - manual_arrival_time: Time of arrival
+                - manual_departure_time: Time of departure
+                - manual_location_notes: Additional notes
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Update manual location fields
+            self.manual_location_address = location_data.get('manual_location_address', '')
+            self.manual_location_landmark = location_data.get('manual_location_landmark', '')
+            self.manual_location_notes = location_data.get('manual_location_notes', '')
+
+            # Handle time fields
+            arrival_time = location_data.get('manual_arrival_time')
+            departure_time = location_data.get('manual_departure_time')
+
+            if arrival_time:
+                self.manual_arrival_time = arrival_time
+
+            if departure_time:
+                self.manual_departure_time = departure_time
+
+            # Save the visit
+            self.save()
+
+            # Create a system note about manual location submission
+            note = f"Manual location information submitted: {self.manual_location_address}"
+
+            # TODO: Add to visit history or notes if such functionality exists
+
+            return True
+        except Exception as e:
+            print(f"Error submitting manual location: {str(e)}")
+            return False
 
     class Meta:
         ordering = ['-scheduled_start']

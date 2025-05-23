@@ -32,7 +32,19 @@ const PaymentStatusManagement = () => {
   // Fetch earnings records with filters
   const fetchEarningsRecords = useCallback(async () => {
     setLoading(true);
+    setError(null); // Clear any previous errors
+
     try {
+      console.log('Fetching earnings records with filters:', {
+        patient: patientFilter,
+        therapist: therapistFilter,
+        status: statusFilter !== 'all' ? statusFilter : null,
+        start_date: startDateFilter,
+        end_date: endDateFilter,
+        page: currentPage,
+        page_size: pageSize
+      });
+
       const data = await financialDashboardService.getEarningsRecords({
         patient: patientFilter,
         therapist: therapistFilter,
@@ -43,18 +55,45 @@ const PaymentStatusManagement = () => {
         page_size: pageSize
       });
 
-      setEarningsRecords(data.results || []);
-      setTotalRecords(data.count || 0);
-      setIsMockData(data.is_mock_data || false);
-      setError(null);
+      // Check if we got data back
+      if (data && (data.results || data.is_mock_data)) {
+        setEarningsRecords(data.results || []);
+        setTotalRecords(data.count || 0);
+        setIsMockData(data.is_mock_data || false);
+
+        if (data.is_mock_data) {
+          console.log('Using mock earnings data for display');
+          toast.info('Using example data for demonstration purposes', {
+            autoClose: 3000,
+            position: 'top-right'
+          });
+        }
+      } else {
+        // If we got an empty response, use mock data
+        console.warn('Empty or invalid response from earnings API, using mock data');
+        const mockData = financialDashboardService.getMockEarningsRecords();
+        setEarningsRecords(mockData);
+        setTotalRecords(mockData.length);
+        setIsMockData(true);
+        setError('No earnings data available. Showing example data for demonstration.');
+      }
     } catch (err) {
-      console.error('Error fetching earnings records:', err);
-      setError('Failed to load earnings records. Please try again later.');
+      console.error('Error in component while fetching earnings records:', err);
+
+      // Set a user-friendly error message
+      setError('Failed to load earnings records. Using example data instead.');
+
       // Use mock data as fallback
       const mockData = financialDashboardService.getMockEarningsRecords();
       setEarningsRecords(mockData);
       setTotalRecords(mockData.length);
       setIsMockData(true);
+
+      // Show a toast notification
+      toast.error('Error loading payment data. Using example data instead.', {
+        autoClose: 5000,
+        position: 'top-right'
+      });
     } finally {
       setLoading(false);
     }

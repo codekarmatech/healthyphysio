@@ -820,6 +820,31 @@ const TherapistDashboard = () => {
                             />
                           </div>
 
+                          {/* Attendance vs Availability Explainer */}
+                          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                            <h4 className="text-sm font-medium text-blue-900 mb-2 flex items-center">
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              </svg>
+                              Understanding Attendance vs Availability
+                            </h4>
+                            <div className="text-sm text-blue-800 space-y-2">
+                              <p><strong>Attendance:</strong> Use the calendar above to mark your attendance for days when you have scheduled appointments.</p>
+                              <p><strong>Availability:</strong> For days when you don't have appointments but are available to work, use the Availability feature.</p>
+                              <div className="mt-3">
+                                <Link
+                                  to="/therapist/availability"
+                                  className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                  </svg>
+                                  Manage Your Availability
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+
                           {/* Weekly Schedule Table - Responsive */}
                           <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8">
                             <div className="inline-block min-w-full py-2 align-middle px-4 sm:px-6 lg:px-8">

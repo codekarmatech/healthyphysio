@@ -25,6 +25,48 @@ class EarningsService extends BaseService {
   }
 
   /**
+   * Get payment history for a therapist
+   * @param {string|number} therapistId - Therapist ID
+   * @param {Object} filters - Optional filters (year, month, start_date, end_date)
+   * @returns {Promise} API response
+   */
+  async getPaymentHistory(therapistId, filters = {}) {
+    try {
+      // Build query parameters
+      const params = new URLSearchParams();
+
+      if (filters.year) params.append('year', filters.year);
+      if (filters.month) params.append('month', filters.month);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
+
+      const queryString = params.toString();
+      const url = `/earnings/therapist/${therapistId}/payment-history/${queryString ? `?${queryString}` : ''}`;
+
+      console.log(`Fetching payment history from: ${url}`);
+      const response = await api.get(url);
+      console.log('Payment history fetched successfully');
+      return response;
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+
+      // Return empty payment history instead of throwing error
+      return {
+        data: {
+          payments: [],
+          summary: {
+            total_paid: 0,
+            payment_count: 0,
+            therapist_name: 'Unknown'
+          },
+          filters_applied: filters,
+          note: 'No payment history available'
+        }
+      };
+    }
+  }
+
+  /**
    * Get therapist earnings by month
    * @param {string|number} therapistId - Therapist ID
    * @param {number} year - Year
@@ -33,19 +75,21 @@ class EarningsService extends BaseService {
    */
   async getMonthlyEarnings(therapistId, year, month) {
     try {
-      // Ensure basePath ends with a slash for consistent URL construction
-      const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
-
-      // Use a single, consistent URL format
-      const url = `${basePath}monthly/${therapistId}/?year=${year}&month=${month}`;
+      // Use the new role-based endpoint that properly handles permissions
+      const url = `/earnings/therapist/${therapistId}/monthly/?year=${year}&month=${month}`;
 
       console.log(`Fetching monthly earnings from: ${url}`);
       const response = await api.get(url);
       console.log('Monthly earnings fetched successfully');
       return response;
     } catch (error) {
+      // If the endpoint returns 403, it means permission denied
+      if (error.response && error.response.status === 403) {
+        console.error('Permission denied for earnings endpoint:', error.response.data);
+        throw new Error('You do not have permission to view this earnings data');
+      }
       // If the endpoint returns 404, log and use mock data
-      if (error.response && error.response.status === 404) {
+      else if (error.response && error.response.status === 404) {
         console.log(`404 Not Found for earnings endpoint: ${error.config?.url}`);
         // Fall through to mock data generation
       } else {
@@ -53,7 +97,7 @@ class EarningsService extends BaseService {
         console.error('Error fetching monthly earnings:', error);
       }
 
-      // Generate mock data as fallback
+      // Generate mock data as fallback only for 404 errors
       console.log('Using mock earnings data as fallback');
       const mockData = await this.getMockEarnings(therapistId, year, month);
       // Add a flag to indicate this is mock data
@@ -177,6 +221,60 @@ class EarningsService extends BaseService {
     // Ensure basePath ends with a slash for consistent URL construction
     const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
     return api.get(`${basePath}analytics/${therapistId}/?period=${period}`);
+  }
+
+  /**
+   * Process offline payments for therapists
+   * @param {Object} paymentData - Payment data
+   * @param {Array} paymentData.earning_ids - Array of earning record IDs to mark as paid
+   * @param {string} paymentData.payment_method - Payment method (bank_transfer, cash, cheque, upi, other)
+   * @param {string} paymentData.payment_reference - Reference number for the payment
+   * @param {string} paymentData.payment_date - Payment date in YYYY-MM-DD format
+   * @param {string} paymentData.notes - Additional notes about the payment
+   * @returns {Promise} API response
+   */
+  processPayments(paymentData) {
+    // Ensure basePath ends with a slash for consistent URL construction
+    const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
+    return api.post(`${basePath}payment-management/process-payments/`, paymentData);
+  }
+
+  /**
+   * Schedule payments for future processing
+   * @param {Object} scheduleData - Schedule data
+   * @param {Array} scheduleData.earning_ids - Array of earning record IDs to schedule
+   * @param {string} scheduleData.payment_date - Scheduled payment date in YYYY-MM-DD format
+   * @param {string} scheduleData.notes - Additional notes about the scheduled payment
+   * @returns {Promise} API response
+   */
+  schedulePayments(scheduleData) {
+    // Ensure basePath ends with a slash for consistent URL construction
+    const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
+    return api.post(`${basePath}payment-management/schedule-payments/`, scheduleData);
+  }
+
+  /**
+   * Get payment history for a therapist (legacy method - kept for backward compatibility)
+   * @param {string|number} therapistId - Therapist ID
+   * @param {string} startDate - Start date in YYYY-MM-DD format
+   * @param {string} endDate - End date in YYYY-MM-DD format
+   * @returns {Promise} API response
+   */
+  getPaymentHistoryLegacy(therapistId, startDate = null, endDate = null) {
+    // Ensure basePath ends with a slash for consistent URL construction
+    const basePath = this.basePath.endsWith('/') ? this.basePath : `${this.basePath}/`;
+
+    let url = `${basePath}payment-management/history/${therapistId}/`;
+
+    // Add date filters if provided
+    if (startDate || endDate) {
+      const params = [];
+      if (startDate) params.push(`start_date=${startDate}`);
+      if (endDate) params.push(`end_date=${endDate}`);
+      url += `?${params.join('&')}`;
+    }
+
+    return api.get(url);
   }
 
   /**

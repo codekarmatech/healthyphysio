@@ -17,13 +17,13 @@ from visits.models import TherapistReport
 def get_therapist_analytics(start_date=None, end_date=None, area_id=None, specialization=None):
     """
     Get analytics data for comparing therapist performance
-    
+
     Args:
         start_date: Start date for filtering data
         end_date: End date for filtering data
         area_id: Filter by area ID
         specialization: Filter by specialization
-        
+
     Returns:
         List of therapist analytics data
     """
@@ -32,23 +32,23 @@ def get_therapist_analytics(start_date=None, end_date=None, area_id=None, specia
         end_date = timezone.now().date()
     if not start_date:
         start_date = end_date - timedelta(days=30)
-    
+
     # Base queryset for therapists
     therapists = Therapist.objects.filter(is_approved=True)
-    
+
     # Apply filters
     if area_id:
         therapists = therapists.filter(
-            Q(therapistservicearea__area_id=area_id) | 
+            Q(therapistservicearea__area_id=area_id) |
             Q(user__areas__id=area_id)
         ).distinct()
-    
+
     if specialization:
         therapists = therapists.filter(specialization__icontains=specialization)
-    
+
     # Prepare result list
     result = []
-    
+
     for therapist in therapists:
         # Get appointments for this therapist in the date range
         appointments = Appointment.objects.filter(
@@ -56,46 +56,46 @@ def get_therapist_analytics(start_date=None, end_date=None, area_id=None, specia
             datetime__date__gte=start_date,
             datetime__date__lte=end_date
         )
-        
+
         # Calculate appointment metrics
         total_appointments = appointments.count()
         completed_appointments = appointments.filter(status='COMPLETED').count()
         cancelled_appointments = appointments.filter(status='CANCELLED').count()
         completion_rate = (completed_appointments / total_appointments * 100) if total_appointments > 0 else 0
-        
+
         # Get earnings for this therapist in the date range
         earnings = EarningRecord.objects.filter(
             therapist=therapist,
             date__gte=start_date,
             date__lte=end_date
         )
-        
+
         # Calculate earnings metrics
         total_earnings = earnings.aggregate(
             total=Coalesce(Sum('therapist_amount'), Decimal('0'), output_field=FloatField())
         )['total']
-        
+
         # Get reports for this therapist in the date range
         reports = TherapistReport.objects.filter(
             therapist=therapist,
             created_at__date__gte=start_date,
             created_at__date__lte=end_date
         )
-        
+
         # Calculate report metrics
         total_reports = reports.count()
         on_time_reports = reports.filter(status='SUBMITTED').count()
         late_reports = reports.filter(status='LATE_SUBMISSION').count()
         report_submission_rate = (on_time_reports / total_reports * 100) if total_reports > 0 else 0
-        
+
         # Get unique patients for this therapist in the date range
         unique_patients = appointments.values('patient').distinct().count()
-        
+
         # Calculate average session duration if available
         avg_duration = appointments.filter(status='COMPLETED').aggregate(
-            avg_duration=Coalesce(Avg('duration'), 0, output_field=FloatField())
+            avg_duration=Coalesce(Avg('duration_minutes'), 0, output_field=FloatField())
         )['avg_duration']
-        
+
         # Add therapist data to result
         result.append({
             'id': therapist.id,
@@ -127,5 +127,5 @@ def get_therapist_analytics(start_date=None, end_date=None, area_id=None, specia
                 }
             }
         })
-    
+
     return result

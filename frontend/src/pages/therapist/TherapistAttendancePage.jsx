@@ -915,54 +915,102 @@ const TherapistAttendancePage = () => {
 
       {/* Calendar Tab */}
       {activeTab === 'calendar' && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 md:mb-0">Monthly Attendance</h2>
-
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => {
-                  setSelectedDate(new Date());
-                  setShowSubmitModal(true);
-                }}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        <div className="space-y-6">
+          {/* Attendance vs Availability Explainer Card */}
+          <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 mt-1">
+                <svg className="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                Mark Today's Attendance
-              </button>
-
-              <MonthSelector
-                currentDate={currentDate}
-                onPrevMonth={handlePrevMonth}
-                onNextMonth={handleNextMonth}
-              />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-gray-900">Understanding Attendance & Availability</h3>
+                <div className="mt-2 text-sm text-gray-600">
+                  <p className="mb-2">Our system distinguishes between two important concepts:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                    <div className="bg-green-50 p-3 rounded-md border border-green-200">
+                      <h4 className="font-medium text-green-800 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Attendance
+                      </h4>
+                      <p className="text-sm text-green-700 mt-1">For days when you have scheduled appointments. Mark yourself as present, absent, or half-day. You get paid based on your attendance status.</p>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                      <h4 className="font-medium text-blue-800 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        Availability
+                      </h4>
+                      <p className="text-sm text-blue-700 mt-1">For days when you don't have appointments but are available to work. This helps administrators assign you new patients on those days.</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex">
+                    <a href="/therapist/availability" className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      Manage Your Availability
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <AttendanceSummary
-            summary={attendanceSummary}
-            loading={loading}
-            isMockData={isAttendanceMockData}
-          />
+          {/* Main Attendance Card */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4 md:mb-0">Monthly Attendance</h2>
 
-          <AttendanceCalendar
-            days={attendanceDays}
-            currentDate={currentDate}
-            onAttendanceUpdated={handleAttendanceUpdated}
-            isMockData={isAttendanceMockData}
-          />
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => {
+                    setSelectedDate(new Date());
+                    setShowSubmitModal(true);
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Mark Today's Attendance
+                </button>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-md">
-            <h3 className="text-lg font-medium text-gray-800 mb-2">Attendance Instructions</h3>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-              <li>Mark your attendance daily by clicking on today's date.</li>
-              <li>Apply for leave at least 48 hours in advance (except for sick leave).</li>
-              <li>Record patient cancellations promptly to maintain accurate records.</li>
-              <li>All leave requests require approval from administration.</li>
-              <li>You will not be paid for days marked as absent, on leave, or with patient cancellations.</li>
-            </ul>
+                <MonthSelector
+                  currentDate={currentDate}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                />
+              </div>
+            </div>
+
+            <AttendanceSummary
+              summary={attendanceSummary}
+              loading={loading}
+              isMockData={isAttendanceMockData}
+            />
+
+            <AttendanceCalendar
+              days={attendanceDays}
+              currentDate={currentDate}
+              onAttendanceUpdated={handleAttendanceUpdated}
+              isMockData={isAttendanceMockData}
+            />
+
+            <div className="mt-6 p-4 bg-gray-50 rounded-md">
+              <h3 className="text-lg font-medium text-gray-800 mb-2">Attendance Instructions</h3>
+              <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                <li>Mark your attendance daily by clicking on today's date.</li>
+                <li>Apply for leave at least 48 hours in advance (except for sick leave).</li>
+                <li>Record patient cancellations promptly to maintain accurate records.</li>
+                <li>All leave requests require approval from administration.</li>
+                <li>You will not be paid for days marked as absent, on leave, or with patient cancellations.</li>
+              </ul>
+            </div>
           </div>
         </div>
       )}

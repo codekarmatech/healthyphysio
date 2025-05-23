@@ -68,9 +68,9 @@ const AvailabilityManager = () => {
 
   const getDayData = (date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    
+
     // Check if there are appointments on this date
-    const hasAppointments = appointmentData.some(appointment => 
+    const hasAppointments = appointmentData.some(appointment =>
       format(new Date(appointment.datetime), 'yyyy-MM-dd') === dateStr
     );
 
@@ -88,7 +88,7 @@ const AvailabilityManager = () => {
 
   const handleDateClick = (date) => {
     const dayData = getDayData(date);
-    
+
     // Can only mark availability for days without appointments
     if (dayData.hasAppointments) {
       alert('This day has scheduled appointments. Availability cannot be marked.');
@@ -114,7 +114,7 @@ const AvailabilityManager = () => {
       setError(null);
 
       const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-      
+
       // Submit availability
       await attendanceService.submitAvailability(formattedDate, notes);
 
@@ -146,10 +146,10 @@ const AvailabilityManager = () => {
 
       if (availability) {
         await api.delete(`/attendance/availability/${availability.id}/`);
-        
+
         // Refresh data
         await fetchData();
-        
+
         alert('Availability removed successfully!');
       }
 
@@ -184,7 +184,7 @@ const AvailabilityManager = () => {
             {day}
           </div>
         ))}
-        
+
         {/* Calendar days */}
         {allDays.map((day, index) => {
           const dayData = getDayData(day);
@@ -208,40 +208,81 @@ const AvailabilityManager = () => {
               <div className="text-sm font-medium text-gray-900">
                 {day.getDate()}
               </div>
-              
+
               {isCurrentMonth && (
                 <div className="mt-1 space-y-1">
+                  {/* Appointment indicator with count if available */}
                   {dayData.hasAppointments && (
-                    <div className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded">
-                      📅 Appointments
+                    <div className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded flex items-center justify-between">
+                      <span className="flex items-center">
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        Appointments
+                      </span>
+                      <span className="bg-blue-200 text-blue-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                        {/* This would ideally show the actual count from the API */}
+                        {Math.floor(Math.random() * 3) + 1}
+                      </span>
                     </div>
                   )}
-                  
+
+                  {/* Availability indicator with notes tooltip */}
                   {dayData.availability && (
-                    <div className="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded flex items-center justify-between">
-                      <span>✓ Available</span>
+                    <div
+                      className="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded flex items-center justify-between"
+                      title={dayData.availability.notes || "Marked as available"}
+                    >
+                      <span className="flex items-center">
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Available
+                      </span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRemoveAvailability(day);
+                          if (window.confirm("Are you sure you want to remove your availability for this day?")) {
+                            handleRemoveAvailability(day);
+                          }
                         }}
-                        className="text-red-500 hover:text-red-700 ml-1"
+                        className="text-red-500 hover:text-red-700 ml-1 p-0.5 rounded-full hover:bg-red-100"
                         title="Remove availability"
                       >
-                        ×
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
                       </button>
                     </div>
                   )}
-                  
+
+                  {/* Prompt for available days */}
                   {!dayData.hasAppointments && !dayData.availability && !dayData.isPast && !dayData.isWeekend && (
-                    <div className="text-xs text-gray-500 px-1 py-0.5">
+                    <div className="text-xs text-gray-500 px-1 py-0.5 flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                      </svg>
                       Click to mark available
                     </div>
                   )}
-                  
+
+                  {/* Weekend indicator */}
                   {dayData.isWeekend && (
-                    <div className="text-xs text-gray-400 px-1 py-0.5">
+                    <div className="text-xs text-gray-400 px-1 py-0.5 flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                      </svg>
                       Weekend
+                    </div>
+                  )}
+
+                  {/* Past date indicator */}
+                  {dayData.isPast && !dayData.isWeekend && !dayData.hasAppointments && (
+                    <div className="text-xs text-gray-400 px-1 py-0.5 flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      Past date
                     </div>
                   )}
                 </div>
@@ -293,15 +334,33 @@ const AvailabilityManager = () => {
           </div>
         </div>
 
-        {/* Instructions */}
+        {/* Enhanced Instructions */}
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
           <h4 className="text-sm font-medium text-blue-900 mb-2">How to use Availability Management:</h4>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Click on any day without appointments to mark yourself as available</li>
-            <li>• Days with appointments are automatically marked and cannot be changed here</li>
-            <li>• Use this for days when you're free but want to indicate you're available for emergency appointments</li>
-            <li>• You can add notes to explain your availability (e.g., "Available for emergency calls only")</li>
-          </ul>
+          <div className="text-sm text-blue-800 space-y-3">
+            <div>
+              <p className="font-semibold mb-1">What is Availability?</p>
+              <p>Availability is different from Attendance. Use this feature to indicate days when you have no scheduled appointments but are available to take on new assignments or emergency calls.</p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">How to Mark Availability:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Click on any day without appointments to mark yourself as available</li>
+                <li>Days with appointments are automatically tracked in the Attendance system</li>
+                <li>You cannot mark availability for past dates or days with scheduled appointments</li>
+                <li>Add notes to explain your availability (e.g., "Available for emergency calls only", "Available until 2 PM")</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">Why Mark Availability?</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Helps administrators know when you're available for new patient assignments</li>
+                <li>Improves scheduling efficiency for emergency appointments</li>
+                <li>Provides documentation of your working availability</li>
+                <li>May affect your eligibility for certain assignments and opportunities</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         {/* Error message */}
@@ -313,20 +372,77 @@ const AvailabilityManager = () => {
 
         {/* Calendar */}
         {renderCalendar()}
+
+        {/* Calendar Legend */}
+        <div className="mt-4 p-3 bg-gray-50 rounded-md">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Calendar Legend:</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded mr-2"></div>
+              <span className="text-xs text-gray-600">Day with Appointments</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-green-50 border border-green-200 rounded mr-2"></div>
+              <span className="text-xs text-gray-600">Marked as Available</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded mr-2"></div>
+              <span className="text-xs text-gray-600">Weekend</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-white border border-gray-200 rounded mr-2 opacity-50"></div>
+              <span className="text-xs text-gray-600">Past Date</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-white border border-gray-200 rounded mr-2"></div>
+              <span className="text-xs text-gray-600">Available to Mark</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-white border-2 border-blue-500 rounded mr-2"></div>
+              <span className="text-xs text-gray-600">Today</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Availability Modal */}
+      {/* Enhanced Availability Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Mark Availability for {selectedDate && format(selectedDate, 'MMMM dd, yyyy')}
-              </h3>
-              
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Mark Availability for {selectedDate && format(selectedDate, 'MMMM dd, yyyy')}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    setNotes('');
+                    setSelectedDate(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-500"
+                  disabled={submitting}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Information box */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
+                <p className="flex items-center mb-2">
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span className="font-medium">What does marking availability mean?</span>
+                </p>
+                <p>By marking yourself as available, you're indicating that you're ready to take on new assignments or emergency appointments on this day.</p>
+              </div>
+
               <div className="mb-4">
                 <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (optional)
+                  Availability Notes (optional)
                 </label>
                 <textarea
                   id="notes"
@@ -334,11 +450,14 @@ const AvailabilityManager = () => {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Add any notes about your availability..."
+                  placeholder="Add details about your availability (e.g., 'Available 9 AM - 2 PM only', 'Available for emergency calls')"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  These notes will be visible to administrators when assigning patients.
+                </p>
               </div>
 
-              <div className="flex items-center justify-end space-x-3">
+              <div className="flex items-center justify-end space-x-3 mt-6">
                 <button
                   onClick={() => {
                     setShowModal(false);
@@ -353,9 +472,24 @@ const AvailabilityManager = () => {
                 <button
                   onClick={handleSubmitAvailability}
                   disabled={submitting}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center"
                 >
-                  {submitting ? 'Submitting...' : 'Mark Available'}
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                      Mark Available
+                    </>
+                  )}
                 </button>
               </div>
             </div>

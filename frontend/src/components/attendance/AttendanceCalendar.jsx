@@ -67,16 +67,27 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
   // Function to handle day click
   const handleDayClick = (date) => {
     setSelectedDate(date);
+    console.log("Day clicked:", date);
 
     // Check if attendance already submitted
     const dayData = getDayData(date);
+
+    // For days with existing attendance, show a modal with details and option to request change
     if (dayData && dayData.status !== 'upcoming') {
-      // Already submitted
+      // Show details modal or change request option
+      console.log("Attendance already submitted for this date:", dayData);
+      // We could add a modal here to show attendance details
+
+      // For now, just notify the parent component
+      if (onAttendanceUpdated) {
+        onAttendanceUpdated('view_details', date);
+      }
       return;
     }
 
     // For today, show attendance submission options
     if (isSameDay(date, new Date())) {
+      console.log("Today clicked, showing submission modal");
       setShowSubmitModal(true);
       return;
     }
@@ -84,6 +95,7 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
     // For future dates, show leave application option
     const today = new Date();
     if (isBefore(today, date)) {
+      console.log("Future date clicked, showing options modal");
       // Check if it's within the next 30 days (for patient cancellation)
       const thirtyDaysFromNow = addDays(today, 30);
       if (isBefore(date, thirtyDaysFromNow)) {
@@ -93,6 +105,14 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
         // Only show leave application for dates beyond 30 days
         setShowLeaveModal(true);
       }
+      return;
+    }
+
+    // For past dates without attendance, allow marking attendance retroactively
+    if (isBefore(date, today) && (!dayData || dayData.status === 'upcoming')) {
+      console.log("Past date without attendance clicked, showing submission modal");
+      setShowSubmitModal(true);
+      return;
     }
   };
 
@@ -222,32 +242,75 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
           return (
             <div
               key={index}
-              className={`h-16 p-1 border ${statusColor} rounded relative cursor-pointer transition-all hover:shadow-md ${
+              className={`h-20 p-1 border ${statusColor} rounded relative cursor-pointer transition-all hover:shadow-md ${
                 isCurrentDay ? 'ring-2 ring-primary-500' : ''
               }`}
               onClick={() => handleDayClick(day)}
               title={`${dayFormat(day)} - ${dayData?.holiday_name || ''}`} // Add tooltip with full day name
             >
               <div className="flex flex-col h-full">
-                <span className={`text-sm font-semibold ${isCurrentDay ? 'text-primary-700' : 'text-gray-700'}`}>
-                  {format(day, dateFormat)}
-                </span>
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-semibold ${isCurrentDay ? 'text-primary-700' : 'text-gray-700'}`}>
+                    {format(day, dateFormat)}
+                  </span>
 
+                  {/* Clickable indicator */}
+                  {(status === 'upcoming' || isSameDay(day, new Date())) && (
+                    <span className="inline-flex items-center justify-center w-4 h-4 bg-primary-100 rounded-full">
+                      <svg className="w-3 h-3 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                      </svg>
+                    </span>
+                  )}
+                </div>
+
+                {/* Status display */}
                 {status !== 'upcoming' && (
                   <div className="mt-1 text-xs">
                     <span className="font-medium capitalize">
                       {dayData?.display_status || status.replace(/_/g, ' ')}
                     </span>
-                    {dayData?.has_appointments && status === 'free_day' && (
-                      <div className="text-xs text-red-500 mt-1 truncate">
-                        Has appointments
+
+                    {/* Appointment indicator */}
+                    {dayData?.has_appointments && (
+                      <div className="text-xs text-blue-600 mt-1 flex items-center">
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        Appointments
                       </div>
                     )}
+
+                    {/* Availability indicator */}
+                    {status === 'available' && (
+                      <div className="text-xs text-teal-600 mt-1 flex items-center">
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Available
+                      </div>
+                    )}
+
+                    {/* Submission time */}
                     {dayData?.submitted_at && (
                       <div className="text-xs text-gray-500 mt-1 truncate" title={`Submitted at ${dayData.submitted_at}`}>
+                        <svg className="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
                         {dayData.submitted_at}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Prompt for upcoming days */}
+                {status === 'upcoming' && (
+                  <div className="mt-1 text-xs text-gray-500 flex items-center">
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Click to mark
                   </div>
                 )}
               </div>
@@ -479,35 +542,88 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
         </div>
       )}
 
-      {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-3">
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-green-100 border border-green-500 rounded mr-1"></div>
-          <span className="text-xs text-gray-600">Present</span>
+      {/* Enhanced Legend with Explanations */}
+      <div className="mt-6">
+        <div className="mb-2">
+          <h4 className="text-sm font-medium text-gray-700">Calendar Legend</h4>
+          <p className="text-xs text-gray-500 mt-1">Click on any day to mark attendance or view details</p>
         </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-red-100 border border-red-500 rounded mr-1"></div>
-          <span className="text-xs text-gray-600">Absent</span>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-green-100 border border-green-500 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Present</span>
+              <p className="text-xs text-gray-500">Marked as present for work</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-red-100 border border-red-500 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Absent</span>
+              <p className="text-xs text-gray-500">Marked as absent (unpaid)</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-yellow-100 border border-yellow-500 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Half Day</span>
+              <p className="text-xs text-gray-500">Worked partial day (50% pay)</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-purple-100 border border-purple-500 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Approved Leave</span>
+              <p className="text-xs text-gray-500">Leave request approved</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-teal-100 border border-teal-500 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Available</span>
+              <p className="text-xs text-gray-500">Available for assignments</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-teal-50 border border-teal-300 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Free Day</span>
+              <p className="text-xs text-gray-500">No appointments scheduled</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-blue-100 border border-blue-500 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Holiday</span>
+              <p className="text-xs text-gray-500">Official holiday (no work)</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-gray-100 border border-gray-300 rounded mr-2"></div>
+            <div>
+              <span className="text-xs font-medium text-gray-700">Upcoming</span>
+              <p className="text-xs text-gray-500">Click to mark attendance</p>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-yellow-100 border border-yellow-500 rounded mr-1"></div>
-          <span className="text-xs text-gray-600">Half Day</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-purple-100 border border-purple-500 rounded mr-1"></div>
-          <span className="text-xs text-gray-600">Approved Leave</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-teal-100 border border-teal-500 rounded mr-1"></div>
-          <span className="text-xs text-gray-600">Available</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-teal-50 border border-teal-300 rounded mr-1"></div>
-          <span className="text-xs text-gray-600">Free Day</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-blue-100 border border-blue-500 rounded mr-1"></div>
-          <span className="text-xs text-gray-600">Holiday</span>
+
+        {/* Attendance vs Availability Explanation */}
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <h5 className="text-xs font-medium text-blue-800 mb-1">Understanding Attendance vs Availability</h5>
+          <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
+            <li><strong>Attendance:</strong> Mark attendance for days when you have scheduled appointments</li>
+            <li><strong>Availability:</strong> Mark availability for days when you don't have appointments but are available to work</li>
+            <li>You will only be paid for days when you have appointments and mark attendance as present</li>
+            <li>Marking availability helps administrators assign you new patients on those days</li>
+          </ul>
         </div>
       </div>
     </div>

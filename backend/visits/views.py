@@ -146,6 +146,50 @@ class VisitViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+    @action(detail=True, methods=['post'])
+    def submit_manual_location(self, request, pk=None):
+        """Submit manual location information for a visit"""
+        visit = self.get_object()
+
+        # Check if user is the therapist for this visit
+        if self.request.user.is_therapist:
+            try:
+                therapist = Therapist.objects.get(user=self.request.user)
+                if visit.therapist != therapist:
+                    return Response(
+                        {"error": "You can only submit location information for your own visits"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            except Therapist.DoesNotExist:
+                return Response(
+                    {"error": "Therapist profile not found"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif not self.request.user.is_admin:
+            return Response(
+                {"error": "Only therapists or admins can submit location information"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Get location data from request
+        location_data = request.data
+
+        # Submit manual location information
+        success = visit.submit_manual_location(location_data)
+
+        if success:
+            # Return updated visit data
+            serializer = self.get_serializer(visit)
+            return Response({
+                "message": "Manual location information submitted successfully",
+                "visit": serializer.data
+            })
+        else:
+            return Response(
+                {"error": "Failed to submit manual location information"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 class LocationUpdateViewSet(viewsets.ModelViewSet):
     """API endpoint for managing location updates"""
