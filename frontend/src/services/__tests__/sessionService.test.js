@@ -8,7 +8,7 @@ describe('sessionService', () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
-    
+
     // Setup default mock implementations
     api.get.mockResolvedValue({ data: 'mock data' });
     api.post.mockResolvedValue({ data: 'mock data' });
@@ -16,8 +16,8 @@ describe('sessionService', () => {
     api.patch.mockResolvedValue({ data: 'mock data' });
   });
 
-  test('getByAppointment calls the correct endpoint', async () => {
-    await sessionService.getByAppointment('123');
+  test('getByAppointment calls the correct endpoint', () => {
+    sessionService.getByAppointment('123');
     expect(api.get).toHaveBeenCalledWith('/scheduling/sessions/?appointment=123');
   });
 

@@ -11,6 +11,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from . import views
+from . import data_protection_views
 from .views import (
     UserViewSet, PatientViewSet, TherapistViewSet, DoctorViewSet,
     PatientDashboardSummaryViewSet, DoctorDashboardSummaryViewSet,
@@ -27,6 +28,7 @@ router.register(r'patients', PatientViewSet, basename='patient')
 router.register(r'therapists', TherapistViewSet, basename='therapist')
 router.register(r'doctors', DoctorViewSet, basename='doctor')
 router.register(r'profile-change-requests', ProfileChangeRequestViewSet, basename='profile-change-request')
+router.register(r'admin/deletion-requests', data_protection_views.AccountDeletionRequestViewSet, basename='deletion-requests')
 
 urlpatterns = [
     # —— AUTHENTICATION —— all routes here will be prefixed with /api/auth/…
@@ -37,6 +39,15 @@ urlpatterns = [
     path('register/', views.register_user, name='register_user'),
     path('me/', views.UserViewSet.as_view({'get': 'me'}), name='user-me'),
 
+
+    # —— DATA PROTECTION & DPDP ACT 2023 COMPLIANCE ——
+    path('request-deletion/', data_protection_views.request_account_deletion, name='request-deletion'),
+    path('deletion-status/', data_protection_views.get_deletion_request_status, name='deletion-status'),
+    path('cancel-deletion/', data_protection_views.cancel_deletion_request, name='cancel-deletion'),
+
+    # Admin Data Protection endpoints
+    path('admin/compliance-dashboard/', data_protection_views.compliance_dashboard, name='compliance-dashboard'),
+    path('admin/retention-policies/', data_protection_views.data_retention_policies, name='retention-policies'),
 
     # —— USER PROFILES —— everything here will be prefixed with /api/users/…
     path('', include(router.urls)),

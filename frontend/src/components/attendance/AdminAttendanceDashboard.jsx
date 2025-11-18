@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import attendanceService from '../../services/attendanceService';
 import api from '../../services/api';
@@ -52,14 +52,7 @@ const AdminAttendanceDashboard = () => {
     fetchTherapists();
   }, []);
 
-  // Fetch attendance data when therapist or date changes
-  useEffect(() => {
-    if (selectedTherapist && currentDate) {
-      fetchAttendanceData();
-    }
-  }, [selectedTherapist, currentDate]);
-
-  const fetchAttendanceData = async () => {
+  const fetchAttendanceData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -95,7 +88,14 @@ const AdminAttendanceDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDate, selectedTherapist]);
+
+  // Fetch attendance data when therapist or date changes
+  useEffect(() => {
+    if (selectedTherapist && currentDate) {
+      fetchAttendanceData();
+    }
+  }, [selectedTherapist, currentDate, fetchAttendanceData]);
 
   // Handle month navigation
   const handlePrevMonth = () => {
@@ -220,6 +220,29 @@ const AdminAttendanceDashboard = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  // Generate calendar data using date-fns utilities
+  const generateCalendarData = useCallback(() => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+    return daysInMonth.map(day => {
+      const isWeekendDay = isWeekend(day);
+      const dayData = attendanceData?.days?.find(d =>
+        format(new Date(d.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
+      );
+
+      return {
+        date: day,
+        isWeekend: isWeekendDay,
+        status: dayData?.status || (isWeekendDay ? 'weekend' : 'no_data'),
+        hasAppointments: dayData?.has_appointments || false,
+        notes: dayData?.notes || '',
+        attendanceData: dayData
+      };
+    });
+  }, [currentDate, attendanceData]);
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -396,32 +419,74 @@ const AdminAttendanceDashboard = () => {
 
       {activeTab === 'calendar' && (
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Calendar View</h3>
-          {attendanceData && attendanceData.days && (
-            <div className="grid grid-cols-7 gap-2">
-              {/* Calendar headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
-                  {day}
-                </div>
-              ))}
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Enhanced Calendar View</h3>
+          <div className="mb-4 text-sm text-gray-600">
+            <p>This calendar shows all days in the month, including weekends and days without data. Weekend days are automatically marked.</p>
+          </div>
 
-              {/* Calendar days */}
-              {attendanceData.days.map((day, index) => (
-                <div key={index} className="p-2 border rounded-lg min-h-[60px]">
-                  <div className="text-sm font-medium text-gray-900">
-                    {new Date(day.date).getDate()}
-                  </div>
-                  <div className={`text-xs px-2 py-1 rounded-full mt-1 ${getStatusBadgeClass(day.status)}`}>
-                    {day.status.replace('_', ' ')}
-                  </div>
-                  {day.has_appointments && (
-                    <div className="text-xs text-blue-600 mt-1">📅</div>
-                  )}
+          <div className="grid grid-cols-7 gap-2">
+            {/* Calendar headers */}
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="p-2 text-center text-sm font-medium text-gray-500 border-b">
+                {day}
+              </div>
+            ))}
+
+            {/* Calendar days using enhanced data */}
+            {generateCalendarData().map((dayInfo, index) => (
+              <div
+                key={index}
+                className={`p-2 border rounded-lg min-h-[80px] ${
+                  dayInfo.isWeekend ? 'bg-gray-50' : 'bg-white'
+                } hover:shadow-sm transition-shadow`}
+              >
+                <div className="text-sm font-medium text-gray-900 mb-1">
+                  {format(dayInfo.date, 'd')}
                 </div>
-              ))}
+
+                <div className={`text-xs px-2 py-1 rounded-full mb-1 ${getStatusBadgeClass(dayInfo.status)}`}>
+                  {dayInfo.status.replace('_', ' ')}
+                </div>
+
+                {dayInfo.hasAppointments && (
+                  <div className="text-xs text-blue-600 mb-1" title="Has appointments">📅</div>
+                )}
+
+                {dayInfo.isWeekend && (
+                  <div className="text-xs text-gray-500" title="Weekend">🏠</div>
+                )}
+
+                {dayInfo.notes && (
+                  <div className="text-xs text-gray-600 truncate" title={dayInfo.notes}>
+                    📝 {dayInfo.notes.substring(0, 10)}...
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Legend */}
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Legend:</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-green-100 rounded mr-2"></div>
+                <span>Present</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-red-100 rounded mr-2"></div>
+                <span>Absent</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-gray-100 rounded mr-2"></div>
+                <span>Weekend</span>
+              </div>
+              <div className="flex items-center">
+                <span className="mr-2">📅</span>
+                <span>Has Appointments</span>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 

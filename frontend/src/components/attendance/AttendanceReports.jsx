@@ -48,7 +48,7 @@ const AttendanceReports = () => {
                 start_date: dateRange.start,
                 end_date: dateRange.end
               });
-              
+
               const attendanceData = response.data || [];
               return {
                 therapist: therapist,
@@ -78,10 +78,10 @@ const AttendanceReports = () => {
           start_date: dateRange.start,
           end_date: dateRange.end
         });
-        
+
         const attendanceData = response.data || [];
         const therapist = therapists.find(t => t.id === parseInt(selectedTherapist));
-        
+
         data = {
           type: 'single_therapist',
           therapist: therapist,
@@ -105,12 +105,12 @@ const AttendanceReports = () => {
     const present = attendanceData.filter(record => record.status === 'present').length;
     const absent = attendanceData.filter(record => record.status === 'absent').length;
     const halfDay = attendanceData.filter(record => record.status === 'half_day').length;
-    const leaves = attendanceData.filter(record => 
+    const leaves = attendanceData.filter(record =>
       ['approved_leave', 'sick_leave', 'emergency_leave'].includes(record.status)
     ).length;
-    
+
     const rate = total > 0 ? ((present + halfDay * 0.5) / total * 100).toFixed(1) : 0;
-    
+
     return { total, present, absent, halfDay, leaves, rate };
   };
 
@@ -125,7 +125,7 @@ const AttendanceReports = () => {
     }, { total: 0, present: 0, absent: 0, halfDay: 0, leaves: 0 });
 
     const rate = totals.total > 0 ? ((totals.present + totals.halfDay * 0.5) / totals.total * 100).toFixed(1) : 0;
-    
+
     return { ...totals, rate };
   };
 
@@ -135,11 +135,11 @@ const AttendanceReports = () => {
     attendanceData.forEach(record => {
       const dayOfWeek = new Date(record.date).getDay();
       const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek];
-      
+
       if (!dayPatterns[dayName]) {
         dayPatterns[dayName] = { present: 0, absent: 0, total: 0 };
       }
-      
+
       dayPatterns[dayName].total++;
       if (record.status === 'present') dayPatterns[dayName].present++;
       if (record.status === 'absent') dayPatterns[dayName].absent++;
@@ -185,7 +185,7 @@ const AttendanceReports = () => {
       {/* Report Configuration */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Generate Attendance Report</h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           {/* Therapist Selection */}
           <div>
@@ -249,6 +249,51 @@ const AttendanceReports = () => {
           </div>
         </div>
 
+        {/* Quick Date Range Presets */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Quick Date Ranges
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setDateRange({
+                start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+                end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
+              })}
+              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            >
+              This Month
+            </button>
+            <button
+              onClick={() => setDateRange({
+                start: format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd'),
+                end: format(endOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd')
+              })}
+              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            >
+              Last Month
+            </button>
+            <button
+              onClick={() => setDateRange({
+                start: format(startOfMonth(subMonths(new Date(), 2)), 'yyyy-MM-dd'),
+                end: format(endOfMonth(subMonths(new Date(), 2)), 'yyyy-MM-dd')
+              })}
+              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            >
+              2 Months Ago
+            </button>
+            <button
+              onClick={() => setDateRange({
+                start: format(startOfMonth(subMonths(new Date(), 2)), 'yyyy-MM-dd'),
+                end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
+              })}
+              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            >
+              Last 3 Months
+            </button>
+          </div>
+        </div>
+
         <div className="flex space-x-4">
           <button
             onClick={generateReport}
@@ -257,7 +302,7 @@ const AttendanceReports = () => {
           >
             {loading ? 'Generating...' : 'Generate Report'}
           </button>
-          
+
           {reportData && (
             <button
               onClick={exportReport}
@@ -372,8 +417,8 @@ const AttendanceReports = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex items-center">
                             <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
-                              <div 
-                                className="bg-green-500 h-2 rounded-full" 
+                              <div
+                                className="bg-green-500 h-2 rounded-full"
                                 style={{ width: `${report.summary.rate}%` }}
                               ></div>
                             </div>

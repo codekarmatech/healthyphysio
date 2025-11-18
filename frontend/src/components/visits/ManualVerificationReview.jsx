@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { visitsService } from '../../services/visitsService';
 import { format } from 'date-fns';
 
 /**
  * ManualVerificationReview Component
- * 
+ *
  * This component allows administrators to review and approve/reject
  * manual verification requests from therapists.
  */
-const ManualVerificationReview = ({ 
-  visitId, 
+const ManualVerificationReview = ({
+  visitId,
   verificationRequest,
   onVerificationProcessed = () => {}
 }) => {
@@ -26,12 +26,12 @@ const ManualVerificationReview = ({
   const handleApprove = async () => {
     try {
       setProcessing(true);
-      
+
       // Approve the verification request
       const response = await visitsService.approveManualVerification(visitId, {
         notes: notes
       });
-      
+
       toast.success('Manual verification request approved');
       onVerificationProcessed(response.data);
     } catch (error) {
@@ -47,15 +47,15 @@ const ManualVerificationReview = ({
       toast.warning('Please provide a reason for rejection');
       return;
     }
-    
+
     try {
       setProcessing(true);
-      
+
       // Reject the verification request
       const response = await visitsService.rejectManualVerification(visitId, {
         reason: rejectionReason
       });
-      
+
       toast.success('Manual verification request rejected');
       setShowRejectionForm(false);
       onVerificationProcessed(response.data);
@@ -77,7 +77,7 @@ const ManualVerificationReview = ({
         </div>
         <div className="ml-3 flex-1">
           <h3 className="text-lg font-medium text-gray-900">Manual Verification Request</h3>
-          
+
           <div className="mt-2 text-sm text-gray-600">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
@@ -103,14 +103,14 @@ const ManualVerificationReview = ({
                 </span>
               </div>
             </div>
-            
+
             {verificationRequest.additional_notes && (
               <div className="mt-4">
                 <p className="font-medium text-gray-700">Additional Notes:</p>
                 <p className="mt-1 whitespace-pre-wrap">{verificationRequest.additional_notes}</p>
               </div>
             )}
-            
+
             <div className="mt-4">
               <p className="font-medium text-gray-700">Verification Statements:</p>
               <ul className="mt-1 list-disc list-inside space-y-1">
@@ -126,7 +126,7 @@ const ManualVerificationReview = ({
               </ul>
             </div>
           </div>
-          
+
           {verificationRequest.status === 'pending' && (
             <div className="mt-5">
               {!showRejectionForm ? (
@@ -145,7 +145,7 @@ const ManualVerificationReview = ({
                       placeholder="Add any notes about this approval"
                     />
                   </div>
-                  
+
                   <div className="flex justify-end space-x-3">
                     <button
                       type="button"
@@ -181,7 +181,7 @@ const ManualVerificationReview = ({
                       required
                     />
                   </div>
-                  
+
                   <div className="flex justify-end space-x-3">
                     <button
                       type="button"
@@ -203,7 +203,7 @@ const ManualVerificationReview = ({
               )}
             </div>
           )}
-          
+
           {verificationRequest.status === 'approved' && verificationRequest.approved_notes && (
             <div className="mt-4 p-3 bg-green-50 rounded-md">
               <p className="font-medium text-green-800">Approval Notes:</p>
@@ -213,7 +213,7 @@ const ManualVerificationReview = ({
               </p>
             </div>
           )}
-          
+
           {verificationRequest.status === 'rejected' && verificationRequest.rejection_reason && (
             <div className="mt-4 p-3 bg-red-50 rounded-md">
               <p className="font-medium text-red-800">Rejection Reason:</p>

@@ -21,6 +21,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     date = serializers.SerializerMethodField()
     therapist_name = serializers.SerializerMethodField()
     doctor_name = serializers.SerializerMethodField()
+    treatment_cycle_info = serializers.SerializerMethodField()
+    is_part_of_treatment_cycle = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -30,7 +32,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'reason_for_visit', 'notes', 'previous_treatments', 'pain_level',
             'mobility_issues', 'changes_log', 'created_at', 'updated_at',
             'patient_details', 'therapist_details', 'payment_status', 'attendance_status',
-            'fee', 'start_time', 'end_time', 'date', 'therapist_name', 'doctor_name'
+            'fee', 'start_time', 'end_time', 'date', 'therapist_name', 'doctor_name',
+            # Treatment cycle fields
+            'treatment_plan', 'daily_treatment', 'treatment_cycle_info', 'is_part_of_treatment_cycle'
         ]
         read_only_fields = ['id', 'session_code', 'created_at', 'updated_at']
 
@@ -109,6 +113,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
         if instance.datetime:
             representation['datetime'] = timezone.localtime(instance.datetime).strftime('%Y-%m-%dT%H:%M:%S%z')
         return representation
+
+    def get_treatment_cycle_info(self, obj):
+        """Get treatment cycle information"""
+        return obj.treatment_cycle_info
+
+    def get_is_part_of_treatment_cycle(self, obj):
+        """Check if appointment is part of treatment cycle"""
+        return obj.is_part_of_treatment_cycle
 
 class RescheduleRequestSerializer(serializers.ModelSerializer):
     appointment_details = AppointmentSerializer(source='appointment', read_only=True)

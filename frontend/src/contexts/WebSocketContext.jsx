@@ -19,8 +19,8 @@ export const WebSocketProvider = ({ children }) => {
 
   // Connect to WebSocket
   const connect = useCallback((sessionCode) => {
-    if (!sessionCode || !token) {
-      setError('Session code and authentication are required');
+    if (!sessionCode || !token || !user) {
+      setError('Session code, authentication, and user data are required');
       return;
     }
 
@@ -46,7 +46,7 @@ export const WebSocketProvider = ({ children }) => {
       newSocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           // Handle different message types
           if (data.type === 'status_update') {
             // Add message to history
@@ -56,7 +56,7 @@ export const WebSocketProvider = ({ children }) => {
               user: data.user_name,
               success: data.success
             }]);
-            
+
             // Update session data if available
             if (data.session_data) {
               setSessionData(data.session_data);
@@ -91,7 +91,7 @@ export const WebSocketProvider = ({ children }) => {
       setError(`Failed to connect: ${err.message}`);
       console.error('WebSocket connection error:', err);
     }
-  }, [token]);
+  }, [token, user, socket]);
 
   // Disconnect WebSocket
   const disconnect = useCallback(() => {

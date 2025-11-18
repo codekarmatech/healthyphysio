@@ -18,9 +18,13 @@ const AppointmentList = () => {
       let response;
 
       if (user?.role === 'patient') {
-        response = await appointmentService.getByPatient(user.id);
+        // Use patientProfile.id for security if available
+        const patientId = user.patientProfile?.id || user.patient_id || user.id;
+        response = await appointmentService.getByPatient(patientId);
       } else if (user?.role === 'therapist') {
-        response = await appointmentService.getByTherapist(user.id);
+        // Use therapistProfile.id for security if available
+        const therapistId = user.therapistProfile?.id || user.therapist_id || user.id;
+        response = await appointmentService.getByTherapist(therapistId);
       } else {
         response = await appointmentService.getAll();
       }
@@ -71,7 +75,10 @@ const AppointmentList = () => {
         date: appointment.datetime || appointment.date,
         time: new Date(appointment.datetime || appointment.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
         status: appointment.status.toLowerCase(),
-        type: appointment.issue || appointment.type || 'Consultation'
+        type: appointment.issue || appointment.type || 'Consultation',
+        // Treatment cycle information
+        isPartOfTreatmentCycle: appointment.is_part_of_treatment_cycle || false,
+        treatmentCycleInfo: appointment.treatment_cycle_info || null
       }));
 
       setAppointments(formattedAppointments);
@@ -98,14 +105,7 @@ const AppointmentList = () => {
     }
   };
 
-  const handleConfirmAppointment = async (id) => {
-    try {
-      await appointmentService.confirmAppointment(id);
-      fetchAppointments();
-    } catch (error) {
-      console.error('Error confirming appointment:', error);
-    }
-  };
+  // Removed handleConfirmAppointment - therapists must go once assigned
 
   const handleApproveReschedule = async (id) => {
     if (window.confirm('Are you sure you want to approve this reschedule request?')) {
@@ -297,6 +297,11 @@ const AppointmentList = () => {
                         </div>
                         <div className="text-sm text-gray-500">
                           {appointment.type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          {appointment.isPartOfTreatmentCycle && appointment.treatmentCycleInfo && (
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              Day {appointment.treatmentCycleInfo.current_day}/{appointment.treatmentCycleInfo.total_days}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -332,15 +337,7 @@ const AppointmentList = () => {
                         View details
                       </Link>
 
-                      {/* Confirm button for therapists */}
-                      {user.role === 'therapist' && appointment.status === 'pending' && (
-                        <button
-                          onClick={() => handleConfirmAppointment(appointment.id)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mr-2"
-                        >
-                          Confirm
-                        </button>
-                      )}
+                      {/* Therapists must go once assigned - no confirm button needed */}
 
                       {/* Reschedule button for therapists */}
                       {user.role === 'therapist' && appointment.status !== 'cancelled' && appointment.status !== 'pending_reschedule' && canRequestReschedule(appointment) && (

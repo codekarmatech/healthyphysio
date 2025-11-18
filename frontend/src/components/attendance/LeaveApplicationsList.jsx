@@ -7,7 +7,7 @@ import { format, parseISO } from 'date-fns';
  * Component to display and manage leave applications
  */
 const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh = null }) => {
-  const { user } = useAuth();
+  const { user, therapistProfile } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,28 +23,28 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
   const fetchLeaveApplications = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       let response;
-      
+
       if (isAdmin) {
         // Admin fetches all pending applications
         response = await attendanceService.getPendingLeaveApplications();
       } else {
         // Therapist fetches their own applications
-        // For therapists, the user.id is the therapist ID
-        const id = therapistId || user?.id;
-        
+        // Use therapistProfile.id for proper role-based access control
+        const id = therapistId || therapistProfile?.id || user?.therapist_id || user?.id;
+
         console.log('User object:', user);
         console.log('Using therapist ID for leave applications:', id);
-        
+
         if (!id) {
           console.error('No therapist ID found in user object:', user);
           setError('Could not determine therapist ID. Please contact support.');
           setLoading(false);
           return;
         }
-        
+
         try {
           response = await attendanceService.getLeaveApplications(id);
           setApplications(response.data || []);
@@ -68,34 +68,34 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, therapistId, user]);
+  }, [isAdmin, therapistId, user, therapistProfile]);
 
   // Fetch applications on component mount
   useEffect(() => {
     fetchLeaveApplications();
-  }, [therapistId, isAdmin, user, fetchLeaveApplications]);
+  }, [fetchLeaveApplications]);
 
   // Handle cancellation of a leave application
   const handleCancelLeave = async () => {
     if (!cancellingId || !cancelReason.trim()) {
       return;
     }
-    
+
     try {
       await attendanceService.cancelLeaveApplication(cancellingId, cancelReason);
-      
+
       // Update the local state
-      setApplications(applications.map(app => 
-        app.id === cancellingId 
-          ? { ...app, status: 'cancelled', cancellation_reason: cancelReason } 
+      setApplications(applications.map(app =>
+        app.id === cancellingId
+          ? { ...app, status: 'cancelled', cancellation_reason: cancelReason }
           : app
       ));
-      
+
       // Reset state
       setCancellingId(null);
       setCancelReason('');
       setShowCancelModal(false);
-      
+
       // Call refresh callback if provided
       if (onRefresh) {
         onRefresh();
@@ -111,27 +111,27 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
     if (!processingId) {
       return;
     }
-    
+
     try {
       await attendanceService.processLeaveApplication(processingId, approvalDecision, processNotes);
-      
+
       // Update the local state
-      setApplications(applications.map(app => 
-        app.id === processingId 
-          ? { 
-              ...app, 
+      setApplications(applications.map(app =>
+        app.id === processingId
+          ? {
+              ...app,
               status: approvalDecision ? 'approved' : 'rejected',
-              admin_notes: processNotes 
-            } 
+              admin_notes: processNotes
+            }
           : app
       ));
-      
+
       // Reset state
       setProcessingId(null);
       setProcessNotes('');
       setShowProcessModal(false);
       setApprovalDecision(true);
-      
+
       // Call refresh callback if provided
       if (onRefresh) {
         onRefresh();
@@ -146,7 +146,7 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
   const formatDateRange = (startDate, endDate) => {
     const start = format(parseISO(startDate), 'MMM d, yyyy');
     const end = format(parseISO(endDate), 'MMM d, yyyy');
-    
+
     return start === end ? start : `${start} - ${end}`;
   };
 
@@ -182,13 +182,13 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
           Refresh
         </button>
       </div>
-      
+
       {error && (
         <div className="px-4 py-3 bg-red-50 border-t border-b border-red-200">
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
-      
+
       {loading ? (
         <div className="px-4 py-5 sm:p-6 text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
@@ -294,7 +294,7 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
                         </button>
                       </div>
                     )}
-                    
+
                     {!isAdmin && application.status === 'pending' && (
                       <button
                         onClick={() => {
@@ -306,7 +306,7 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
                         Cancel
                       </button>
                     )}
-                    
+
                     {application.status !== 'pending' && (
                       <span className="text-gray-400">No actions</span>
                     )}
@@ -317,7 +317,7 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
           </table>
         </div>
       )}
-      
+
       {/* Cancel Leave Modal */}
       {showCancelModal && (
         <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -325,9 +325,9 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-            
+
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
+
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
@@ -387,7 +387,7 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
           </div>
         </div>
       )}
-      
+
       {/* Process Leave Modal */}
       {showProcessModal && (
         <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -395,9 +395,9 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-            
+
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
+
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
@@ -416,8 +416,8 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
                     </h3>
                     <div className="mt-2">
                       <p className="text-sm text-gray-500">
-                        {approvalDecision 
-                          ? 'Are you sure you want to approve this leave application?' 
+                        {approvalDecision
+                          ? 'Are you sure you want to approve this leave application?'
                           : 'Are you sure you want to reject this leave application?'
                         }
                       </p>
@@ -431,8 +431,8 @@ const LeaveApplicationsList = ({ therapistId = null, isAdmin = false, onRefresh 
                           onChange={(e) => setProcessNotes(e.target.value)}
                           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                           rows="3"
-                          placeholder={approvalDecision 
-                            ? "Add any notes for the therapist..." 
+                          placeholder={approvalDecision
+                            ? "Add any notes for the therapist..."
                             : "Please provide a reason for rejecting this leave application..."
                           }
                         ></textarea>

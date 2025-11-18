@@ -25,8 +25,8 @@ const AppointmentsPage = () => {
       try {
         setLoading(true);
 
-        // Get therapist ID from user object
-        const therapistId = user.therapist_id || user.id;
+        // Get therapist ID from user object - use therapistProfile.id for security
+        const therapistId = user.therapistProfile?.id || user.therapist_id || user.id;
 
         // Fetch upcoming appointments
         const upcomingResponse = await appointmentService.getUpcoming();

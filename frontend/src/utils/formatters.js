@@ -48,11 +48,11 @@ export const formatDate = (date, format = 'medium') => {
     medium: { day: 'numeric', month: 'short', year: 'numeric' },
     long: { day: 'numeric', month: 'long', year: 'numeric' },
     time: { hour: '2-digit', minute: '2-digit' },
-    dateTime: { 
-      day: 'numeric', 
-      month: 'short', 
+    dateTime: {
+      day: 'numeric',
+      month: 'short',
       year: 'numeric',
-      hour: '2-digit', 
+      hour: '2-digit',
       minute: '2-digit'
     }
   };
@@ -125,9 +125,9 @@ export const formatPhoneNumber = (phoneNumber) => {
  */
 export const truncateText = (text, maxLength = 50) => {
   if (!text) return '';
-  
+
   if (text.length <= maxLength) return text;
-  
+
   return `${text.substring(0, maxLength)}...`;
 };
 
@@ -156,17 +156,17 @@ export const formatFileSize = (bytes, decimals = 2) => {
  */
 export const formatDuration = (minutes) => {
   if (!minutes && minutes !== 0) return '';
-  
+
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  
+
   if (hours === 0) return `${mins} min`;
   if (mins === 0) return `${hours} hr`;
-  
+
   return `${hours} hr ${mins} min`;
 };
 
-export default {
+const formatters = {
   formatCurrency,
   formatDate,
   formatPercentage,
@@ -176,3 +176,5 @@ export default {
   formatFileSize,
   formatDuration
 };
+
+export default formatters;

@@ -3,7 +3,7 @@ import EarningsChart from './EarningsChart';
 import { useAuth } from '../../contexts/AuthContext';
 
 const EarningsAnalytics = ({ earnings, loading }) => {
-  const { user } = useAuth();
+  const { user, therapistProfile } = useAuth();
   const [activeChartType, setActiveChartType] = useState('line');
   const [showAttendance, setShowAttendance] = useState(true);
 
@@ -157,7 +157,7 @@ const EarningsAnalytics = ({ earnings, loading }) => {
         {/* Chart */}
         <div className="p-6">
           <EarningsChart
-            therapistId={user?.therapist_id || user?.id}
+            therapistId={therapistProfile?.id || user?.therapist_id || user?.id}
             year={currentYear}
             month={currentMonth}
             chartType={activeChartType}
@@ -182,6 +182,64 @@ const EarningsAnalytics = ({ earnings, loading }) => {
               </label>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Performance Insights */}
+      <div className="bg-white shadow-sm rounded-lg">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Performance Insights</h3>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h4 className="text-sm font-medium text-green-800">Best Earning Day</h4>
+                  <p className="text-lg font-semibold text-green-900">
+                    {highestEarningDay.totalEarned > 0
+                      ? `₹${highestEarningDay.totalEarned.toFixed(2)}`
+                      : 'No earnings yet'
+                    }
+                  </p>
+                  {highestEarningDay.totalEarned > 0 && (
+                    <p className="text-xs text-green-700">
+                      {new Date(highestEarningDay.date).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h4 className="text-sm font-medium text-blue-800">Most Active Day</h4>
+                  <p className="text-lg font-semibold text-blue-900">
+                    {mostSessionsDay.sessions > 0
+                      ? `${mostSessionsDay.sessions} sessions`
+                      : 'No sessions yet'
+                    }
+                  </p>
+                  {mostSessionsDay.sessions > 0 && (
+                    <p className="text-xs text-blue-700">
+                      {new Date(mostSessionsDay.date).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

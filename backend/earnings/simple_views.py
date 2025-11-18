@@ -36,17 +36,22 @@ def simple_therapist_monthly_earnings(request, therapist_id):
 
     # Role-based access control
     user = request.user
+
     if user.is_therapist:
         try:
             therapist = Therapist.objects.get(user=user)
+
             if str(therapist.id) != str(therapist_id):
                 return Response(
-                    {"error": "You can only view your own earnings data"},
+                    {
+                        "error": "You can only view your own earnings data",
+                        "details": f"Your therapist ID is {therapist.id}, but you requested data for therapist {therapist_id}"
+                    },
                     status=status.HTTP_403_FORBIDDEN
                 )
         except Therapist.DoesNotExist:
             return Response(
-                {"error": "Therapist profile not found"},
+                {"error": "Therapist profile not found for your account"},
                 status=status.HTTP_400_BAD_REQUEST
             )
     elif not user.is_admin:

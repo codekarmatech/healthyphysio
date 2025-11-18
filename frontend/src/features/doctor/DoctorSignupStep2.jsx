@@ -9,7 +9,7 @@
 
 import React, { useState } from 'react';
 
-const DoctorSignupStep2 = ({ initialData = {} }) => {
+const DoctorSignupStep2 = ({ initialData = {}, onSubmit = () => {} }) => {
   const [formData, setFormData] = useState({
     specialization: "",
     licenseNumber: "",

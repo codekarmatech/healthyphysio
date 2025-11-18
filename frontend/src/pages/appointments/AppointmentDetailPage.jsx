@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import appointmentService from '../../services/appointmentService';
 import sessionService from '../../services/sessionService';
+import TreatmentCycleProgress from '../../components/treatmentCycles/TreatmentCycleProgress';
 
 const AppointmentDetailPage = () => {
   const { id } = useParams();
@@ -350,6 +351,13 @@ const AppointmentDetailPage = () => {
                     )}
                   </dl>
                 </div>
+
+                {/* Treatment Cycle Progress */}
+                {appointment.is_part_of_treatment_cycle && appointment.treatment_cycle_info && (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+                    <TreatmentCycleProgress treatmentCycleInfo={appointment.treatment_cycle_info} />
+                  </div>
+                )}
 
                 {/* Action buttons */}
                 <div className="border-t border-gray-200 px-4 py-5 sm:px-6">

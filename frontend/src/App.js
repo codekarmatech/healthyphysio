@@ -85,6 +85,7 @@ import TherapistReportPage from './pages/therapist/TherapistReportPage';
 import PendingReportsPage from './pages/therapist/PendingReportsPage';
 import TreatmentPlansPage from './pages/therapist/TreatmentPlansPage';
 import TreatmentPlanDetailPage from './pages/therapist/TreatmentPlanDetailPage';
+import AdminTreatmentPlansPage from './pages/admin/TreatmentPlansPage';
 import ReportsPage from './pages/therapist/ReportsPage';
 import NewReportPage from './pages/therapist/NewReportPage';
 import PendingApprovalPage from './pages/therapist/PendingApprovalPage';
@@ -194,6 +195,8 @@ function App() {
             <Route path="/admin/session-fees" element={<SessionFeeManagement />} />
             <Route path="/admin/revenue-distribution" element={<RevenueDistributionConfig />} />
             <Route path="/admin/payment-status" element={<PaymentStatusManagement />} />
+            {/* Treatment Plans Management */}
+            <Route path="/admin/treatment-plans" element={<AdminTreatmentPlansPage />} />
             {/* Audit Dashboard */}
             <Route path="/admin/audit-dashboard" element={<AuditDashboardPage />} />
           </Route>

@@ -24,7 +24,7 @@ import FeatureGuard from '../../components/common/FeatureGuard';
 import { isMockData } from '../../utils/responseNormalizer';
 
 const TherapistDashboard = () => {
-  const { user } = useAuth(); // Get user from context
+  const { user, therapistProfile } = useAuth(); // Get user and therapist profile from context
   // Use the feature access hook
   const { featureAccess, refreshAccess } = useFeatureAccess();
 
@@ -73,8 +73,12 @@ const TherapistDashboard = () => {
           throw new Error('User not authenticated or token missing');
         }
 
-        // Use therapist_id from user object if available
-        const therapistId = user.therapist_id || user.id;
+        // Use therapist profile ID first, then fallback to user object
+        const therapistId = therapistProfile?.id || user.therapist_id || user.id;
+
+        console.log('TherapistDashboard - Using therapist ID:', therapistId);
+        console.log('TherapistDashboard - Therapist profile:', therapistProfile);
+        console.log('TherapistDashboard - User object:', user);
 
         // The updated getMonthlyAttendance method will return real data or mock data
         const response = await attendanceService.getMonthlyAttendance(currentYear, currentMonth, therapistId);
@@ -112,7 +116,7 @@ const TherapistDashboard = () => {
         }
       }
     );
-  }, [currentYear, currentMonth, user]);
+  }, [currentYear, currentMonth, user, therapistProfile]);
 
   // Fetch active visits and check for proximity alerts
   const fetchActiveVisits = useCallback(async () => {
@@ -122,8 +126,8 @@ const TherapistDashboard = () => {
     setVisitsError(null);
 
     try {
-      // Get therapist ID from user object
-      const therapistId = user.therapist_id || user.id;
+      // Get therapist ID from therapist profile first, then fallback to user object
+      const therapistId = therapistProfile?.id || user.therapist_id || user.id;
 
       // Fetch active visits (scheduled, en_route, arrived, in_session)
       const response = await visitsService.getAll({
@@ -158,7 +162,7 @@ const TherapistDashboard = () => {
       // Set empty array as fallback
       setActiveVisits([]);
     }
-  }, [user]);
+  }, [user, therapistProfile]);
 
   // Fetch active visits when component mounts
   useEffect(() => {
@@ -225,8 +229,8 @@ const TherapistDashboard = () => {
           // If we reach here, the summary endpoint didn't work, so we fall back to individual API calls
           console.log('Dashboard summary endpoint not available, using individual API calls');
 
-          // Get therapist ID from user object
-          const therapistId = user.therapist_id || user.id;
+          // Get therapist ID from therapist profile first, then fallback to user object
+          const therapistId = therapistProfile?.id || user.therapist_id || user.id;
 
           // Fetch upcoming appointments using the service
           const upcomingResponse = await appointmentService.getByTherapist(therapistId, {
@@ -391,7 +395,7 @@ const TherapistDashboard = () => {
     if (user) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user, therapistProfile]);
 
   // We don't need to track approval status separately anymore
   // since we're using featureAccess directly
@@ -407,8 +411,8 @@ const TherapistDashboard = () => {
           throw new Error('User not authenticated or token missing');
         }
 
-        // Use therapist_id from user object if available
-        const therapistId = user.therapist_id || user.id;
+        // Use therapist profile ID first, then fallback to user object
+        const therapistId = therapistProfile?.id || user.therapist_id || user.id;
 
         // Use earningsService
         const response = await earningsService.getMonthlyEarnings(therapistId, currentYear, currentMonth);
@@ -455,7 +459,7 @@ const TherapistDashboard = () => {
         }
       }
     );
-  }, [currentYear, currentMonth, user]);
+  }, [currentYear, currentMonth, user, therapistProfile]);
 
   // Add useEffect for attendance data
   useEffect(() => {
@@ -1301,7 +1305,7 @@ const TherapistDashboard = () => {
                   {renderFeature('earnings',
                     <div className="px-4 py-5 sm:p-6 h-60 sm:h-80">
                       <EarningsChart
-                        therapistId={user?.therapist_id || user?.id}
+                        therapistId={therapistProfile?.id || user?.therapist_id || user?.id}
                         year={currentYear}
                         month={currentMonth}
                       />

@@ -2,7 +2,9 @@ from rest_framework import viewsets, permissions, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Count, Avg
+from django.db.models.functions import TruncMonth
+from datetime import datetime, timedelta
 
 from .models import (
     TreatmentPlan, TreatmentPlanVersion, TreatmentPlanChangeRequest,
@@ -149,6 +151,74 @@ class TreatmentPlanViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get treatment plan statistics for admin dashboard"""
+        user = request.user
+
+        # Only admins can access stats
+        if not user.is_admin:
+            return Response(
+                {'error': 'Only admins can access treatment plan statistics'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Get all treatment plans
+        queryset = TreatmentPlan.objects.all()
+
+        # Calculate basic statistics
+        total_plans = queryset.count()
+        draft_plans = queryset.filter(status='draft').count()
+        pending_approval = queryset.filter(status='pending_approval').count()
+        approved_plans = queryset.filter(status='approved').count()
+        completed_plans = queryset.filter(status='completed').count()
+        archived_plans = queryset.filter(status='archived').count()
+
+        # Calculate monthly statistics for the last 6 months
+        six_months_ago = timezone.now() - timedelta(days=180)
+        monthly_stats = (
+            queryset.filter(created_at__gte=six_months_ago)
+            .extra(select={'month': "DATE_TRUNC('month', created_at)"})
+            .values('month')
+            .annotate(count=Count('id'))
+            .order_by('month')
+        )
+
+        # Get pending change requests count
+        pending_changes = TreatmentPlanChangeRequest.objects.filter(status='pending').count()
+
+        # Get active sessions count
+        active_sessions = TreatmentSession.objects.filter(status='scheduled').count()
+
+        # Calculate average plan duration
+        completed_plans_with_duration = queryset.filter(
+            status='completed',
+            start_date__isnull=False,
+            end_date__isnull=False
+        )
+
+        avg_duration = 0
+        if completed_plans_with_duration.exists():
+            total_duration = sum([
+                (plan.end_date - plan.start_date).days
+                for plan in completed_plans_with_duration
+            ])
+            avg_duration = total_duration / completed_plans_with_duration.count()
+
+        return Response({
+            'total_plans': total_plans,
+            'draft_plans': draft_plans,
+            'pending_approval': pending_approval,
+            'approved_plans': approved_plans,
+            'completed_plans': completed_plans,
+            'archived_plans': archived_plans,
+            'pending_changes': pending_changes,
+            'active_sessions': active_sessions,
+            'average_duration_days': round(avg_duration, 1),
+            'monthly_stats': list(monthly_stats),
+            'success_rate': round((completed_plans / total_plans * 100), 1) if total_plans > 0 else 0
+        })
+
 class TreatmentPlanChangeRequestViewSet(viewsets.ModelViewSet):
     """
     API endpoint for treatment plan change requests.
@@ -285,6 +355,63 @@ class DailyTreatmentViewSet(viewsets.ModelViewSet):
                 treatment_plan__status__in=['approved', 'completed']
             )
         return DailyTreatment.objects.none()
+
+    @action(detail=False, methods=['get'])
+    def by_appointment(self, request):
+        """Get daily treatments for a specific appointment date and therapist"""
+        user = request.user
+        appointment_date = request.query_params.get('date')
+        therapist_id = request.query_params.get('therapist_id')
+
+        if not appointment_date:
+            return Response(
+                {'error': 'Date parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Parse the date
+        try:
+            from datetime import datetime
+            date_obj = datetime.strptime(appointment_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {'error': 'Invalid date format. Use YYYY-MM-DD'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Build queryset based on user role
+        if user.is_admin:
+            queryset = DailyTreatment.objects.all()
+        elif user.is_therapist:
+            # Use therapist profile ID for security
+            therapist_profile_id = getattr(user, 'therapist_profile', {}).get('id') or user.therapist_id or user.id
+            queryset = DailyTreatment.objects.filter(
+                treatment_plan__patient__appointments__therapist__id=therapist_profile_id,
+                treatment_plan__status__in=['approved', 'completed']
+            ).distinct()
+        else:
+            return Response(
+                {'error': 'Insufficient permissions'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Filter by therapist if specified (for admin use)
+        if therapist_id and user.is_admin:
+            queryset = queryset.filter(
+                treatment_plan__patient__appointments__therapist__id=therapist_id
+            )
+
+        # Filter by appointment date - find treatments for plans that have appointments on this date
+        queryset = queryset.filter(
+            treatment_plan__patient__appointments__datetime__date=date_obj
+        ).distinct()
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            'date': appointment_date,
+            'daily_treatments': serializer.data,
+            'count': queryset.count()
+        })
 
     def perform_create(self, serializer):
         # Ensure the treatment plan exists and user has permission

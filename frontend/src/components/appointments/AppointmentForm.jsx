@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { toast } from 'react-toastify';
 import appointmentService from '../../services/appointmentService';
 import therapistService from '../../services/therapistService';
 import patientService from '../../services/patientService';
+import treatmentPlanService from '../../services/treatmentPlanService';
+import financialDashboardService from '../../services/financialDashboardService';
 
 const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
   const navigate = useNavigate();
@@ -17,14 +20,30 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
     date: '',
     startTime: '',
     endTime: '',
+    // Enhanced fields for treatment plan integration
+    startDate: '',
+    endDate: '',
     type: 'initial-assessment',
     notes: '',
     reasonForVisit: '',
     previousTreatments: '',
     painLevel: '0',
-    mobilityIssues: ''
+    mobilityIssues: '',
+    // Treatment plan integration
+    treatmentPlanId: '',
+    dailyTreatmentId: '',
+    createNewTreatmentPlan: false,
+    // Revenue calculator integration
+    totalFee: '',
+    adminEarnings: '',
+    therapistEarnings: '',
+    doctorEarnings: '',
+    platformFee: ''
   });
   const [errors, setErrors] = useState({});
+  const [treatmentPlans, setTreatmentPlans] = useState([]);
+  const [revenueCalculation, setRevenueCalculation] = useState(null);
+  const [showRevenueCalculator, setShowRevenueCalculator] = useState(false);
 
   const fetchAppointment = useCallback(async (id) => {
     try {
@@ -96,7 +115,7 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
         if (user.role === 'therapist') {
           response = await patientService.getByTherapist(user.id);
         } else {
-          response = await patientService.getAll();
+          response = await patientService.getAllPatients();
         }
         // Extract the data array from the response
         const data = response.data.results || response.data || [];
@@ -107,8 +126,22 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
       }
     };
 
+    const fetchTreatmentPlans = async () => {
+      try {
+        if (user.role === 'admin') {
+          const response = await treatmentPlanService.getAllTreatmentPlans();
+          const data = response.data.results || response.data || [];
+          setTreatmentPlans(data);
+        }
+      } catch (error) {
+        console.error('Error fetching treatment plans:', error);
+        setTreatmentPlans([]);
+      }
+    };
+
     fetchTherapists();
     fetchPatients();
+    fetchTreatmentPlans();
 
     if (editMode && appointmentId) {
       fetchAppointment(appointmentId);
@@ -118,14 +151,55 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
   // We're now using direct time input fields instead of fetching available slots
   // This allows for more flexibility in appointment scheduling
 
+  // Revenue calculation function
+  const calculateRevenue = (totalFee) => {
+    const fee = parseFloat(totalFee) || 0;
+    if (fee <= 0) return null;
+
+    // Fixed 3% platform fee
+    const platformFeeAmount = (fee * 3) / 100;
+    const distributableAmount = fee - platformFeeAmount;
+
+    // Default distribution: Admin 40%, Therapist 40%, Doctor 20%
+    const adminAmount = (distributableAmount * 40) / 100;
+    const therapistAmount = (distributableAmount * 40) / 100;
+    const doctorAmount = (distributableAmount * 20) / 100;
+
+    return {
+      total: fee,
+      platformFee: platformFeeAmount,
+      adminEarnings: adminAmount,
+      therapistEarnings: therapistAmount,
+      doctorEarnings: doctorAmount,
+      distributableAmount
+    };
+  };
+
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     console.log(`Field changed: ${name}, value: ${value}`);
 
-    setFormData({
+    let newFormData = {
       ...formData,
-      [name]: value
-    });
+      [name]: type === 'checkbox' ? checked : value
+    };
+
+    // Auto-calculate revenue when total fee changes
+    if (name === 'totalFee' && user.role === 'admin') {
+      const calculation = calculateRevenue(value);
+      if (calculation) {
+        newFormData = {
+          ...newFormData,
+          adminEarnings: calculation.adminEarnings.toFixed(2),
+          therapistEarnings: calculation.therapistEarnings.toFixed(2),
+          doctorEarnings: calculation.doctorEarnings.toFixed(2),
+          platformFee: calculation.platformFee.toFixed(2)
+        };
+        setRevenueCalculation(calculation);
+      }
+    }
+
+    setFormData(newFormData);
   };
 
   const validateForm = () => {
@@ -211,7 +285,18 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
         notes: formData.notes,
         previous_treatments: formData.previousTreatments,
         pain_level: formData.painLevel,
-        mobility_issues: formData.mobilityIssues
+        mobility_issues: formData.mobilityIssues,
+        // Treatment plan integration - use the new fields
+        treatment_plan: formData.treatmentPlanId || null,
+        daily_treatment: formData.dailyTreatmentId || null,
+        // Revenue data for admin
+        ...(user.role === 'admin' && formData.totalFee && {
+          total_fee: parseFloat(formData.totalFee),
+          admin_earnings: parseFloat(formData.adminEarnings),
+          therapist_earnings: parseFloat(formData.therapistEarnings),
+          doctor_earnings: parseFloat(formData.doctorEarnings),
+          platform_fee: parseFloat(formData.platformFee)
+        })
       };
 
       // If user is a therapist, set the therapist ID to the user's ID
@@ -235,13 +320,21 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
         }
       }
 
+      let appointmentResponse;
       if (editMode && appointmentId) {
-        await appointmentService.update(appointmentId, appointmentData);
+        appointmentResponse = await appointmentService.update(appointmentId, appointmentData);
       } else {
-        await appointmentService.create(appointmentData);
+        appointmentResponse = await appointmentService.create(appointmentData);
       }
 
-      navigate('/appointments');
+      // Handle treatment plan creation if requested
+      if (user.role === 'admin' && formData.createNewTreatmentPlan && !editMode) {
+        // Redirect to treatment plan creation with appointment context
+        const appointmentId = appointmentResponse.data?.id || appointmentResponse.id;
+        navigate(`/admin/treatment-plans/new?appointmentId=${appointmentId}&patientId=${formData.patientId}&therapistId=${formData.therapistId}&startDate=${formData.startDate}&endDate=${formData.endDate}`);
+      } else {
+        navigate('/appointments');
+      }
     } catch (error) {
       console.error('Error saving appointment:', error);
       setLoading(false);
@@ -583,6 +676,252 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
                   />
                 </div>
               </div>
+
+              {/* Treatment Plan Integration - Admin Only */}
+              {user.role === 'admin' && (
+                <>
+                  <div className="sm:col-span-6">
+                    <div className="border-t border-gray-200 pt-6">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Treatment Plan Integration</h3>
+                    </div>
+                  </div>
+
+                  {/* Start Date for Treatment Plan */}
+                  <div className="sm:col-span-3">
+                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                      Treatment Start Date
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="date"
+                        name="startDate"
+                        id="startDate"
+                        min={new Date().toISOString().split('T')[0]}
+                        value={formData.startDate}
+                        onChange={handleChange}
+                        className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Start date for the treatment plan (if creating new plan)
+                    </p>
+                  </div>
+
+                  {/* End Date for Treatment Plan */}
+                  <div className="sm:col-span-3">
+                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                      Treatment End Date
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="date"
+                        name="endDate"
+                        id="endDate"
+                        min={formData.startDate || new Date().toISOString().split('T')[0]}
+                        value={formData.endDate}
+                        onChange={handleChange}
+                        className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Expected end date for the treatment plan
+                    </p>
+                  </div>
+
+                  {/* Treatment Plan Selection */}
+                  <div className="sm:col-span-4">
+                    <label htmlFor="treatmentPlanId" className="block text-sm font-medium text-gray-700">
+                      Existing Treatment Plan
+                    </label>
+                    <div className="mt-1">
+                      <select
+                        id="treatmentPlanId"
+                        name="treatmentPlanId"
+                        value={formData.treatmentPlanId}
+                        onChange={handleChange}
+                        disabled={formData.createNewTreatmentPlan}
+                        className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md disabled:bg-gray-100"
+                      >
+                        <option value="">Select existing treatment plan</option>
+                        {treatmentPlans.map((plan) => (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.title} - {plan.patient_details?.user?.first_name} {plan.patient_details?.user?.last_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Create New Treatment Plan Option */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Or Create New Plan
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        id="createNewTreatmentPlan"
+                        name="createNewTreatmentPlan"
+                        type="checkbox"
+                        checked={formData.createNewTreatmentPlan}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="createNewTreatmentPlan" className="ml-2 block text-sm text-gray-900">
+                        Create new treatment plan
+                      </label>
+                    </div>
+                    {formData.createNewTreatmentPlan && (
+                      <p className="mt-1 text-xs text-green-600">
+                        You'll be redirected to create a new treatment plan after saving this appointment
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Revenue Calculator - Admin Only */}
+              {user.role === 'admin' && (
+                <>
+                  <div className="sm:col-span-6">
+                    <div className="border-t border-gray-200 pt-6">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Revenue Calculator</h3>
+                    </div>
+                  </div>
+
+                  {/* Total Fee */}
+                  <div className="sm:col-span-3">
+                    <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
+                      Total Fee (₹)
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="number"
+                        name="totalFee"
+                        id="totalFee"
+                        min="0"
+                        step="0.01"
+                        value={formData.totalFee}
+                        onChange={handleChange}
+                        className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        placeholder="Enter total appointment fee"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Show Revenue Calculator Button */}
+                  <div className="sm:col-span-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Revenue Distribution
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowRevenueCalculator(!showRevenueCalculator)}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    >
+                      {showRevenueCalculator ? 'Hide' : 'Show'} Revenue Breakdown
+                    </button>
+                  </div>
+
+                  {/* Revenue Breakdown Display */}
+                  {showRevenueCalculator && revenueCalculation && (
+                    <div className="sm:col-span-6">
+                      <div className="bg-gray-50 p-4 rounded-md">
+                        <h4 className="text-sm font-medium text-gray-900 mb-3">Revenue Distribution Breakdown</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500">Platform Fee (3%)</p>
+                            <p className="text-lg font-semibold text-red-600">₹{revenueCalculation.platformFee.toFixed(2)}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500">Admin Earnings (40%)</p>
+                            <p className="text-lg font-semibold text-blue-600">₹{revenueCalculation.adminEarnings.toFixed(2)}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500">Therapist Earnings (40%)</p>
+                            <p className="text-lg font-semibold text-green-600">₹{revenueCalculation.therapistEarnings.toFixed(2)}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500">Doctor Earnings (20%)</p>
+                            <p className="text-lg font-semibold text-purple-600">₹{revenueCalculation.doctorEarnings.toFixed(2)}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium text-gray-900">Total Fee:</span>
+                            <span className="text-sm font-semibold text-gray-900">₹{revenueCalculation.total.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Distributable Amount:</span>
+                            <span className="text-sm text-gray-600">₹{revenueCalculation.distributableAmount.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual Revenue Input Fields */}
+                  {formData.totalFee && (
+                    <>
+                      <div className="sm:col-span-2">
+                        <label htmlFor="adminEarnings" className="block text-sm font-medium text-gray-700">
+                          Admin Earnings (₹)
+                        </label>
+                        <div className="mt-1">
+                          <input
+                            type="number"
+                            name="adminEarnings"
+                            id="adminEarnings"
+                            min="0"
+                            step="0.01"
+                            value={formData.adminEarnings}
+                            onChange={handleChange}
+                            className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            readOnly
+                          />
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label htmlFor="therapistEarnings" className="block text-sm font-medium text-gray-700">
+                          Therapist Earnings (₹)
+                        </label>
+                        <div className="mt-1">
+                          <input
+                            type="number"
+                            name="therapistEarnings"
+                            id="therapistEarnings"
+                            min="0"
+                            step="0.01"
+                            value={formData.therapistEarnings}
+                            onChange={handleChange}
+                            className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            readOnly
+                          />
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label htmlFor="doctorEarnings" className="block text-sm font-medium text-gray-700">
+                          Doctor Earnings (₹)
+                        </label>
+                        <div className="mt-1">
+                          <input
+                            type="number"
+                            name="doctorEarnings"
+                            id="doctorEarnings"
+                            min="0"
+                            step="0.01"
+                            value={formData.doctorEarnings}
+                            onChange={handleChange}
+                            className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            readOnly
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end space-x-3">

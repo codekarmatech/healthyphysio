@@ -45,6 +45,25 @@ class Appointment(models.Model):
     pain_level = models.CharField(max_length=2, blank=True, default='0')
     mobility_issues = models.TextField(blank=True)
     changes_log = models.JSONField(blank=True, null=True)  # Track changes to the appointment
+
+    # Link to treatment plan system for flexible cycle durations
+    treatment_plan = models.ForeignKey(
+        'treatment_plans.TreatmentPlan',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='appointments',
+        help_text="Associated treatment plan for flexible cycle durations"
+    )
+    daily_treatment = models.ForeignKey(
+        'treatment_plans.DailyTreatment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='appointments',
+        help_text="Specific daily treatment within the plan"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -93,7 +112,61 @@ class Appointment(models.Model):
 
         return hours_until_appointment > 24
 
+    @property
+    def is_part_of_treatment_cycle(self):
+        """Check if this appointment is part of a treatment plan cycle"""
+        return self.treatment_plan is not None
+
+    @property
+    def treatment_cycle_info(self):
+        """Get treatment cycle information with flexible duration support"""
+        if not self.treatment_plan:
+            return None
+
+        # Get all appointments in this treatment plan
+        cycle_appointments = Appointment.objects.filter(
+            treatment_plan=self.treatment_plan
+        ).order_by('datetime')
+
+        total_appointments = cycle_appointments.count()
+        completed_appointments = cycle_appointments.filter(status=self.Status.COMPLETED).count()
+
+        # Calculate cycle duration from treatment plan dates or appointment count
+        if self.treatment_plan.start_date and self.treatment_plan.end_date:
+            cycle_duration_days = (self.treatment_plan.end_date - self.treatment_plan.start_date).days + 1
+        else:
+            # Fallback to daily treatments count or appointment count
+            daily_treatments_count = self.treatment_plan.daily_treatments.count()
+            cycle_duration_days = daily_treatments_count if daily_treatments_count > 0 else total_appointments
+
+        # Find current appointment position
+        current_position = 1
+        for i, apt in enumerate(cycle_appointments, 1):
+            if apt.id == self.id:
+                current_position = i
+                break
+
+        # Use daily treatment day number if available, otherwise use position
+        current_day = self.daily_treatment.day_number if self.daily_treatment else current_position
+
+        return {
+            'treatment_plan_title': self.treatment_plan.title,
+            'start_date': self.treatment_plan.start_date,
+            'end_date': self.treatment_plan.end_date,
+            'current_day': current_day,
+            'total_days': cycle_duration_days,
+            'total_appointments': total_appointments,
+            'completed_days': completed_appointments,
+            'progress_percentage': round((completed_appointments / total_appointments) * 100, 1) if total_appointments > 0 else 0,
+            'daily_treatment_title': self.daily_treatment.title if self.daily_treatment else None,
+            'cycle_duration_days': cycle_duration_days,
+            'is_appointment_based': total_appointments > 0,
+            'remaining_appointments': total_appointments - completed_appointments
+        }
+
     def __str__(self):
+        if self.is_part_of_treatment_cycle and self.daily_treatment:
+            return f"Day {self.daily_treatment.day_number} - {self.patient.user.username} with {self.therapist.user.username}"
         return f"Appointment {self.session_code}: {self.patient.user.username} with {self.therapist.user.username}"
 
 

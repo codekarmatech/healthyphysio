@@ -8,7 +8,7 @@ import { reportsService, visitsService, locationService } from '../../services/v
 import { formatDate } from '../../utils/dateUtils';
 
 const NewReportPage = () => {
-  const { user } = useAuth();
+  const { user, therapistProfile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -19,7 +19,7 @@ const NewReportPage = () => {
   const [locationError, setLocationError] = useState(null);
   const [timeWarning, setTimeWarning] = useState(null);
   const [error, setError] = useState(null);
-  
+
   // Form data
   const [formData, setFormData] = useState({
     patient: '',
@@ -64,14 +64,14 @@ const NewReportPage = () => {
     const fetchPatients = async () => {
       try {
         setLoading(true);
-        
-        // Get therapist ID from user object
-        const therapistId = user.therapist_id || user.id;
-        
+
+        // Get therapist ID from user object - use therapistProfile.id for proper role-based access control
+        const therapistId = therapistProfile?.id || user.therapist_id || user.id;
+
         // In a real implementation, we would fetch the therapist's patients
         // For now, we'll use a mock API call
         const response = await fetch(`/api/users/therapists/${therapistId}/patients/`);
-        
+
         if (response.ok) {
           const data = await response.json();
           setPatients(data);
@@ -80,7 +80,7 @@ const NewReportPage = () => {
           console.error('Failed to fetch patients');
           setError('Failed to load patients. Please try again.');
         }
-        
+
         setLoading(false);
       } catch (err) {
         console.error('Error fetching patients:', err);
@@ -90,43 +90,43 @@ const NewReportPage = () => {
     };
 
     fetchPatients();
-  }, [user.therapist_id, user.id]);
+  }, [therapistProfile?.id, user.therapist_id, user.id]);
 
   // Fetch visits when patient is selected
   useEffect(() => {
     const fetchVisits = async () => {
       if (!formData.patient) return;
-      
+
       try {
         setLoadingVisits(true);
-        
+
         // Fetch visits for the selected patient
         const response = await visitsService.getByPatient(formData.patient);
-        
+
         if (response && response.data) {
           // Filter visits to only include those within the last 12 hours
           const now = new Date();
           const twelveHoursAgo = new Date(now.getTime() - (12 * 60 * 60 * 1000));
-          
+
           const recentVisits = response.data.filter(visit => {
             const visitEndTime = visit.scheduled_end ? new Date(visit.scheduled_end) : null;
             if (!visitEndTime) return false;
-            
+
             // Check if visit ended within the last 12 hours
             return visitEndTime > twelveHoursAgo;
           });
-          
+
           setVisits(recentVisits);
-          
+
           // Set time warning if needed
           if (recentVisits.length > 0) {
-            const mostRecentVisit = recentVisits.sort((a, b) => 
+            const mostRecentVisit = recentVisits.sort((a, b) =>
               new Date(b.scheduled_end) - new Date(a.scheduled_end)
             )[0];
-            
+
             const visitEndTime = new Date(mostRecentVisit.scheduled_end);
             const hoursSinceEnd = (now - visitEndTime) / (1000 * 60 * 60);
-            
+
             if (hoursSinceEnd > 1 && hoursSinceEnd <= 12) {
               setTimeWarning(`This report is being created ${hoursSinceEnd.toFixed(1)} hours after the visit ended. Late submissions will be flagged.`);
             } else if (hoursSinceEnd <= 1) {
@@ -136,7 +136,7 @@ const NewReportPage = () => {
         } else {
           setVisits([]);
         }
-        
+
         setLoadingVisits(false);
       } catch (err) {
         console.error('Error fetching visits:', err);
@@ -170,23 +170,23 @@ const NewReportPage = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate required fields
     const requiredFields = ['patient', 'visit', 'therapist_notes', 'treatment_provided', 'patient_progress'];
     const missingFields = requiredFields.filter(field => !formData[field]);
-    
+
     if (missingFields.length > 0) {
       const fieldNames = missingFields.map(field => field.replace(/_/g, ' ')).join(', ');
       toast.error(`Please fill in the following required fields: ${fieldNames}`);
       return;
     }
-    
+
     try {
       setSubmitting(true);
-      
-      // Get therapist ID from user object
-      const therapistId = user.therapist_id || user.id;
-      
+
+      // Get therapist ID from user object - use therapistProfile.id for proper role-based access control
+      const therapistId = therapistProfile?.id || user.therapist_id || user.id;
+
       // Prepare report data
       const reportData = {
         therapist: therapistId,
@@ -204,7 +204,7 @@ const NewReportPage = () => {
         }),
         report_date: new Date().toISOString().split('T')[0]
       };
-      
+
       // Submit location data if available
       if (currentLocation) {
         await locationService.updateLocation({
@@ -214,13 +214,13 @@ const NewReportPage = () => {
           visit: formData.visit
         });
       }
-      
+
       // Create the report
       const response = await reportsService.create(reportData);
-      
+
       if (response && response.data) {
         toast.success('Report created successfully!');
-        
+
         // Navigate to the report detail page
         navigate(`/therapist/report/${response.data.id}`);
       } else {
@@ -249,13 +249,13 @@ const NewReportPage = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="bg-white shadow-md rounded-lg p-6">
           <h1 className="text-2xl font-bold mb-6">Create New Report</h1>
-          
+
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
               {error}
             </div>
           )}
-          
+
           {locationError && (
             <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
               <p className="font-bold">⚠️ Location Warning</p>
@@ -263,14 +263,14 @@ const NewReportPage = () => {
               <p>Location verification is required for report submission.</p>
             </div>
           )}
-          
+
           {timeWarning && (
             <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
               <p className="font-bold">⚠️ Late Submission Warning</p>
               <p>{timeWarning}</p>
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               {/* Patient Selection */}
@@ -295,7 +295,7 @@ const NewReportPage = () => {
                   ))}
                 </select>
               </div>
-              
+
               {/* Visit Selection */}
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="visit">
@@ -313,7 +313,7 @@ const NewReportPage = () => {
                   <option value="">Select a visit</option>
                   {visits.map(visit => (
                     <option key={visit.id} value={visit.id}>
-                      {formatDate(new Date(visit.scheduled_start), 'MMM dd, yyyy HH:mm')} - 
+                      {formatDate(new Date(visit.scheduled_start), 'MMM dd, yyyy HH:mm')} -
                       {formatDate(new Date(visit.scheduled_end), 'HH:mm')}
                     </option>
                   ))}
@@ -324,7 +324,7 @@ const NewReportPage = () => {
                 )}
               </div>
             </div>
-            
+
             <div className="space-y-6">
               {/* Therapist Notes */}
               <div>
@@ -343,7 +343,7 @@ const NewReportPage = () => {
                   required
                 />
               </div>
-              
+
               {/* Treatment Provided */}
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="treatment_provided">
@@ -361,7 +361,7 @@ const NewReportPage = () => {
                   required
                 />
               </div>
-              
+
               {/* Patient Progress */}
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="patient_progress">
@@ -379,7 +379,7 @@ const NewReportPage = () => {
                   required
                 />
               </div>
-              
+
               {/* Pain Levels */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -415,7 +415,7 @@ const NewReportPage = () => {
                   />
                 </div>
               </div>
-              
+
               {/* Mobility Assessment */}
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="mobility_assessment">
@@ -432,7 +432,7 @@ const NewReportPage = () => {
                   placeholder="Assess the patient's mobility"
                 />
               </div>
-              
+
               {/* Recommendations */}
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="recommendations">
@@ -449,7 +449,7 @@ const NewReportPage = () => {
                   placeholder="Provide recommendations for the patient's home care"
                 />
               </div>
-              
+
               {/* Next Session Goals */}
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="next_session_goals">
@@ -467,7 +467,7 @@ const NewReportPage = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between mt-6">
               <button
                 type="button"
@@ -477,7 +477,7 @@ const NewReportPage = () => {
               >
                 Cancel
               </button>
-              
+
               <button
                 type="submit"
                 className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"

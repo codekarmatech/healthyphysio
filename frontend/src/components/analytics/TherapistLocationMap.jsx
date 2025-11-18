@@ -727,6 +727,45 @@ const TherapistLocationMap = ({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Therapist Selection Controls */}
+      <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <label htmlFor="therapist-select" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+              Focus on Therapist:
+            </label>
+            <select
+              id="therapist-select"
+              value={selectedTherapistId || ''}
+              onChange={handleTherapistSelect}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[200px]"
+            >
+              <option value="">All Therapists</option>
+              {therapistOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {selectedTherapistId && (
+              <button
+                onClick={() => onTherapistSelect(null)}
+                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+              >
+                Clear Selection
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600">
+              Showing {therapists.length} therapist{therapists.length !== 1 ? 's' : ''}
+              {patients.length > 0 && ` and ${patients.length} patient${patients.length !== 1 ? 's' : ''}`}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="relative">
         {/* Map status indicator */}
         {selectedTherapistId && (

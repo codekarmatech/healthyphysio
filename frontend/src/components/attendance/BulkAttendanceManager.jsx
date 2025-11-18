@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import api from '../../services/api';
 import attendanceService from '../../services/attendanceService';
@@ -25,12 +25,6 @@ const BulkAttendanceManager = () => {
     fetchTherapists();
   }, []);
 
-  useEffect(() => {
-    if (selectedTherapists.length > 0) {
-      fetchAttendanceRecords();
-    }
-  }, [selectedTherapists, dateRange]);
-
   const fetchTherapists = async () => {
     try {
       const response = await api.get('/users/therapists/');
@@ -41,7 +35,7 @@ const BulkAttendanceManager = () => {
     }
   };
 
-  const fetchAttendanceRecords = async () => {
+  const fetchAttendanceRecords = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -53,14 +47,14 @@ const BulkAttendanceManager = () => {
             start_date: dateRange.start,
             end_date: dateRange.end
           });
-          
+
           const therapist = therapists.find(t => t.id === therapistId);
           const therapistRecords = (response.data || []).map(record => ({
             ...record,
             therapist_id: therapistId,
             therapist_name: `${therapist.user.first_name} ${therapist.user.last_name}`
           }));
-          
+
           records.push(...therapistRecords);
         } catch (err) {
           console.error(`Error fetching records for therapist ${therapistId}:`, err);
@@ -75,7 +69,13 @@ const BulkAttendanceManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTherapists, dateRange, therapists]);
+
+  useEffect(() => {
+    if (selectedTherapists.length > 0) {
+      fetchAttendanceRecords();
+    }
+  }, [selectedTherapists, dateRange, fetchAttendanceRecords]);
 
   const handleTherapistSelection = (therapistId) => {
     setSelectedTherapists(prev => {
@@ -188,7 +188,7 @@ const BulkAttendanceManager = () => {
       {/* Configuration Panel */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Bulk Attendance Operations</h3>
-        
+
         {/* Therapist Selection */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">

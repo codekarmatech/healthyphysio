@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import api from '../../services/api';
 
@@ -11,19 +11,14 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (therapistId) {
-      fetchAnalytics();
-    }
-  }, [therapistId, dateRange]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Calculate date range
-      const endDate = new Date();
+      // Calculate date range using endOfMonth for proper month boundaries
+      const currentDate = new Date();
+      const endDate = dateRange ? new Date(dateRange.end) : endOfMonth(currentDate);
       const startDate = dateRange ? new Date(dateRange.start) : subDays(endDate, 30);
 
       // Fetch attendance analytics data
@@ -43,7 +38,7 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
       const presentDays = attendanceData.filter(record => record.status === 'present').length;
       const absentDays = attendanceData.filter(record => record.status === 'absent').length;
       const halfDays = attendanceData.filter(record => record.status === 'half_day').length;
-      const leaveDays = attendanceData.filter(record => 
+      const leaveDays = attendanceData.filter(record =>
         ['approved_leave', 'sick_leave', 'emergency_leave'].includes(record.status)
       ).length;
 
@@ -63,7 +58,11 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
         consistency: consistencyData,
         impact: impactData,
         trends: calculateTrends(attendanceData),
-        patterns: analyzePatterns(attendanceData)
+        patterns: analyzePatterns(attendanceData),
+        dateRange: {
+          start: format(startDate, 'MMM dd, yyyy'),
+          end: format(endDate, 'MMM dd, yyyy')
+        }
       });
 
     } catch (err) {
@@ -72,7 +71,14 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [therapistId, dateRange]);
+
+  // Fetch analytics data when component mounts or dependencies change
+  useEffect(() => {
+    if (therapistId) {
+      fetchAnalytics();
+    }
+  }, [therapistId, dateRange, fetchAnalytics]);
 
   const calculateTrends = (data) => {
     // Calculate weekly trends
@@ -81,11 +87,11 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
       const date = new Date(record.date);
       const weekStart = startOfMonth(date);
       const weekKey = format(weekStart, 'yyyy-MM-dd');
-      
+
       if (!weeks[weekKey]) {
         weeks[weekKey] = { present: 0, absent: 0, total: 0 };
       }
-      
+
       weeks[weekKey].total++;
       if (record.status === 'present') weeks[weekKey].present++;
       if (record.status === 'absent') weeks[weekKey].absent++;
@@ -161,7 +167,14 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Attendance Summary</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Attendance Summary</h3>
+          <div className="text-sm text-gray-500">
+            {analytics.dateRange && (
+              <span>Period: {analytics.dateRange.start} - {analytics.dateRange.end}</span>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">{analytics.summary.totalDays}</div>
@@ -232,8 +245,8 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div className="flex items-center">
                       <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
-                        <div 
-                          className="bg-green-500 h-2 rounded-full" 
+                        <div
+                          className="bg-green-500 h-2 rounded-full"
                           style={{ width: `${day.attendanceRate}%` }}
                         ></div>
                       </div>
@@ -258,7 +271,7 @@ const AttendanceAnalytics = ({ therapistId, dateRange }) => {
             </div>
             <div className="text-2xl font-bold text-blue-600">{analytics.summary.attendanceRate}%</div>
           </div>
-          
+
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
               <div className="text-sm font-medium text-gray-900">Absenteeism Rate</div>

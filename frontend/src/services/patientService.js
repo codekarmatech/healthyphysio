@@ -61,6 +61,15 @@ class PatientService extends BaseService {
   search(query) {
     return api.get(`${this.basePath}search/?q=${query}`);
   }
+
+  /**
+   * Get all patients (alias for getAll for better API consistency)
+   * @param {Object} params - Optional query parameters
+   * @returns {Promise} API response
+   */
+  getAllPatients(params = {}) {
+    return this.getAll(params);
+  }
 }
 
 // Create and export a singleton instance
