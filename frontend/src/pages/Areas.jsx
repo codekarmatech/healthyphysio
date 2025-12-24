@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
+import PageHeader from '../components/common/PageHeader';
 import areaService from '../services/areaService';
 import { COMPANY_INFO } from '../constants';
 
@@ -36,19 +37,19 @@ const Areas = () => {
       setLoading(true);
       // Use the areas API endpoint to get all areas
       const response = await areaService.getAll();
-      
+
       // Filter for Ahmedabad, Gujarat areas only
-      const ahmedabadAreas = (response.data || []).filter(area => 
-        area.city?.toLowerCase() === 'ahmedabad' && 
+      const ahmedabadAreas = (response.data || []).filter(area =>
+        area.city?.toLowerCase() === 'ahmedabad' &&
         area.state?.toLowerCase() === 'gujarat'
       );
-      
+
       setAreas(ahmedabadAreas);
       setError(null);
     } catch (err) {
       console.error('Error fetching areas:', err);
       setError('Failed to load service areas. Please try again later.');
-      
+
       // Fallback: Show some default Ahmedabad areas if API fails
       setAreas([
         {
@@ -100,15 +101,12 @@ const Areas = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 relative overflow-hidden">
-        {/* Dynamic Background Pattern */}
-        <div className="absolute inset-0 pattern-grid opacity-25"></div>
-        
+      <div className="min-h-screen bg-slate-50 relative overflow-hidden">
         <Navbar />
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600 mx-auto mb-4"></div>
-            <p className="font-sans text-gray-600">Loading service areas...</p>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-brand-blue mx-auto mb-4"></div>
+            <p className="text-slate-600">Loading service areas...</p>
           </div>
         </div>
       </div>
@@ -116,51 +114,28 @@ const Areas = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 relative overflow-hidden">
-      {/* Dynamic Background Pattern */}
-      <div className="absolute inset-0 pattern-grid opacity-25"></div>
-      
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
-      
-      {/* Hero Section */}
-      <section className="relative pt-20 pb-16 overflow-hidden">
-        {/* Dynamic Light Color Effects */}
-        <div className="absolute top-10 right-10 w-40 h-40 bg-gradient-to-br from-emerald-400/15 via-teal-400/20 to-cyan-400/15 blur-2xl opacity-60" style={{ animation: 'colorShift 13s ease-in-out infinite 1s' }}></div>
-        <div className="absolute bottom-10 left-10 w-32 h-32 bg-gradient-to-br from-violet-400/20 via-purple-400/25 to-indigo-400/20 blur-xl opacity-70" style={{ animation: 'colorShift 11s ease-in-out infinite 3s' }}></div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full mb-6 shadow-lg">
-              <span className="text-green-500 mr-2">📍</span>
-              <span className="text-sm font-medium text-gray-700">Currently Serving Ahmedabad, Gujarat</span>
-            </div>
-            
-            <h1 className="font-display text-5xl lg:text-6xl font-bold text-gray-900 mb-8 leading-tight overflow-visible">
-              Our Service 
-              <span className="block bg-gradient-to-r from-primary-600 via-secondary-500 to-primary-700 bg-clip-text text-transparent overflow-visible">
-                Areas
-              </span>
-            </h1>
-            
-            <p className="font-sans text-xl lg:text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed mb-8">
-              Professional physiotherapy services delivered to your doorstep across Ahmedabad, Gujarat. 
-              <span className="text-primary-600 font-semibold">Quality care, wherever you are.</span>
-            </p>
 
-            {/* Search Bar */}
-            <div className="max-w-md mx-auto">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search areas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-6 py-4 rounded-2xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none font-sans text-lg"
-                />
-                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                  <span className="text-gray-400">🔍</span>
-                </div>
-              </div>
+      <PageHeader
+        title="Our Service Areas"
+        subtitle="Professional physiotherapy services delivered to your doorstep across Ahmedabad, Gujarat."
+        bgImage="https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"
+      />
+
+      {/* Search Bar - overlapping header */}
+      <section className="relative px-4 sm:px-6 lg:px-8 -mt-8 z-20 mb-12">
+        <div className="max-w-md mx-auto">
+          <div className="relative shadow-xl rounded-2xl">
+            <input
+              type="text"
+              placeholder="Search areas..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none text-lg text-slate-700 shadow-sm"
+            />
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-xl">
+              🔍
             </div>
           </div>
         </div>
@@ -170,29 +145,29 @@ const Areas = () => {
       <section className="pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {error ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-12 bg-red-50 rounded-3xl border border-red-100">
+              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-dark">
                 <span className="text-3xl">⚠️</span>
               </div>
-              <h3 className="font-heading text-xl font-bold text-gray-900 mb-2">Error Loading Areas</h3>
-              <p className="font-sans text-gray-600 mb-6">{error}</p>
+              <h3 className="text-xl font-bold text-brand-dark mb-2">Error Loading Areas</h3>
+              <p className="text-slate-600 mb-6">{error}</p>
               <button
                 onClick={fetchAreas}
-                className="px-6 py-3 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition-colors"
+                className="px-6 py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-brand-blue/90 transition-colors"
               >
                 Try Again
               </button>
             </div>
           ) : filteredAreas.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-12 bg-white rounded-3xl shadow-sm border border-slate-100">
+              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">📍</span>
               </div>
-              <h3 className="font-heading text-xl font-bold text-gray-900 mb-2">
+              <h3 className="text-xl font-bold text-brand-dark mb-2">
                 {searchQuery ? 'No Areas Found' : 'No Service Areas Available'}
               </h3>
-              <p className="font-sans text-gray-600 mb-6">
-                {searchQuery 
+              <p className="text-slate-600 mb-6">
+                {searchQuery
                   ? `No areas match "${searchQuery}". Try a different search term.`
                   : 'We are expanding our service areas. Check back soon!'
                 }
@@ -200,7 +175,7 @@ const Areas = () => {
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="px-6 py-3 bg-primary-600 text-white font-semibold rounded-xl hover:bg-primary-700 transition-colors"
+                  className="px-6 py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-brand-blue/90 transition-colors"
                 >
                   Clear Search
                 </button>
@@ -213,56 +188,56 @@ const Areas = () => {
                 return (
                   <div
                     key={area.id}
-                    className="group bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl hover:shadow-2xl border border-white/50 transition-all duration-500 transform hover:scale-105 hover:-translate-y-2"
+                    className="glass-card group p-8 rounded-3xl hover:-translate-y-2 transition-transform duration-300 animate-slide-up"
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     {/* Area Header */}
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex-1">
-                        <h3 className="font-heading text-xl font-bold text-gray-900 mb-2">
+                        <h3 className="font-heading text-xl font-bold text-brand-dark mb-1 group-hover:text-brand-blue transition-colors">
                           {area.name}
                         </h3>
-                        <p className="font-sans text-gray-600">
+                        <p className="text-slate-600 font-medium">
                           {area.city}, {area.state}
                         </p>
                         {area.zip_code && (
-                          <p className="font-sans text-sm text-gray-500">
+                          <p className="text-sm text-slate-400 mt-1">
                             PIN: {area.zip_code}
                           </p>
                         )}
                       </div>
-                      <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                        <span className="text-white text-xl">📍</span>
+                      <div className="w-12 h-12 bg-brand-light rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <span className="text-2xl">⚡</span>
                       </div>
                     </div>
 
                     {/* Description */}
                     {area.description && (
-                      <p className="font-sans text-gray-600 text-sm mb-6 leading-relaxed">
+                      <p className="text-slate-600 text-sm mb-6 leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                         {area.description}
                       </p>
                     )}
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-3 gap-4 mb-6 pt-4 border-t border-slate-100">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-primary-600">{stats.therapists}</div>
-                        <div className="text-xs text-gray-500 font-medium">Therapists</div>
+                        <div className="text-xl font-bold text-brand-blue">{stats.therapists}</div>
+                        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Therapists</div>
+                      </div>
+                      <div className="text-center border-l border-slate-100 border-r">
+                        <div className="text-xl font-bold text-brand-orange">{stats.patients}</div>
+                        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Patients</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-secondary-600">{stats.patients}</div>
-                        <div className="text-xs text-gray-500 font-medium">Patients</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{stats.doctors}</div>
-                        <div className="text-xs text-gray-500 font-medium">Doctors</div>
+                        <div className="text-xl font-bold text-green-500">{stats.doctors}</div>
+                        <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">Doctors</div>
                       </div>
                     </div>
 
                     {/* Action Button */}
                     <Link
                       to="/book-consultation"
-                      className="block w-full py-3 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 text-white font-heading font-semibold text-center rounded-2xl transition-all duration-300 transform group-hover:scale-105"
+                      className="block w-full py-3 bg-brand-dark text-white font-bold text-center rounded-xl hover:bg-brand-blue transition-colors shadow-lg hover:shadow-brand-blue/20"
                     >
                       Book Consultation
                     </Link>
@@ -273,24 +248,27 @@ const Areas = () => {
           )}
 
           {/* Contact Section */}
-          <div className="mt-20 text-center">
-            <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/50">
-              <h3 className="font-display text-3xl font-bold text-gray-900 mb-4">
+          <div className="mt-20 text-center animate-fade-in">
+            <div className="glass-panel p-10 rounded-[3rem] max-w-4xl mx-auto relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-blue/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-orange/5 rounded-full blur-3xl -ml-16 -mb-16"></div>
+
+              <h3 className="font-heading text-3xl font-bold text-brand-dark mb-4 relative z-10">
                 Don't See Your Area?
               </h3>
-              <p className="font-sans text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
+              <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto relative z-10">
                 We're rapidly expanding our services across Gujarat. Contact us to check if we can serve your area or to request service in your location.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center relative z-10">
                 <a
                   href={`tel:${COMPANY_INFO.phone}`}
-                  className="px-8 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 text-white font-heading font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                  className="px-8 py-4 bg-brand-blue text-white font-bold rounded-xl shadow-lg hover:bg-brand-blue/90 transition-all hover:-translate-y-1"
                 >
                   📞 Call {COMPANY_INFO.phone}
                 </a>
                 <Link
                   to="/contact"
-                  className="px-8 py-4 bg-white border-2 border-primary-200 text-primary-600 font-heading font-semibold rounded-2xl hover:bg-primary-50 hover:border-primary-300 transition-all duration-300 transform hover:scale-105"
+                  className="px-8 py-4 bg-white border border-slate-200 text-brand-dark font-bold rounded-xl hover:bg-slate-50 transition-all hover:-translate-y-1"
                 >
                   Contact Us
                 </Link>

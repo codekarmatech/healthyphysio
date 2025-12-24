@@ -6,11 +6,26 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        'sans': ['Inter', 'system-ui', 'sans-serif'],
-        'heading': ['Poppins', 'system-ui', 'sans-serif'],
+        'sans': ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
+        'heading': ['"Playfair Display"', 'serif'],
         'display': ['Playfair Display', 'serif'],
       },
       colors: {
+        // Deep Brand Colors (Logo)
+        brand: {
+          dark: '#0f172a', // Deep Blue/Slate
+          blue: '#1e40af', // Primary Blue
+          orange: '#ea580c', // Primary Orange
+        },
+        // Pastel Theme Palette
+        pastel: {
+          blue: '#e0f2fe', // Sky 100
+          orange: '#ffedd5', // Orange 100
+          purple: '#f3e8ff', // Purple 100
+          teal: '#ccfbf1', // Teal 100
+          cream: '#fdfbf7', // Warm Cream
+          gray: '#f8fafc', // Slate 50
+        },
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -101,64 +116,64 @@ module.exports = {
           '50%': { transform: 'translateY(-10px)' },
         },
         colorShift: {
-          '0%': { 
+          '0%': {
             background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.1))',
             transform: 'scale(1) rotate(0deg)'
           },
-          '25%': { 
+          '25%': {
             background: 'linear-gradient(45deg, rgba(34, 197, 94, 0.15), rgba(20, 184, 166, 0.2), rgba(6, 182, 212, 0.15))',
             transform: 'scale(1.1) rotate(90deg)'
           },
-          '50%': { 
+          '50%': {
             background: 'linear-gradient(45deg, rgba(251, 191, 36, 0.12), rgba(249, 115, 22, 0.18), rgba(239, 68, 68, 0.12))',
             transform: 'scale(0.9) rotate(180deg)'
           },
-          '75%': { 
+          '75%': {
             background: 'linear-gradient(45deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.15))',
             transform: 'scale(1.05) rotate(270deg)'
           },
-          '100%': { 
+          '100%': {
             background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.1))',
             transform: 'scale(1) rotate(360deg)'
           }
         },
         patternShift: {
-          '0%': { 
+          '0%': {
             backgroundPosition: '0% 0%',
             filter: 'hue-rotate(0deg) brightness(1)',
             transform: 'scale(1)'
           },
-          '25%': { 
+          '25%': {
             backgroundPosition: '100% 0%',
             filter: 'hue-rotate(90deg) brightness(1.1)',
             transform: 'scale(1.05)'
           },
-          '50%': { 
+          '50%': {
             backgroundPosition: '100% 100%',
             filter: 'hue-rotate(180deg) brightness(0.9)',
             transform: 'scale(0.95)'
           },
-          '75%': { 
+          '75%': {
             backgroundPosition: '0% 100%',
             filter: 'hue-rotate(270deg) brightness(1.05)',
             transform: 'scale(1.02)'
           },
-          '100%': { 
+          '100%': {
             backgroundPosition: '0% 0%',
             filter: 'hue-rotate(360deg) brightness(1)',
             transform: 'scale(1)'
           }
         },
         wavePattern: {
-          '0%': { 
+          '0%': {
             backgroundPosition: '0% 50%',
             opacity: '0.3'
           },
-          '50%': { 
+          '50%': {
             backgroundPosition: '100% 50%',
             opacity: '0.6'
           },
-          '100%': { 
+          '100%': {
             backgroundPosition: '0% 50%',
             opacity: '0.3'
           }
@@ -241,7 +256,7 @@ module.exports = {
   },
   plugins: [
     // Plugin to add text shadow utilities
-    function({ addUtilities }) {
+    function ({ addUtilities }) {
       const newUtilities = {
         '.text-shadow-none': {
           textShadow: 'none',

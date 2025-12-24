@@ -2,131 +2,78 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
-import { COMPANY_INFO, STATS, CSS_CLASSES } from '../constants';
+import PageHeader from '../components/common/PageHeader';
+import { getAllSettings } from '../services/siteSettingsService';
+import { COMPANY_INFO, STATS } from '../constants';
 
 const AboutUs = () => {
-  const [isVisible, setIsVisible] = useState({});
+  const [settings, setSettings] = useState(null);
 
   useEffect(() => {
-    document.title = 'About Us - PhysioWay | Professional Home Physiotherapy Services';
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsVisible(prev => ({ ...prev, [entry.target.id]: true }));
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    document.querySelectorAll('[id]').forEach((el) => {
-      observer.observe(el);
-    });
-
-    return () => observer.disconnect();
+    const fetchSettings = async () => {
+      const data = await getAllSettings();
+      setSettings(data);
+      document.title = `About Us - ${data?.branding?.company_name || 'PhysioWay'}`;
+    };
+    fetchSettings();
   }, []);
 
-  // Using founder and IT partner data from constants
+  const branding = settings?.branding || COMPANY_INFO;
 
   const values = [
-    {
-      title: 'Excellence',
-      description: 'We strive for the highest standards in everything we do, from treatment protocols to patient care.',
-      icon: '⭐'
-    },
-    {
-      title: 'Compassion',
-      description: 'Every patient receives personalized, empathetic care tailored to their unique needs and circumstances.',
-      icon: '❤️'
-    },
-    {
-      title: 'Innovation',
-      description: 'We embrace cutting-edge technology and evidence-based practices to deliver superior outcomes.',
-      icon: '🚀'
-    },
-    {
-      title: 'Integrity',
-      description: 'Transparency, honesty, and ethical practices form the foundation of our patient relationships.',
-      icon: '🤝'
-    }
+    { title: 'Excellence', description: 'We strive for the highest standards in everything we do.', icon: '⭐' },
+    { title: 'Compassion', description: 'Every patient receives personalized, empathetic care.', icon: '❤️' },
+    { title: 'Innovation', description: 'Embracing cutting-edge technology for better outcomes.', icon: '🚀' },
+    { title: 'Integrity', description: 'Transparency and honesty in all our relationships.', icon: '🤝' }
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
-      
-      {/* Hero Section */}
-      <section id="hero" className="relative pt-20 pb-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-white to-secondary-50"></div>
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary-100/20 to-transparent"></div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <div className={`${isVisible.hero ? 'animate-fade-in' : 'opacity-0'}`}>
-              <h1 className={CSS_CLASSES.heading.h1}>
-                About <span className={CSS_CLASSES.heading.gradient}>PhysioWay</span>
-              </h1>
-              <p className="mt-6 text-xl text-gray-600 leading-relaxed max-w-4xl mx-auto">
-                We're revolutionizing physiotherapy by bringing world-class treatment directly to your home. 
-                Our mission is to make quality healthcare accessible, convenient, and effective for everyone.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+
+      <PageHeader
+        title={`About ${branding.company_name || 'PhysioWay'}`}
+        subtitle="Revolutionizing physiotherapy by bringing world-class treatment directly to your home."
+        bgImage="https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"
+      />
 
       {/* Mission & Vision Section */}
-      <section id="mission" className="py-20 bg-white">
+      <section className="py-20 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
-            <div className={`${isVisible.mission ? 'animate-slide-in-left' : 'opacity-0'}`}>
-              <h2 className={CSS_CLASSES.heading.h2}>
-                Our <span className={CSS_CLASSES.heading.gradient}>Mission</span>
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="animate-slide-in-left">
+              <h2 className="text-3xl font-heading font-bold text-brand-dark mb-6">
+                Our <span className="text-brand-blue">Mission</span>
               </h2>
-              <p className="mt-6 text-lg text-gray-600 leading-relaxed">
-                To provide exceptional physiotherapy services in the comfort of your home, combining 
-                professional expertise with cutting-edge technology to deliver personalized care that 
+              <p className="text-lg text-slate-600 leading-relaxed mb-8">
+                To provide exceptional physiotherapy services in the comfort of your home, combining
+                professional expertise with cutting-edge technology to deliver personalized care that
                 accelerates recovery and improves quality of life.
               </p>
-              <div className="mt-8 space-y-4">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center mr-4">
-                    <span className="text-primary-600">✓</span>
+              <div className="space-y-4">
+                {['Patient-centered care approach', 'Evidence-based treatment protocols', 'Continuous innovation and improvement'].map((item, i) => (
+                  <div key={i} className="flex items-center">
+                    <span className="w-8 h-8 rounded-full bg-brand-blue/10 flex items-center justify-center text-brand-blue mr-4 font-bold">✓</span>
+                    <span className="text-slate-700 font-medium">{item}</span>
                   </div>
-                  <span className="text-gray-700">Patient-centered care approach</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-secondary-100 rounded-lg flex items-center justify-center mr-4">
-                    <span className="text-secondary-600">✓</span>
-                  </div>
-                  <span className="text-gray-700">Evidence-based treatment protocols</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center mr-4">
-                    <span className="text-primary-600">✓</span>
-                  </div>
-                  <span className="text-gray-700">Continuous innovation and improvement</span>
-                </div>
+                ))}
               </div>
             </div>
-            
-            <div className={`mt-12 lg:mt-0 ${isVisible.mission ? 'animate-slide-in-right' : 'opacity-0'}`}>
-              <div className="bg-gradient-to-br from-primary-500 to-secondary-500 rounded-3xl p-8 text-white">
-                <h3 className="text-2xl font-bold mb-6">Our Vision</h3>
-                <p className="text-lg leading-relaxed mb-6">
-                  To become the leading home healthcare provider, transforming the way physiotherapy 
-                  is delivered and making quality treatment accessible to every individual, regardless 
-                  of their location or mobility constraints.
+
+            <div className="relative animate-slide-in-right">
+              <div className="absolute inset-0 bg-gradient-to-r from-brand-blue to-brand-orange transform rotate-3 rounded-3xl opacity-20 blur-xl"></div>
+              <div className="relative glass-card bg-white/80 rounded-3xl p-8 shadow-xl border border-white/50">
+                <h3 className="text-2xl font-heading font-bold text-brand-dark mb-4">Our Vision</h3>
+                <p className="text-slate-600 mb-6">
+                  To become the leading home healthcare provider, transforming the way physiotherapy
+                  is delivered and making quality treatment accessible to every individual.
                 </p>
-                <div className="bg-white/20 rounded-2xl p-6">
-                  <h4 className="font-semibold mb-2">By 2030, we aim to:</h4>
-                  <ul className="space-y-2 text-sm">
-                    <li>• Serve 100,000+ patients nationwide</li>
-                    <li>• Expand to 50+ cities across India</li>
-                    <li>• Pioneer AI-driven treatment protocols</li>
-                    <li>• Achieve 99% patient satisfaction rate</li>
+                <div className="bg-slate-50/80 rounded-2xl p-6 border border-slate-100">
+                  <h4 className="font-bold text-brand-dark mb-3">By 2030, we aim to:</h4>
+                  <ul className="space-y-2 text-sm text-slate-600">
+                    <li className="flex items-center"><span className="text-brand-orange mr-2">•</span> Serve 100,000+ patients nationwide</li>
+                    <li className="flex items-center"><span className="text-brand-orange mr-2">•</span> Expand to 50+ cities across India</li>
+                    <li className="flex items-center"><span className="text-brand-orange mr-2">•</span> Pioneer AI-driven treatment protocols</li>
                   </ul>
                 </div>
               </div>
@@ -136,25 +83,15 @@ const AboutUs = () => {
       </section>
 
       {/* Stats Section */}
-      <section id="stats" className="py-20 bg-gradient-to-r from-primary-600 to-secondary-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Our Impact in Numbers
-            </h2>
-            <p className="text-xl text-primary-100">
-              Making a difference, one patient at a time
-            </p>
-          </div>
-          
+      <section className="py-20 bg-brand-dark relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {STATS.map((stat, index) => (
-              <div key={index} className={`text-center ${isVisible.stats ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-                  <div className="text-5xl mb-4">{stat.icon}</div>
-                  <div className="text-4xl font-bold text-white mb-2">{stat.number}</div>
-                  <div className="text-primary-100 font-medium">{stat.label}</div>
-                </div>
+              <div key={index} className="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-colors animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                <div className="text-4xl mb-4">{stat.icon}</div>
+                <div className="text-4xl font-bold text-white mb-2">{stat.number}</div>
+                <div className="text-slate-400 font-medium">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -162,167 +99,123 @@ const AboutUs = () => {
       </section>
 
       {/* Founder Section */}
-      <section id="founder" className="py-20 bg-gradient-to-br from-gray-50 to-primary-50">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={`text-center mb-16 ${isVisible.founder ? 'animate-fade-in' : 'opacity-0'}`}>
-            <h2 className={CSS_CLASSES.heading.h2}>
-              Meet Our <span className={CSS_CLASSES.heading.gradient}>Core Founder</span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto mt-4">
-              Led by a young and experienced neurological physiotherapist with a vision to revolutionize healthcare delivery.
+          <div className="text-center mb-16 animate-fade-in">
+            <h2 className="text-3xl font-heading font-bold text-brand-dark">Meet Our Founder</h2>
+            <p className="text-slate-600 mt-4 max-w-2xl mx-auto">Led by experienced professionals committed to your health.</p>
+          </div>
+
+          <div className="glass-card p-8 lg:p-12 rounded-[3rem] max-w-5xl mx-auto animate-slide-up">
+            <div className="flex flex-col md:flex-row items-center gap-12">
+              <div className="relative">
+                <div className="w-48 h-48 bg-gray-200 rounded-full overflow-hidden border-4 border-white shadow-xl">
+                  {/* Placeholder for founder image */}
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-blue to-brand-dark text-white text-4xl font-heading">
+                    {COMPANY_INFO.founder.name.charAt(0)}
+                  </div>
+                </div>
+                <div className="absolute bottom-0 right-0 bg-brand-orange text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg">FOUNDER</div>
+              </div>
+
+              <div className="flex-1 text-center md:text-left">
+                <h3 className="text-3xl font-heading font-bold text-brand-dark mb-2">{COMPANY_INFO.founder.name}</h3>
+                <p className="text-brand-blue font-medium mb-6 uppercase tracking-wider text-sm">{COMPANY_INFO.founder.title}</p>
+                <p className="text-slate-600 leading-relaxed mb-6 italic">"{COMPANY_INFO.founder.description}"</p>
+                <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                  {COMPANY_INFO.founder.qualifications.map((q, i) => (
+                    <span key={i} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium border border-slate-200">{q}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* IT Partner Section */}
+      <section className="py-20 border-t border-slate-200 bg-slate-50/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 animate-fade-in">
+            <h3 className="text-3xl font-bold text-brand-dark mb-4">
+              Our Technology <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-orange">Partner</span>
+            </h3>
+            <p className="text-xl text-slate-600">
+              Powered by cutting-edge technology solutions
             </p>
           </div>
-          
-          <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center mb-20">
-            <div className={`${isVisible.founder ? 'animate-slide-in-left' : 'opacity-0'}`}>
-              <div className="relative">
-                <div className="absolute -top-8 -right-8 w-32 h-32 bg-gradient-to-br from-primary-200 to-primary-300 rounded-full opacity-20 animate-pulse-slow"></div>
-                <div className="relative bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 p-8">
-                  <div className="text-center">
-                    <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-6xl shadow-lg">
-                      👨‍⚕️
-                    </div>
-                    <div className="bg-gradient-to-r from-primary-50 to-secondary-50 rounded-2xl p-6">
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">{COMPANY_INFO.founder.name}</h3>
-                      <p className="text-primary-600 font-semibold mb-2">{COMPANY_INFO.founder.title}</p>
-                      <p className="text-secondary-600 font-medium">{COMPANY_INFO.founder.experience}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className={`mt-12 lg:mt-0 ${isVisible.founder ? 'animate-slide-in-right' : 'opacity-0'}`}>
-              <h3 className="text-3xl font-bold text-gray-900 mb-6">Visionary Leadership</h3>
-              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                {COMPANY_INFO.founder.description}
-              </p>
-              
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-xl font-semibold text-gray-900 mb-4">Qualifications</h4>
-                  <div className="grid grid-cols-1 gap-3">
-                    {COMPANY_INFO.founder.qualifications.map((qualification, index) => (
-                      <div key={index} className="flex items-center">
-                        <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center mr-3">
-                          <span className="text-primary-600">🎓</span>
-                        </div>
-                        <span className="text-gray-700">{qualification}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="text-xl font-semibold text-gray-900 mb-4">Key Achievements</h4>
-                  <div className="grid grid-cols-1 gap-3">
-                    {COMPANY_INFO.founder.achievements.map((achievement, index) => (
-                      <div key={index} className="flex items-center">
-                        <div className="w-8 h-8 bg-secondary-100 rounded-lg flex items-center justify-center mr-3">
-                          <span className="text-secondary-600">🏆</span>
-                        </div>
-                        <span className="text-gray-700">{achievement}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-8 p-6 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl text-white">
-                <h4 className="text-lg font-semibold mb-3">Vision Statement</h4>
-                <p className="text-primary-100 italic">"{COMPANY_INFO.founder.vision}"</p>
-              </div>
-            </div>
-          </div>
-          
-          {/* IT Partner Section */}
-          <div className="border-t border-gray-200 pt-20">
-            <div className={`text-center mb-12 ${isVisible.founder ? 'animate-fade-in' : 'opacity-0'}`}>
-              <h3 className="text-3xl font-bold text-gray-900 mb-4">
-                Our Technology <span className={CSS_CLASSES.heading.gradient}>Partner</span>
-              </h3>
-              <p className="text-xl text-gray-600">
-                Powered by cutting-edge technology solutions
-              </p>
-            </div>
-            
-            <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
-              <div className={`${isVisible.founder ? 'animate-slide-in-left' : 'opacity-0'}`}>
-                <div className="bg-gradient-to-br from-primary-500 to-secondary-500 rounded-3xl p-8 text-white">
+
+          <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
+            <div className="animate-slide-in-left">
+              <div className="bg-gradient-to-br from-brand-blue to-brand-dark rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-orange/10 rounded-full blur-3xl -ml-16 -mb-16"></div>
+
+                <div className="relative z-10">
                   <div className="text-center mb-8">
-                    <div className="w-24 h-24 mx-auto mb-6 bg-white rounded-2xl flex items-center justify-center shadow-lg">
-                      <div className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-500 bg-clip-text text-transparent">
+                    <div className="w-24 h-24 mx-auto mb-6 bg-white rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-all duration-500">
+                      <div className="text-3xl font-bold bg-gradient-to-r from-brand-blue to-brand-dark bg-clip-text text-transparent">
                         CB
                       </div>
                     </div>
                     <h4 className="text-2xl font-bold mb-2">{COMPANY_INFO.itPartner.fullName}</h4>
-                    <p className="text-primary-100">Technology Excellence Partner</p>
+                    <p className="text-blue-100">Technology Excellence Partner</p>
                   </div>
-                  
+
                   <div className="space-y-4">
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-4">🚀</span>
-                      <div>
-                        <h5 className="font-semibold">Innovation</h5>
-                        <p className="text-primary-100 text-sm">Cutting-edge healthcare technology</p>
+                    {[
+                      { icon: '🚀', title: 'Innovation', desc: 'Cutting-edge healthcare technology' },
+                      { icon: '🔧', title: 'Development', desc: 'Custom software solutions' },
+                      { icon: '☁️', title: 'Infrastructure', desc: 'Scalable cloud architecture' },
+                      { icon: '🛡️', title: 'Security', desc: 'Enterprise-grade data protection' }
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center bg-white/10 p-3 rounded-xl backdrop-blur-sm">
+                        <span className="text-2xl mr-4">{item.icon}</span>
+                        <div>
+                          <h5 className="font-semibold">{item.title}</h5>
+                          <p className="text-blue-100 text-sm">{item.desc}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-4">🔧</span>
-                      <div>
-                        <h5 className="font-semibold">Development</h5>
-                        <p className="text-primary-100 text-sm">Custom software solutions</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-4">☁️</span>
-                      <div>
-                        <h5 className="font-semibold">Infrastructure</h5>
-                        <p className="text-primary-100 text-sm">Scalable cloud architecture</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-2xl mr-4">🛡️</span>
-                      <div>
-                        <h5 className="font-semibold">Security</h5>
-                        <p className="text-primary-100 text-sm">Enterprise-grade data protection</p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
-              
-              <div className={`mt-12 lg:mt-0 ${isVisible.founder ? 'animate-slide-in-right' : 'opacity-0'}`}>
-                <h4 className="text-2xl font-bold text-gray-900 mb-6">Technology Partnership</h4>
-                <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-                  {COMPANY_INFO.itPartner.description}
-                </p>
-                
-                <div className="space-y-4">
-                  <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-100">
-                    <h5 className="font-semibold text-gray-900 mb-2">🌐 Web Platform</h5>
-                    <p className="text-gray-600 text-sm">Modern, responsive web application built with React and advanced UI/UX design</p>
+            </div>
+
+            <div className="mt-12 lg:mt-0 animate-slide-in-right">
+              <h4 className="text-2xl font-bold text-brand-dark mb-6">Technology Partnership</h4>
+              <p className="text-lg text-slate-600 mb-6 leading-relaxed">
+                {COMPANY_INFO.itPartner.description}
+              </p>
+
+              <div className="space-y-4">
+                {[
+                  { title: 'Web Platform', desc: 'Modern, responsive web application built with React and advanced UI/UX design', icon: '🌐' },
+                  { title: 'Mobile Solutions', desc: 'Cross-platform mobile applications for seamless patient and therapist experience', icon: '📱' },
+                  { title: 'Integration', desc: 'Seamless integration with healthcare systems and third-party services', icon: '🔄' }
+                ].map((item, i) => (
+                  <div key={i} className="glass-panel bg-white p-4 rounded-xl shadow-md border border-slate-100 hover:shadow-lg transition-all duration-300">
+                    <div className="flex items-start">
+                      <span className="text-2xl mr-3">{item.icon}</span>
+                      <div>
+                        <h5 className="font-semibold text-brand-dark mb-1">{item.title}</h5>
+                        <p className="text-slate-600 text-sm">{item.desc}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-100">
-                    <h5 className="font-semibold text-gray-900 mb-2">📱 Mobile Solutions</h5>
-                    <p className="text-gray-600 text-sm">Cross-platform mobile applications for seamless patient and therapist experience</p>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-100">
-                    <h5 className="font-semibold text-gray-900 mb-2">🔄 Integration</h5>
-                    <p className="text-gray-600 text-sm">Seamless integration with healthcare systems and third-party services</p>
-                  </div>
-                </div>
-                
-                <div className="mt-8">
-                  <a 
-                    href={COMPANY_INFO.itPartner.website} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className={`${CSS_CLASSES.button.primary} inline-block text-center`}
-                  >
-                    Visit {COMPANY_INFO.itPartner.name}
-                  </a>
-                </div>
+                ))}
+              </div>
+
+              <div className="mt-8">
+                <a
+                  href={COMPANY_INFO.itPartner.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center px-8 py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-brand-blue/90 transition-colors shadow-lg shadow-brand-blue/20"
+                >
+                  Visit {COMPANY_INFO.itPartner.name}
+                  <span className="ml-2">→</span>
+                </a>
               </div>
             </div>
           </div>
@@ -330,25 +223,19 @@ const AboutUs = () => {
       </section>
 
       {/* Values Section */}
-      <section id="values" className="py-20 bg-white">
+      <section className="py-20 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={`text-center mb-16 ${isVisible.values ? 'animate-fade-in' : 'opacity-0'}`}>
-            <h2 className={CSS_CLASSES.heading.h2}>
-              Our <span className={CSS_CLASSES.heading.gradient}>Core Values</span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto mt-4">
-              These principles guide everything we do and shape our commitment to exceptional patient care.
-            </p>
+          <div className="text-center mb-16 animate-fade-in">
+            <h2 className="text-3xl font-heading font-bold text-brand-dark mb-4">Our Core Values</h2>
+            <p className="text-slate-600">Principles that guide our commitment to your care.</p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {values.map((value, index) => (
-              <div key={index} className={`text-center ${isVisible.values ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-2xl flex items-center justify-center text-4xl">
-                  {value.icon}
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">{value.title}</h3>
-                <p className="text-gray-600">{value.description}</p>
+              <div key={index} className="glass-card p-8 rounded-2xl text-center hover:-translate-y-2 transition-transform duration-300 border border-slate-100/50 bg-white/60 animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+                <div className="text-4xl mb-4">{value.icon}</div>
+                <h3 className="text-xl font-bold text-brand-dark mb-3">{value.title}</h3>
+                <p className="text-slate-600 text-sm">{value.description}</p>
               </div>
             ))}
           </div>
@@ -356,26 +243,26 @@ const AboutUs = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-primary-600 to-secondary-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6">
+      <section className="py-20 bg-gradient-to-r from-brand-blue to-brand-orange">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
+          <h2 className="text-3xl lg:text-4xl font-heading font-bold mb-6">
             Ready to Experience the PhysioWay Difference?
           </h2>
-          <p className="text-xl text-primary-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
             Join thousands of satisfied patients who have chosen PhysioWay for their recovery journey.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/book-consultation" className="px-8 py-4 bg-white text-primary-600 rounded-lg font-semibold hover:bg-gray-50 transition-colors duration-300">
+            <Link to="/book-consultation" className="px-8 py-4 bg-white text-brand-blue rounded-xl font-bold hover:bg-slate-50 transition-colors shadow-lg">
               Book Free Consultation
             </Link>
-            <a href={`tel:${COMPANY_INFO.phone}`} className="px-8 py-4 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-primary-600 transition-all duration-300">
+            <a href={`tel:${COMPANY_INFO.phone}`} className="px-8 py-4 border-2 border-white text-white rounded-xl font-bold hover:bg-white hover:text-brand-blue transition-all duration-300">
               Call {COMPANY_INFO.phone}
             </a>
           </div>
         </div>
       </section>
 
-      <Footer />
+      <Footer branding={branding} />
     </div>
   );
 };

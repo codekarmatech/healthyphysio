@@ -2,33 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
-import { BLOG_CATEGORIES, CSS_CLASSES } from '../constants';
+import PageHeader from '../components/common/PageHeader';
+import { getAllSettings } from '../services/siteSettingsService';
+import { BLOG_CATEGORIES, COMPANY_INFO } from '../constants';
 
 const Blog = () => {
-  const [isVisible, setIsVisible] = useState({});
+  const [settings, setSettings] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    document.title = 'Blog - PhysioWay | Health Tips & Physiotherapy Insights';
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsVisible(prev => ({ ...prev, [entry.target.id]: true }));
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    document.querySelectorAll('[id]').forEach((el) => {
-      observer.observe(el);
-    });
-
-    return () => observer.disconnect();
+    const fetchSettings = async () => {
+      const data = await getAllSettings();
+      setSettings(data);
+      document.title = `Blog - ${data?.branding?.company_name || 'PhysioWay'}`;
+    };
+    fetchSettings();
   }, []);
+
+  const branding = settings?.branding || COMPANY_INFO;
 
   // Sample blog posts - in real app, this would come from API/CMS
   const blogPosts = [
@@ -117,46 +109,27 @@ const Blog = () => {
   const filteredPosts = blogPosts.filter(post => {
     const matchesCategory = selectedCategory === 'all' || post.category === selectedCategory;
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      post.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
 
   const featuredPosts = blogPosts.filter(post => post.featured);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
-      
-      {/* Hero Section */}
-      <section id="hero" className="relative pt-20 pb-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-white to-secondary-50"></div>
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary-100/20 to-transparent"></div>
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <div className={`${isVisible.hero ? 'animate-fade-in' : 'opacity-0'}`}>
-              <div className="inline-flex items-center px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg mb-8">
-                <span className="text-primary-500 mr-2">📚</span>
-                <span className="text-sm font-medium text-gray-700">Health & Wellness Insights</span>
-              </div>
-              
-              <h1 className={CSS_CLASSES.heading.h1}>
-                Health <span className={CSS_CLASSES.heading.gradient}>Blog</span>
-              </h1>
-              <p className="mt-6 text-xl text-gray-600 leading-relaxed max-w-4xl mx-auto">
-                Stay informed with the latest insights, tips, and expert advice on physiotherapy, 
-                health, and wellness from our team of certified professionals.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+
+      <PageHeader
+        title="Health & Wellness Blog"
+        subtitle="Stay informed with the latest insights, tips, and expert advice on physiotherapy, health, and wellness."
+        bgImage="https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"
+      />
 
       {/* Search and Filter */}
-      <section id="search-filter" className="py-12 bg-white border-b border-gray-200">
+      <section className="py-12 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-16 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={`${isVisible['search-filter'] ? 'animate-fade-in' : 'opacity-0'}`}>
+          <div className="animate-fade-in">
             {/* Search Bar */}
             <div className="max-w-md mx-auto mb-8">
               <div className="relative">
@@ -165,25 +138,24 @@ const Blog = () => {
                   placeholder="Search articles..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className="w-full px-4 py-3 pl-12 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue/50 outline-none transition-all shadow-sm"
                 />
-                <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-                  <span className="text-gray-400">🔍</span>
+                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-xl">
+                  🔍
                 </div>
               </div>
             </div>
-            
+
             {/* Category Filter */}
             <div className="flex flex-wrap justify-center gap-3">
               {categories.map((category) => (
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
-                    selectedCategory === category
-                      ? 'bg-gradient-to-r from-primary-600 to-secondary-500 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 ${selectedCategory === category
+                    ? 'bg-brand-blue text-white shadow-lg shadow-brand-blue/30 scale-105'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
                 >
                   {category === 'all' ? 'All Articles' : category}
                 </button>
@@ -195,45 +167,43 @@ const Blog = () => {
 
       {/* Featured Articles */}
       {selectedCategory === 'all' && searchTerm === '' && (
-        <section id="featured" className="py-20 bg-gradient-to-br from-gray-50 to-primary-50">
+        <section className="py-20 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-brand-blue/5 to-transparent -z-10"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className={`text-center mb-16 ${isVisible.featured ? 'animate-fade-in' : 'opacity-0'}`}>
-              <h2 className={CSS_CLASSES.heading.h2}>
-                Featured <span className={CSS_CLASSES.heading.gradient}>Articles</span>
-              </h2>
-              <p className="text-xl text-gray-600 mt-4">
+            <div className="text-center mb-16 animate-fade-in">
+              <h2 className="text-3xl font-heading font-bold text-brand-dark">Featured Articles</h2>
+              <p className="text-xl text-slate-600 mt-4 font-light">
                 Don't miss these essential reads from our experts
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {featuredPosts.map((post, index) => (
-                <article key={post.id} className={`${CSS_CLASSES.card.base} overflow-hidden ${isVisible.featured ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-                  <div className="aspect-w-16 aspect-h-9 bg-gradient-to-br from-primary-100 to-secondary-100 flex items-center justify-center text-6xl">
+                <article key={post.id} className="glass-card group rounded-3xl overflow-hidden hover:-translate-y-2 transition-all duration-500 animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+                  <div className="aspect-w-16 aspect-h-9 bg-gradient-to-br from-brand-blue/10 to-brand-orange/10 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-500">
                     {post.image}
                   </div>
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">
+                  <div className="p-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="px-3 py-1 bg-brand-blue/10 text-brand-blue rounded-full text-xs font-bold uppercase tracking-wider">
                         {post.category}
                       </span>
-                      <span className="text-xs text-gray-500">{post.readTime}</span>
+                      <span className="text-xs text-slate-500 font-medium">{post.readTime}</span>
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2">{post.title}</h3>
-                    <p className="text-gray-600 mb-4 line-clamp-3">{post.excerpt}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm text-gray-500">
+                    <h3 className="text-xl font-bold text-brand-dark mb-3 line-clamp-2 group-hover:text-brand-blue transition-colors">{post.title}</h3>
+                    <p className="text-slate-600 mb-6 line-clamp-3">{post.excerpt}</p>
+                    <div className="flex items-center justify-between pt-6 border-t border-slate-100">
+                      <div className="flex items-center text-sm font-medium text-slate-700">
                         <span className="mr-2">👨‍⚕️</span>
                         <span>{post.author}</span>
                       </div>
-                      <span className="text-sm text-gray-500">{new Date(post.date).toLocaleDateString()}</span>
+                      <Link
+                        to={`/blog/${post.id}`}
+                        className="inline-flex items-center text-brand-orange font-bold hover:text-brand-orange/80 transition-colors"
+                      >
+                        Read More →
+                      </Link>
                     </div>
-                    <Link 
-                      to={`/blog/${post.id}`}
-                      className="mt-4 inline-flex items-center text-primary-600 font-medium hover:text-primary-700 transition-colors"
-                    >
-                      Read More →
-                    </Link>
                   </div>
                 </article>
               ))}
@@ -243,72 +213,64 @@ const Blog = () => {
       )}
 
       {/* All Articles */}
-      <section id="articles" className="py-20 bg-white">
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={`mb-12 ${isVisible.articles ? 'animate-fade-in' : 'opacity-0'}`}>
-            <h2 className={CSS_CLASSES.heading.h2}>
-              {selectedCategory === 'all' ? 'All' : selectedCategory} <span className={CSS_CLASSES.heading.gradient}>Articles</span>
+          <div className="mb-12 animate-fade-in">
+            <h2 className="text-3xl font-heading font-bold text-brand-dark">
+              {selectedCategory === 'all' ? 'All' : selectedCategory} Articles
             </h2>
-            <p className="text-gray-600 mt-4">
+            <p className="text-slate-600 mt-4">
               {filteredPosts.length} article{filteredPosts.length !== 1 ? 's' : ''} found
             </p>
           </div>
-          
+
           {filteredPosts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredPosts.map((post, index) => (
-                <article key={post.id} className={`${CSS_CLASSES.card.base} overflow-hidden ${isVisible.articles ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-                  <div className="aspect-w-16 aspect-h-9 bg-gradient-to-br from-primary-100 to-secondary-100 flex items-center justify-center text-5xl">
+                <article key={post.id} className="glass-panel p-0 rounded-2xl overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+                  <div className="aspect-w-16 aspect-h-9 bg-slate-50 flex items-center justify-center text-5xl">
                     {post.image}
                   </div>
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="px-3 py-1 bg-secondary-100 text-secondary-700 rounded-full text-xs font-medium">
+                      <span className="px-3 py-1 bg-brand-light/50 text-brand-dark rounded-full text-xs font-bold">
                         {post.category}
                       </span>
-                      <span className="text-xs text-gray-500">{post.readTime}</span>
+                      <span className="text-xs text-slate-400">{post.readTime}</span>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2">{post.title}</h3>
-                    <p className="text-gray-600 mb-4 line-clamp-3">{post.excerpt}</p>
-                    
+                    <h3 className="text-lg font-bold text-brand-dark mb-3 line-clamp-2 hover:text-brand-blue transition-colors">
+                      <Link to={`/blog/${post.id}`}>{post.title}</Link>
+                    </h3>
+                    <p className="text-slate-500 mb-4 line-clamp-2 text-sm">{post.excerpt}</p>
+
                     {/* Tags */}
                     <div className="flex flex-wrap gap-2 mb-4">
                       {post.tags.slice(0, 2).map((tag, idx) => (
-                        <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                        <span key={idx} className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-xs">
                           #{tag}
                         </span>
                       ))}
                     </div>
-                    
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center text-sm text-gray-500">
-                        <span className="mr-2">👨‍⚕️</span>
-                        <span>{post.author}</span>
-                      </div>
-                      <span className="text-sm text-gray-500">{new Date(post.date).toLocaleDateString()}</span>
+
+                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100">
+                      <span className="text-sm font-medium text-slate-600">{post.author}</span>
+                      <span className="text-xs text-slate-400">{new Date(post.date).toLocaleDateString()}</span>
                     </div>
-                    
-                    <Link 
-                      to={`/blog/${post.id}`}
-                      className={`${CSS_CLASSES.button.primary} w-full text-center text-sm`}
-                    >
-                      Read Full Article
-                    </Link>
                   </div>
                 </article>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📝</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No articles found</h3>
-              <p className="text-gray-600 mb-6">Try adjusting your search or filter criteria</p>
-              <button 
+            <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
+              <div className="text-6xl mb-6">📝</div>
+              <h3 className="text-xl font-bold text-brand-dark mb-2">No articles found</h3>
+              <p className="text-slate-600 mb-8">Try adjusting your search or filter criteria</p>
+              <button
                 onClick={() => {
                   setSearchTerm('');
                   setSelectedCategory('all');
                 }}
-                className={CSS_CLASSES.button.secondary}
+                className="px-6 py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-brand-blue/90 transition-colors"
               >
                 Clear Filters
               </button>
@@ -317,29 +279,9 @@ const Blog = () => {
         </div>
       </section>
 
-      {/* Newsletter Signup */}
-      <section className="py-20 bg-gradient-to-r from-primary-600 to-secondary-500">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6">
-            Stay Updated with Health Tips
-          </h2>
-          <p className="text-xl text-primary-100 mb-8">
-            Subscribe to our newsletter for the latest physiotherapy insights and health tips delivered to your inbox.
-          </p>
-          <div className="max-w-md mx-auto flex gap-4">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="flex-1 px-4 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white focus:outline-none"
-            />
-            <button className="px-6 py-3 bg-white text-primary-600 rounded-lg font-semibold hover:bg-gray-50 transition-colors duration-300">
-              Subscribe
-            </button>
-          </div>
-        </div>
-      </section>
 
-      <Footer />
+
+      <Footer branding={branding} />
     </div>
   );
 };

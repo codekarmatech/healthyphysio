@@ -62,10 +62,10 @@ const Register = () => {
   // Filter areas based on search term
   const filteredAreas = searchTerm
     ? areas.filter(area =>
-        area.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        area.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        area.state.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      area.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      area.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      area.state.toLowerCase().includes(searchTerm.toLowerCase())
+    )
     : areas;
 
   useEffect(() => {
@@ -124,16 +124,16 @@ const Register = () => {
         setError('Please enter your residential area');
         return;
       }
-      
+
       // Check if custom area name already exists in the areas list
       if (formData.customArea && formData.customAreaInput.trim()) {
         const customAreaName = formData.customAreaInput.trim().toLowerCase();
-        const existingArea = areas.find(area => 
+        const existingArea = areas.find(area =>
           area.name.toLowerCase() === customAreaName ||
           area.city.toLowerCase() === customAreaName ||
           area.state.toLowerCase() === customAreaName
         );
-        
+
         if (existingArea) {
           setError(`The area "${formData.customAreaInput}" already exists. Please select it from the list or enter a different area name.`);
           return;
@@ -208,13 +208,13 @@ const Register = () => {
       navigate('/login');
     } catch (err) {
       console.error('Registration error:', err);
-      
+
       // Handle specific error messages
       let errorMessage = 'Registration failed. Please try again.';
-      
+
       if (err.response?.data?.error) {
         const backendError = err.response.data.error;
-        
+
         // Handle duplicate key constraint error for areas
         if (backendError.includes('duplicate key value violates unique constraint') && backendError.includes('areas_area')) {
           errorMessage = `Unable to create the area "${formData.customAreaInput}". This might be due to a system limitation. Please try:
@@ -236,7 +236,7 @@ const Register = () => {
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -414,7 +414,7 @@ const Register = () => {
 
   // Step 3: Role-specific fields
   const renderStep3 = () => {
-    switch(formData.role) {
+    switch (formData.role) {
       case 'patient':
         return (
           <div className="space-y-4">
@@ -1014,98 +1014,98 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 relative overflow-hidden">
       <Navbar />
-      
+
       {/* Dynamic Background Pattern */}
       <div className="absolute inset-0 pattern-hexagon opacity-30"></div>
-      
+
       {/* Dynamic Light Color Effects */}
       <div className="absolute top-20 right-20 w-32 h-32 bg-gradient-to-br from-blue-400/10 via-purple-400/15 to-pink-400/10 blur-2xl opacity-60" style={{ animation: 'colorShift 8s ease-in-out infinite' }}></div>
       <div className="absolute bottom-32 left-20 w-28 h-28 bg-gradient-to-br from-green-400/15 via-teal-400/20 to-cyan-400/15 blur-xl opacity-70" style={{ animation: 'colorShift 6s ease-in-out infinite 2s' }}></div>
       <div className="absolute top-1/2 right-1/3 w-24 h-24 bg-gradient-to-br from-yellow-400/12 via-orange-400/18 to-red-400/12 blur-lg opacity-50" style={{ animation: 'colorShift 10s ease-in-out infinite 4s' }}></div>
-      
+
       <div className="flex flex-col justify-center py-12 sm:px-6 lg:px-8 pt-20">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <span className="text-3xl text-white">🏥</span>
-          </div>
-          <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">
-            Join <span className="gradient-text-safe bg-gradient-to-r from-primary-600 to-secondary-500">PhysioWay</span>
-          </h1>
-          <h2 className="font-heading text-2xl font-semibold text-gray-700 mb-4">
-            Create your account
-          </h2>
-          <div className="inline-flex items-center px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm">
-            <span className="text-primary-500 mr-2">📋</span>
-            <span className="font-sans text-sm font-medium text-gray-600">
-              Step {step} of 3: {step === 1 ? 'Account Basics' : step === 2 ? 'Personal Information' : 'Role Details'}
-            </span>
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <span className="text-3xl text-white">🏥</span>
+            </div>
+            <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">
+              Join <span className="gradient-text-safe bg-gradient-to-r from-primary-600 to-secondary-500">PhysioWay</span>
+            </h1>
+            <h2 className="font-heading text-2xl font-semibold text-gray-700 mb-4">
+              Create your account
+            </h2>
+            <div className="inline-flex items-center px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm">
+              <span className="text-primary-500 mr-2">📋</span>
+              <span className="font-sans text-sm font-medium text-gray-600">
+                Step {step} of 3: {step === 1 ? 'Account Basics' : step === 2 ? 'Personal Information' : 'Role Details'}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="max-w-xl mx-auto p-8 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50">
-          {/* Progress Bar */}
-          <div className="flex items-center mb-8">
-            <div className={`flex-1 h-2 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
-            <div className={`flex-1 h-2 mx-2 rounded-full transition-all duration-500 ${step >= 2 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
-            <div className={`flex-1 h-2 rounded-full transition-all duration-500 ${step >= 3 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
-          </div>
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="max-w-xl mx-auto p-8 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50">
+            {/* Progress Bar */}
+            <div className="flex items-center mb-8">
+              <div className={`flex-1 h-2 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-2 mx-2 rounded-full transition-all duration-500 ${step >= 2 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-2 rounded-full transition-all duration-500 ${step >= 3 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
+            </div>
 
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <form onSubmit={handleSubmit}>
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
+            <form onSubmit={handleSubmit}>
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
 
-            <div className="flex justify-between mt-6">
-              {step > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setStep(s => s - 1)}
-                  className="px-4 py-2 border rounded hover:bg-gray-100"
-                >
-                  Back
-                </button>
-              )}
-              <div className={step > 1 ? '' : 'ml-auto'}>
-                <button
-                  type={step < 3 ? 'button' : 'submit'}
-                  onClick={step < 3 ? () => setStep(s => s + 1) : null}
-                  disabled={loading}
-                  className="px-6 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  {step < 3 ? 'Next' : (loading ? 'Creating account...' : 'Create Account')}
-                </button>
+              <div className="flex justify-between mt-6">
+                {step > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(s => s - 1)}
+                    className="px-4 py-2 border rounded hover:bg-gray-100"
+                  >
+                    Back
+                  </button>
+                )}
+                <div className={step > 1 ? '' : 'ml-auto'}>
+                  <button
+                    type={step < 3 ? 'button' : 'submit'}
+                    onClick={step < 3 ? () => setStep(s => s + 1) : null}
+                    disabled={loading}
+                    className="px-6 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    {step < 3 ? 'Next' : (loading ? 'Creating account...' : 'Create Account')}
+                  </button>
+                </div>
               </div>
-            </div>
-          </form>
+            </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-                Sign in
-              </Link>
-            </p>
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
+                  Sign in
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
   );
