@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.jsx';
+import './styles/gradient-text-fix.css';
 import ProtectedRoute from './components/ProtectedRoute';
+import { getBrandingSettings } from './services/siteSettingsService';
 import ApprovedTherapistRoute from './components/ApprovedTherapistRoute';
 import TreatmentPlansApprovedRoute from './components/TreatmentPlansApprovedRoute';
 import ReportsApprovedRoute from './components/ReportsApprovedRoute';
@@ -94,12 +96,66 @@ import RequestSessionPage from './pages/therapist/RequestSessionPage';
 import VisitsListPage from './pages/therapist/VisitsListPage';
 import VisitTrackingPage from './pages/therapist/VisitTrackingPage';
 
+// Patient Pages (role-specific)
+import PatientAppointmentsPage from './pages/patient/PatientAppointmentsPage';
+import PatientProgressPage from './pages/patient/PatientProgressPage';
+import PatientExercisesPage from './pages/patient/PatientExercisesPage';
+
 // Other Pages
 import Landing from './pages/Landing';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 
+// Service Pages
+import OrthopedicPhysiotherapy from './pages/services/OrthopedicPhysiotherapy';
+import NeurologicalPhysiotherapy from './pages/services/NeurologicalPhysiotherapy';
+import CardiopulmonaryPhysiotherapy from './pages/services/CardiopulmonaryPhysiotherapy';
+import PediatricPhysiotherapy from './pages/services/PediatricPhysiotherapy';
+import GeriatricPhysiotherapy from './pages/services/GeriatricPhysiotherapy';
+import WomensHealthPhysiotherapy from './pages/services/WomensHealthPhysiotherapy';
+
+// Static Pages
+import AboutUs from './pages/AboutUs';
+import ContactUs from './pages/ContactUs';
+import Services from './pages/Services';
+import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost';
+import BookConsultation from './pages/BookConsultation';
+import Areas from './pages/Areas';
+
 function App() {
+  // Dynamic favicon loading from backend branding settings
+  useEffect(() => {
+    const loadFavicon = async () => {
+      try {
+        const branding = await getBrandingSettings();
+        if (branding?.favicon_url) {
+          // Update existing favicon link or create new one
+          let link = document.querySelector("link[rel~='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = branding.favicon_url;
+        }
+        // Also update apple-touch-icon if logo is available
+        if (branding?.logo_url) {
+          let appleLink = document.querySelector("link[rel='apple-touch-icon']");
+          if (!appleLink) {
+            appleLink = document.createElement('link');
+            appleLink.rel = 'apple-touch-icon';
+            document.head.appendChild(appleLink);
+          }
+          appleLink.href = branding.logo_url;
+        }
+      } catch (error) {
+        console.warn('Failed to load favicon from backend:', error);
+      }
+    };
+    loadFavicon();
+  }, []);
+
   return (
     <Router>
       <AuthProvider>
@@ -110,6 +166,23 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
+          
+          {/* Service Pages */}
+          <Route path="/services/orthopedic" element={<OrthopedicPhysiotherapy />} />
+          <Route path="/services/neurological" element={<NeurologicalPhysiotherapy />} />
+          <Route path="/services/cardiopulmonary" element={<CardiopulmonaryPhysiotherapy />} />
+          <Route path="/services/pediatric" element={<PediatricPhysiotherapy />} />
+          <Route path="/services/geriatric" element={<GeriatricPhysiotherapy />} />
+          <Route path="/services/womens-health" element={<WomensHealthPhysiotherapy />} />
+          
+          {/* Static Pages */}
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/areas" element={<Areas />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:id" element={<BlogPost />} />
+          <Route path="/book-consultation" element={<BookConsultation />} />
 
           {/* Protected Routes - Common for all roles */}
           <Route element={<ProtectedRoute />}>
@@ -253,12 +326,21 @@ function App() {
 
           {/* Patient Routes */}
           <Route element={<ProtectedRoute allowedRoles={['patient']} />}>
-            <Route path="/patient/*" element={<PatientDashboard />} />
+            <Route path="/patient/dashboard" element={<PatientDashboard />} />
+            <Route path="/patient/appointments" element={<PatientAppointmentsPage />} />
+            <Route path="/patient/appointments/:id" element={<AppointmentDetailPage />} />
+            <Route path="/patient/exercises" element={<PatientExercisesPage />} />
+            <Route path="/patient/progress" element={<PatientProgressPage />} />
+            <Route path="/patient/equipment" element={<EquipmentListPage />} />
           </Route>
 
           {/* Doctor Routes */}
           <Route element={<ProtectedRoute allowedRoles={['doctor']} />}>
-            <Route path="/doctor/*" element={<DoctorDashboard />} />
+            <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+            <Route path="/doctor/patients" element={<PatientsPage />} />
+            <Route path="/doctor/patients/:id" element={<PatientDetailPage />} />
+            <Route path="/doctor/referrals" element={<DoctorDashboard />} />
+            <Route path="/doctor/reports" element={<DoctorDashboard />} />
           </Route>
 
           {/* Admin Routes */}

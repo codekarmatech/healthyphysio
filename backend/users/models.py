@@ -1,4 +1,5 @@
 from django.db import models
+from datetime import timedelta
 
 # Create your models here.
 """
@@ -274,6 +275,124 @@ class Therapist(models.Model):
     def account_approval_date(self):
         """Alias for approval_date for backward compatibility"""
         return self.approval_date
+
+    def is_available_on_date(self, date):
+        """
+        Check if therapist is available on a specific date.
+        Returns tuple (is_available, reason)
+        
+        Therapist is NOT available if:
+        1. They have approved leave on that date
+        2. They have half_day attendance on that date
+        3. They have more than 4 appointments on that date
+        """
+        from attendance.models import Attendance, Leave
+        from scheduling.models import Appointment
+        
+        # Check for approved leave
+        leave = Leave.objects.filter(
+            therapist=self,
+            start_date__lte=date,
+            end_date__gte=date,
+            status='approved'
+        ).first()
+        
+        if leave:
+            return (False, f"On {leave.leave_type} leave")
+        
+        # Check for half_day attendance
+        attendance = Attendance.objects.filter(
+            therapist=self,
+            date=date,
+            status='half_day'
+        ).first()
+        
+        if attendance:
+            return (False, "Half day - limited availability")
+        
+        # Check for sick/emergency leave attendance
+        leave_attendance = Attendance.objects.filter(
+            therapist=self,
+            date=date,
+            status__in=['sick_leave', 'emergency_leave']
+        ).first()
+        
+        if leave_attendance:
+            return (False, f"On {leave_attendance.status.replace('_', ' ')}")
+        
+        # Check appointment count (max 4 per day)
+        appointment_count = Appointment.objects.filter(
+            therapist=self,
+            datetime__date=date,
+            status__in=['scheduled', 'rescheduled', 'pending']
+        ).count()
+        
+        if appointment_count >= 4:
+            return (False, f"Maximum appointments reached ({appointment_count}/4)")
+        
+        return (True, f"Available ({appointment_count}/4 appointments)")
+
+    def get_availability_status(self, date):
+        """
+        Get detailed availability status for a date.
+        Returns dict with availability info.
+        """
+        is_available, reason = self.is_available_on_date(date)
+        
+        from scheduling.models import Appointment
+        
+        # Get appointments for the date
+        appointments = Appointment.objects.filter(
+            therapist=self,
+            datetime__date=date,
+            status__in=['scheduled', 'rescheduled', 'pending', 'completed']
+        ).order_by('datetime')
+        
+        # Get time slots that are already booked
+        booked_slots = []
+        for apt in appointments:
+            booked_slots.append({
+                'start': apt.datetime.strftime('%H:%M'),
+                'end': (apt.datetime + timedelta(minutes=apt.duration_minutes)).strftime('%H:%M'),
+                'patient': apt.patient.user.get_full_name() if apt.patient else 'Unknown',
+                'status': apt.status
+            })
+        
+        return {
+            'is_available': is_available,
+            'reason': reason,
+            'appointment_count': appointments.count(),
+            'max_appointments': 4,
+            'booked_slots': booked_slots
+        }
+
+    def has_time_conflict(self, date, start_time, duration_minutes):
+        """
+        Check if a new appointment would conflict with existing appointments.
+        Returns tuple (has_conflict, conflicting_appointment)
+        """
+        from scheduling.models import Appointment
+        from datetime import datetime, timedelta
+        
+        # Combine date and time
+        new_start = datetime.combine(date, start_time)
+        new_end = new_start + timedelta(minutes=duration_minutes)
+        
+        # Get existing appointments for the date
+        existing_appointments = Appointment.objects.filter(
+            therapist=self,
+            datetime__date=date,
+            status__in=['scheduled', 'rescheduled', 'pending']
+        )
+        
+        for apt in existing_appointments:
+            apt_end = apt.datetime + timedelta(minutes=apt.duration_minutes)
+            
+            # Check for overlap
+            if (new_start < apt_end and new_end > apt.datetime):
+                return (True, apt)
+        
+        return (False, None)
 
 
 # Update the Doctor model to include all fields referenced in serializers

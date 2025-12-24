@@ -4,7 +4,7 @@ Connected to: Session management and assessments
 """
 
 from rest_framework import serializers
-from .models import Attendance, Holiday, Leave, Availability, INDIAN_TZ
+from .models import Attendance, Holiday, Leave, Availability, SessionTimeLog, INDIAN_TZ
 from .admin_requests import AttendanceChangeRequest
 from django.utils import timezone
 import datetime
@@ -418,3 +418,102 @@ class AttendanceChangeRequestSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Therapist profile not found for this user.")
 
         return super().create(validated_data)
+
+
+class SessionTimeLogSerializer(serializers.ModelSerializer):
+    """Serializer for SessionTimeLog model"""
+    therapist_name = serializers.SerializerMethodField()
+    patient_name = serializers.SerializerMethodField()
+    appointment_session_code = serializers.SerializerMethodField()
+    therapist_reached_time_ist = serializers.SerializerMethodField()
+    therapist_leaving_time_ist = serializers.SerializerMethodField()
+    patient_confirmed_arrival_ist = serializers.SerializerMethodField()
+    patient_confirmed_departure_ist = serializers.SerializerMethodField()
+    therapist_duration_display = serializers.ReadOnlyField()
+    patient_duration_display = serializers.ReadOnlyField()
+    is_complete = serializers.ReadOnlyField()
+
+    class Meta:
+        model = SessionTimeLog
+        fields = [
+            'id', 'appointment', 'therapist', 'patient', 'date', 'status',
+            'therapist_name', 'patient_name', 'appointment_session_code',
+            # Therapist timestamps
+            'therapist_reached_time', 'therapist_reached_time_ist',
+            'therapist_leaving_time', 'therapist_leaving_time_ist',
+            'therapist_duration_minutes', 'therapist_duration_display',
+            # Patient timestamps
+            'patient_confirmed_arrival', 'patient_confirmed_arrival_ist',
+            'patient_confirmed_departure', 'patient_confirmed_departure_ist',
+            'patient_confirmed_duration_minutes', 'patient_duration_display',
+            # Discrepancy info
+            'has_discrepancy', 'discrepancy_minutes', 'discrepancy_notes',
+            'discrepancy_resolved', 'resolved_by', 'resolved_at',
+            # Status and metadata
+            'is_complete', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'therapist', 'patient', 'therapist_reached_time', 'therapist_leaving_time',
+            'patient_confirmed_arrival', 'patient_confirmed_departure',
+            'therapist_duration_minutes', 'patient_confirmed_duration_minutes',
+            'has_discrepancy', 'discrepancy_minutes', 'discrepancy_resolved',
+            'resolved_by', 'resolved_at', 'created_at', 'updated_at'
+        ]
+
+    def get_therapist_name(self, obj):
+        return f"{obj.therapist.user.first_name} {obj.therapist.user.last_name}"
+
+    def get_patient_name(self, obj):
+        return f"{obj.patient.user.first_name} {obj.patient.user.last_name}"
+
+    def get_appointment_session_code(self, obj):
+        return obj.appointment.session_code
+
+    def get_therapist_reached_time_ist(self, obj):
+        if obj.therapist_reached_time:
+            ist_time = timezone.localtime(obj.therapist_reached_time, timezone=INDIAN_TZ)
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return None
+
+    def get_therapist_leaving_time_ist(self, obj):
+        if obj.therapist_leaving_time:
+            ist_time = timezone.localtime(obj.therapist_leaving_time, timezone=INDIAN_TZ)
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return None
+
+    def get_patient_confirmed_arrival_ist(self, obj):
+        if obj.patient_confirmed_arrival:
+            ist_time = timezone.localtime(obj.patient_confirmed_arrival, timezone=INDIAN_TZ)
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return None
+
+    def get_patient_confirmed_departure_ist(self, obj):
+        if obj.patient_confirmed_departure:
+            ist_time = timezone.localtime(obj.patient_confirmed_departure, timezone=INDIAN_TZ)
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return None
+
+
+class SessionTimeLogListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for listing SessionTimeLogs"""
+    therapist_name = serializers.SerializerMethodField()
+    patient_name = serializers.SerializerMethodField()
+    appointment_session_code = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SessionTimeLog
+        fields = [
+            'id', 'appointment', 'date', 'status',
+            'therapist_name', 'patient_name', 'appointment_session_code',
+            'therapist_duration_minutes', 'patient_confirmed_duration_minutes',
+            'has_discrepancy', 'discrepancy_minutes'
+        ]
+
+    def get_therapist_name(self, obj):
+        return f"{obj.therapist.user.first_name} {obj.therapist.user.last_name}"
+
+    def get_patient_name(self, obj):
+        return f"{obj.patient.user.first_name} {obj.patient.user.last_name}"
+
+    def get_appointment_session_code(self, obj):
+        return obj.appointment.session_code

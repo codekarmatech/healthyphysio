@@ -22,11 +22,12 @@ from users.models import Therapist
 # User utilities
 from users.utils import get_therapist_from_user
 #Import local app models and serializers
-from .models import Attendance, Holiday, Leave, Availability, INDIAN_TZ
+from .models import Attendance, Holiday, Leave, Availability, SessionTimeLog, INDIAN_TZ
 from .admin_requests import AttendanceChangeRequest
 from .serializers import (
     AttendanceSerializer, HolidaySerializer, AttendanceMonthSerializer,
-    LeaveSerializer, AttendanceChangeRequestSerializer, AvailabilitySerializer
+    LeaveSerializer, AttendanceChangeRequestSerializer, AvailabilitySerializer,
+    SessionTimeLogSerializer, SessionTimeLogListSerializer
 )
 from django.db.models import Count
 from rest_framework.decorators import api_view
@@ -1164,3 +1165,315 @@ class AttendanceChangeRequestViewSet(viewsets.ModelViewSet):
         change_request = self.get_object()
         change_request.reject(request.user)
         return Response({'status': 'attendance change request rejected'})
+
+
+class SessionTimeLogViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing session time logs.
+    Tracks therapist arrival/departure and patient confirmations.
+    """
+    queryset = SessionTimeLog.objects.all()
+    serializer_class = SessionTimeLogSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return SessionTimeLogListSerializer
+        return SessionTimeLogSerializer
+
+    def get_queryset(self):
+        """Filter queryset based on user role"""
+        user = self.request.user
+        queryset = SessionTimeLog.objects.all()
+
+        if user.role == 'admin':
+            # Admin can see all session time logs
+            pass
+        elif user.role == 'therapist':
+            # Therapist can only see their own session time logs
+            try:
+                therapist = Therapist.objects.get(user=user)
+                queryset = queryset.filter(therapist=therapist)
+            except Therapist.DoesNotExist:
+                return SessionTimeLog.objects.none()
+        elif user.role == 'patient':
+            # Patient can only see their own session time logs
+            try:
+                from users.models import Patient
+                patient = Patient.objects.get(user=user)
+                queryset = queryset.filter(patient=patient)
+            except:
+                return SessionTimeLog.objects.none()
+        else:
+            return SessionTimeLog.objects.none()
+
+        # Apply filters
+        date_param = self.request.query_params.get('date')
+        if date_param:
+            queryset = queryset.filter(date=date_param)
+
+        date_from = self.request.query_params.get('date_from')
+        if date_from:
+            queryset = queryset.filter(date__gte=date_from)
+
+        date_to = self.request.query_params.get('date_to')
+        if date_to:
+            queryset = queryset.filter(date__lte=date_to)
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        has_discrepancy = self.request.query_params.get('has_discrepancy')
+        if has_discrepancy:
+            queryset = queryset.filter(has_discrepancy=has_discrepancy.lower() == 'true')
+
+        therapist_id = self.request.query_params.get('therapist_id')
+        if therapist_id and user.role == 'admin':
+            queryset = queryset.filter(therapist_id=therapist_id)
+
+        patient_id = self.request.query_params.get('patient_id')
+        if patient_id and user.role in ['admin', 'therapist']:
+            queryset = queryset.filter(patient_id=patient_id)
+
+        return queryset.order_by('-date', '-created_at')
+
+    @action(detail=True, methods=['post'], url_path='therapist-reached')
+    def therapist_reached(self, request, pk=None):
+        """Therapist marks arrival at patient's house"""
+        session_log = self.get_object()
+
+        # Verify the user is the therapist for this session
+        if request.user.role != 'therapist':
+            return Response(
+                {"error": "Only therapists can mark arrival"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            if session_log.therapist != therapist:
+                return Response(
+                    {"error": "You are not assigned to this session"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if session_log.therapist_reached_time:
+            return Response(
+                {"error": "Arrival already recorded"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        session_log.therapist_reached()
+        serializer = self.get_serializer(session_log)
+        return Response({
+            "message": "Arrival recorded successfully",
+            "data": serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='therapist-leaving')
+    def therapist_leaving(self, request, pk=None):
+        """Therapist marks departure from patient's house"""
+        session_log = self.get_object()
+
+        # Verify the user is the therapist for this session
+        if request.user.role != 'therapist':
+            return Response(
+                {"error": "Only therapists can mark departure"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            if session_log.therapist != therapist:
+                return Response(
+                    {"error": "You are not assigned to this session"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        success = session_log.therapist_leaving()
+        if not success:
+            return Response(
+                {"error": "Must record arrival before departure"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(session_log)
+        return Response({
+            "message": "Departure recorded successfully",
+            "duration_minutes": session_log.therapist_duration_minutes,
+            "data": serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='patient-confirm-arrival')
+    def patient_confirm_arrival(self, request, pk=None):
+        """Patient confirms therapist has arrived"""
+        session_log = self.get_object()
+
+        # Verify the user is the patient for this session
+        if request.user.role != 'patient':
+            return Response(
+                {"error": "Only patients can confirm arrival"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            from users.models import Patient
+            patient = Patient.objects.get(user=request.user)
+            if session_log.patient != patient:
+                return Response(
+                    {"error": "This is not your session"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except:
+            return Response(
+                {"error": "Patient profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if session_log.patient_confirmed_arrival:
+            return Response(
+                {"error": "Arrival already confirmed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        session_log.patient_confirm_arrival()
+        serializer = self.get_serializer(session_log)
+        return Response({
+            "message": "Therapist arrival confirmed",
+            "data": serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='patient-confirm-departure')
+    def patient_confirm_departure(self, request, pk=None):
+        """Patient confirms therapist has left"""
+        session_log = self.get_object()
+
+        # Verify the user is the patient for this session
+        if request.user.role != 'patient':
+            return Response(
+                {"error": "Only patients can confirm departure"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            from users.models import Patient
+            patient = Patient.objects.get(user=request.user)
+            if session_log.patient != patient:
+                return Response(
+                    {"error": "This is not your session"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except:
+            return Response(
+                {"error": "Patient profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        success = session_log.patient_confirm_departure()
+        if not success:
+            return Response(
+                {"error": "Must confirm arrival before departure"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(session_log)
+        return Response({
+            "message": "Therapist departure confirmed",
+            "duration_minutes": session_log.patient_confirmed_duration_minutes,
+            "has_discrepancy": session_log.has_discrepancy,
+            "data": serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='resolve-discrepancy')
+    def resolve_discrepancy(self, request, pk=None):
+        """Admin resolves a discrepancy between therapist and patient times"""
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can resolve discrepancies"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        session_log = self.get_object()
+
+        if not session_log.has_discrepancy:
+            return Response(
+                {"error": "No discrepancy to resolve"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        notes = request.data.get('notes', '')
+        session_log.resolve_discrepancy(request.user, notes)
+
+        serializer = self.get_serializer(session_log)
+        return Response({
+            "message": "Discrepancy resolved",
+            "data": serializer.data
+        })
+
+    @action(detail=False, methods=['get'], url_path='discrepancies')
+    def discrepancies(self, request):
+        """Get all sessions with discrepancies (admin only)"""
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can view discrepancies"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        queryset = SessionTimeLog.objects.filter(
+            has_discrepancy=True,
+            discrepancy_resolved=False
+        ).order_by('-date')
+
+        serializer = SessionTimeLogListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='today')
+    def today_sessions(self, request):
+        """Get today's session time logs for the current user"""
+        today = timezone.now().astimezone(INDIAN_TZ).date()
+        queryset = self.get_queryset().filter(date=today)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='by-appointment/(?P<appointment_id>[^/.]+)')
+    def by_appointment(self, request, appointment_id=None):
+        """Get session time log for a specific appointment"""
+        try:
+            session_log = SessionTimeLog.objects.get(appointment_id=appointment_id)
+
+            # Check permissions
+            user = request.user
+            if user.role == 'therapist':
+                therapist = Therapist.objects.get(user=user)
+                if session_log.therapist != therapist:
+                    return Response(
+                        {"error": "You are not assigned to this session"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            elif user.role == 'patient':
+                from users.models import Patient
+                patient = Patient.objects.get(user=user)
+                if session_log.patient != patient:
+                    return Response(
+                        {"error": "This is not your session"},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+            serializer = self.get_serializer(session_log)
+            return Response(serializer.data)
+        except SessionTimeLog.DoesNotExist:
+            return Response(
+                {"error": "Session time log not found for this appointment"},
+                status=status.HTTP_404_NOT_FOUND
+            )

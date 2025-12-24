@@ -54,6 +54,19 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 return Appointment.objects.none()
         return Appointment.objects.none()
 
+    def perform_create(self, serializer):
+        """
+        Set appointment status to SCHEDULED when admin creates an appointment.
+        Admin-created appointments don't need approval, they are directly scheduled.
+        """
+        user = self.request.user
+        if user.is_admin:
+            # Admin creates appointments directly as scheduled
+            serializer.save(status=Appointment.Status.SCHEDULED)
+        else:
+            # Other users create appointments with default pending status
+            serializer.save()
+
     def update(self, request, *args, **kwargs):
         # Get the original appointment
         instance = self.get_object()
@@ -374,6 +387,286 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get'], url_path='check-therapist-availability')
+    def check_therapist_availability(self, request):
+        """
+        Check if a therapist is available on a specific date.
+        
+        Query parameters:
+        - therapist: ID of the therapist
+        - date: Date in YYYY-MM-DD format
+        - time: (optional) Time in HH:MM format to check for conflicts
+        - duration: (optional) Duration in minutes for conflict check
+        
+        Returns availability status including:
+        - is_available: Boolean
+        - reason: Why unavailable (if applicable)
+        - appointment_count: Current appointments for the day
+        - max_appointments: Maximum allowed (4)
+        - booked_slots: List of already booked time slots
+        """
+        from users.models import Therapist
+        
+        therapist_id = request.query_params.get('therapist')
+        date_str = request.query_params.get('date')
+        time_str = request.query_params.get('time')
+        duration = request.query_params.get('duration', 60)
+        
+        if not therapist_id or not date_str:
+            return Response(
+                {"error": "Both therapist and date parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get therapist
+            therapist = Therapist.objects.get(id=therapist_id)
+            
+            # Parse date
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+            
+            # Get availability status
+            availability = therapist.get_availability_status(date_obj)
+            
+            # If time is provided, also check for time conflicts
+            if time_str:
+                try:
+                    time_obj = datetime.strptime(time_str, '%H:%M').time()
+                    has_conflict, conflicting_apt = therapist.has_time_conflict(
+                        date_obj, time_obj, int(duration)
+                    )
+                    availability['has_time_conflict'] = has_conflict
+                    if has_conflict and conflicting_apt:
+                        availability['conflicting_appointment'] = {
+                            'id': conflicting_apt.id,
+                            'time': conflicting_apt.datetime.strftime('%H:%M'),
+                            'patient': conflicting_apt.patient.user.get_full_name() if conflicting_apt.patient else 'Unknown'
+                        }
+                except ValueError:
+                    pass
+            
+            return Response(availability)
+            
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'], url_path='create-treatment-cycle')
+    def create_treatment_cycle(self, request):
+        """
+        Create a master appointment with auto-generated daily child appointments.
+        
+        Request body:
+        - patient_id: ID of the patient
+        - therapist_id: ID of the therapist
+        - treatment_plan_id: ID of the treatment plan
+        - treatment_start_date: Start date in YYYY-MM-DD format
+        - treatment_end_date: End date in YYYY-MM-DD format
+        - time: Time in HH:MM format (same for all days)
+        - duration_minutes: Duration in minutes (default 60)
+        - issue: Reason for visit (optional)
+        - notes: Additional notes (optional)
+        
+        Returns:
+        - master_appointment: The master appointment object
+        - child_appointments: List of generated child appointments
+        """
+        from users.models import Patient, Therapist
+        from treatment_plans.models import TreatmentPlan, DailyTreatment
+        from attendance.models import SessionTimeLog, Attendance
+        import uuid
+        
+        # Validate required fields
+        required_fields = ['patient_id', 'therapist_id', 'treatment_start_date', 'treatment_end_date', 'time']
+        for field in required_fields:
+            if field not in request.data:
+                return Response(
+                    {"error": f"Missing required field: {field}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        try:
+            # Get patient and therapist
+            patient = Patient.objects.get(id=request.data['patient_id'])
+            therapist = Therapist.objects.get(id=request.data['therapist_id'])
+            
+            # Parse dates
+            start_date = datetime.strptime(request.data['treatment_start_date'], '%Y-%m-%d').date()
+            end_date = datetime.strptime(request.data['treatment_end_date'], '%Y-%m-%d').date()
+            time_obj = datetime.strptime(request.data['time'], '%H:%M').time()
+            
+            # Validate date range
+            if end_date < start_date:
+                return Response(
+                    {"error": "End date must be after start date"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Calculate number of days
+            num_days = (end_date - start_date).days + 1
+            
+            # Get treatment plan if provided
+            treatment_plan = None
+            if request.data.get('treatment_plan_id'):
+                treatment_plan = TreatmentPlan.objects.get(id=request.data['treatment_plan_id'])
+            
+            # Get optional fields
+            duration_minutes = int(request.data.get('duration_minutes', 60))
+            issue = request.data.get('issue', '')
+            notes = request.data.get('notes', '')
+            appointment_type = request.data.get('type', Appointment.Type.TREATMENT)
+            
+            # Generate base session code
+            base_code = str(uuid.uuid4())[:8].upper()
+            
+            # Create master appointment (Day 1)
+            first_datetime = datetime.combine(start_date, time_obj)
+            first_datetime = timezone.make_aware(first_datetime) if timezone.is_naive(first_datetime) else first_datetime
+            
+            # Get daily treatment for Day 1 if treatment plan exists
+            daily_treatment_day1 = None
+            if treatment_plan:
+                daily_treatment_day1 = DailyTreatment.objects.filter(
+                    treatment_plan=treatment_plan,
+                    day_number=1
+                ).first()
+            
+            master_appointment = Appointment.objects.create(
+                patient=patient,
+                therapist=therapist,
+                session_code=f"{base_code}-D1",
+                datetime=first_datetime,
+                duration_minutes=duration_minutes,
+                status=Appointment.Status.SCHEDULED,
+                type=appointment_type,
+                issue=issue,
+                notes=notes,
+                treatment_plan=treatment_plan,
+                daily_treatment=daily_treatment_day1,
+                treatment_start_date=start_date,
+                treatment_end_date=end_date,
+                treatment_day_number=1,
+                is_master_appointment=True,
+                master_appointment=None
+            )
+            
+            # Create SessionTimeLog for master appointment
+            SessionTimeLog.objects.create(
+                appointment=master_appointment,
+                date=start_date,
+                status='pending'
+            )
+            
+            # Create Attendance record for master appointment
+            Attendance.objects.get_or_create(
+                therapist=therapist,
+                date=start_date,
+                defaults={'status': 'expected'}
+            )
+            
+            child_appointments = []
+            
+            # Create child appointments for remaining days
+            for day_num in range(2, num_days + 1):
+                current_date = start_date + timedelta(days=day_num - 1)
+                current_datetime = datetime.combine(current_date, time_obj)
+                current_datetime = timezone.make_aware(current_datetime) if timezone.is_naive(current_datetime) else current_datetime
+                
+                # Get daily treatment for this day if treatment plan exists
+                daily_treatment = None
+                if treatment_plan:
+                    daily_treatment = DailyTreatment.objects.filter(
+                        treatment_plan=treatment_plan,
+                        day_number=day_num
+                    ).first()
+                
+                child_appointment = Appointment.objects.create(
+                    patient=patient,
+                    therapist=therapist,
+                    session_code=f"{base_code}-D{day_num}",
+                    datetime=current_datetime,
+                    duration_minutes=duration_minutes,
+                    status=Appointment.Status.SCHEDULED,
+                    type=appointment_type,
+                    issue=issue,
+                    notes=notes,
+                    treatment_plan=treatment_plan,
+                    daily_treatment=daily_treatment,
+                    treatment_start_date=start_date,
+                    treatment_end_date=end_date,
+                    treatment_day_number=day_num,
+                    is_master_appointment=False,
+                    master_appointment=master_appointment
+                )
+                
+                # Create SessionTimeLog for child appointment
+                SessionTimeLog.objects.create(
+                    appointment=child_appointment,
+                    date=current_date,
+                    status='pending'
+                )
+                
+                # Create Attendance record for child appointment
+                Attendance.objects.get_or_create(
+                    therapist=therapist,
+                    date=current_date,
+                    defaults={'status': 'expected'}
+                )
+                
+                child_appointments.append(child_appointment)
+            
+            # Serialize response
+            master_serializer = AppointmentSerializer(master_appointment)
+            children_serializer = AppointmentSerializer(child_appointments, many=True)
+            
+            return Response({
+                'message': f'Successfully created {num_days} appointments for treatment cycle',
+                'master_appointment': master_serializer.data,
+                'child_appointments': children_serializer.data,
+                'total_appointments': num_days,
+                'treatment_start_date': start_date.isoformat(),
+                'treatment_end_date': end_date.isoformat()
+            }, status=status.HTTP_201_CREATED)
+            
+        except Patient.DoesNotExist:
+            return Response(
+                {"error": "Patient not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except TreatmentPlan.DoesNotExist:
+            return Response(
+                {"error": "Treatment plan not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ValueError as e:
+            return Response(
+                {"error": f"Invalid date or time format: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 class RescheduleRequestViewSet(viewsets.ModelViewSet):
     queryset = RescheduleRequest.objects.all()
     serializer_class = RescheduleRequestSerializer
@@ -483,6 +776,176 @@ class RescheduleRequestViewSet(viewsets.ModelViewSet):
             {"message": "Reschedule request rejected"},
             status=status.HTTP_200_OK
         )
+
+    @action(detail=False, methods=['post'], url_path='patient-request')
+    def patient_request(self, request):
+        """
+        Create a reschedule request from a patient.
+        Patient requests go to admin for approval first.
+        
+        Request body:
+        - appointment_id: ID of the appointment to reschedule
+        - requested_datetime: New requested datetime in ISO format
+        - reason: Reason for the change request
+        - patient_note: Additional note from patient (optional)
+        """
+        user = request.user
+        
+        if not user.is_patient:
+            return Response(
+                {"error": "Only patients can create patient reschedule requests"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        appointment_id = request.data.get('appointment_id')
+        requested_datetime = request.data.get('requested_datetime')
+        reason = request.data.get('reason', '')
+        patient_note = request.data.get('patient_note', '')
+        
+        if not appointment_id or not requested_datetime:
+            return Response(
+                {"error": "appointment_id and requested_datetime are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get the appointment and verify it belongs to this patient
+            appointment = Appointment.objects.get(id=appointment_id)
+            
+            if appointment.patient.user != user:
+                return Response(
+                    {"error": "You can only request changes to your own appointments"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Check if appointment can be rescheduled
+            if not appointment.can_reschedule():
+                return Response(
+                    {"error": "This appointment cannot be rescheduled (max reschedules reached or too close to appointment time)"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Parse the requested datetime
+            if isinstance(requested_datetime, str):
+                requested_datetime = datetime.fromisoformat(requested_datetime.replace('Z', '+00:00'))
+            
+            # Create the reschedule request
+            reschedule_request = RescheduleRequest.objects.create(
+                appointment=appointment,
+                requested_by=user,
+                requested_datetime=requested_datetime,
+                reason=reason,
+                status=RescheduleRequest.Status.PENDING,
+                request_source=RescheduleRequest.RequestSource.PATIENT,
+                patient_note=patient_note
+            )
+            
+            # Update appointment status to pending reschedule
+            appointment.status = Appointment.Status.PENDING_RESCHEDULE
+            appointment.save()
+            
+            serializer = RescheduleRequestSerializer(reschedule_request)
+            return Response({
+                "message": "Reschedule request submitted successfully. Waiting for admin approval.",
+                "reschedule_request": serializer.data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Appointment.DoesNotExist:
+            return Response(
+                {"error": "Appointment not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'], url_path='forward-to-therapist')
+    def forward_to_therapist(self, request, pk=None):
+        """
+        Admin forwards an approved patient request to the therapist.
+        
+        Request body:
+        - admin_note_to_therapist: Note from admin to therapist (optional)
+        """
+        user = request.user
+        
+        if not user.is_admin:
+            return Response(
+                {"error": "Only admins can forward requests to therapists"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        reschedule_request = self.get_object()
+        
+        # Only forward patient requests that are approved
+        if reschedule_request.request_source != RescheduleRequest.RequestSource.PATIENT:
+            return Response(
+                {"error": "Only patient requests can be forwarded to therapists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        admin_note = request.data.get('admin_note_to_therapist', '')
+        
+        # Forward the request
+        reschedule_request.forward_to_therapist(user, admin_note)
+        reschedule_request.status = RescheduleRequest.Status.FORWARDED
+        reschedule_request.save()
+        
+        # TODO: Send notification to therapist
+        
+        serializer = RescheduleRequestSerializer(reschedule_request)
+        return Response({
+            "message": "Request forwarded to therapist successfully",
+            "reschedule_request": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='patient-requests')
+    def patient_requests(self, request):
+        """
+        Get all patient reschedule requests (for admin dashboard).
+        """
+        user = request.user
+        
+        if not user.is_admin:
+            return Response(
+                {"error": "Only admins can view all patient requests"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        patient_requests = RescheduleRequest.objects.filter(
+            request_source=RescheduleRequest.RequestSource.PATIENT
+        ).order_by('-created_at')
+        
+        serializer = RescheduleRequestSerializer(patient_requests, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='forwarded-requests')
+    def forwarded_requests(self, request):
+        """
+        Get all forwarded requests for the current therapist.
+        """
+        user = request.user
+        
+        if not user.is_therapist:
+            return Response(
+                {"error": "Only therapists can view forwarded requests"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            therapist = user.therapist_profile
+            forwarded = RescheduleRequest.objects.filter(
+                appointment__therapist=therapist,
+                forwarded_to_therapist=True
+            ).order_by('-forwarded_at')
+            
+            serializer = RescheduleRequestSerializer(forwarded, many=True)
+            return Response(serializer.data)
+        except Exception:
+            return Response([], status=status.HTTP_200_OK)
+
 
 class SessionViewSet(viewsets.ModelViewSet):
     queryset = Session.objects.all()

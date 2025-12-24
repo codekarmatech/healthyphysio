@@ -1431,31 +1431,92 @@ class PatientDashboardSummaryViewSet(viewsets.ViewSet):
         return Response(response_data)
 
 class DoctorDashboardSummaryViewSet(viewsets.ViewSet):
+    """
+    Dashboard summary for doctors - shows patients in their area and referral stats
+    """
     permission_classes = [permissions.IsAuthenticated, IsDoctorUser]
 
     def list(self, request):
         # Get the doctor profile
         try:
             doctor = request.user.doctor_profile
-        except:
+        except Exception:
             return Response({"error": "Doctor profile not found"}, status=status.HTTP_404_NOT_FOUND)
 
         # Get current date and time
         now = timezone.now()
         today = now.date()
+        first_day_of_month = today.replace(day=1)
 
-        # Since we don't have the exact model structure for doctor referrals,
-        # let's create a simplified response with placeholder data
-        # You'll need to adjust this based on your actual model relationships
-
-        # Prepare response data with placeholder values
+        # Get doctor's name for referral matching
+        doctor_name = request.user.get_full_name() or request.user.username
+        
+        # Query patients - those in doctor's area or referred by this doctor
+        from django.db.models import Q
+        
+        # Build query for patients related to this doctor
+        patient_query = Q()
+        
+        # Patients in doctor's practice area
+        if doctor.practice_area:
+            patient_query |= Q(area=doctor.practice_area)
+        
+        # Patients who mentioned this doctor in referred_by field
+        patient_query |= Q(referred_by__icontains=doctor_name)
+        patient_query |= Q(referred_by__icontains=request.user.username)
+        
+        # Get all related patients
+        related_patients = Patient.objects.filter(patient_query).distinct()
+        
+        # Calculate stats
+        total_patients = related_patients.count()
+        
+        # Active patients (those with recent appointments in last 30 days)
+        from scheduling.models import Appointment
+        from datetime import timedelta
+        
+        thirty_days_ago = now - timedelta(days=30)
+        active_patient_ids = Appointment.objects.filter(
+            patient__in=related_patients,
+            datetime__gte=thirty_days_ago,
+            status__in=['scheduled', 'completed', 'pending']
+        ).values_list('patient_id', flat=True).distinct()
+        active_patients_count = len(set(active_patient_ids))
+        
+        # New patients this month
+        new_this_month = related_patients.filter(
+            user__date_joined__gte=first_day_of_month
+        ).count()
+        
+        # Recent referrals/patients (last 10)
+        recent_patients = related_patients.select_related('user', 'area').order_by('-user__date_joined')[:10]
+        
+        recent_referrals = []
+        for patient in recent_patients:
+            # Get latest appointment for this patient
+            latest_appointment = Appointment.objects.filter(
+                patient=patient
+            ).order_by('-datetime').first()
+            
+            recent_referrals.append({
+                'id': patient.id,
+                'patient_name': patient.user.get_full_name() or patient.user.username,
+                'condition': patient.disease or 'Not specified',
+                'area': patient.area.name if patient.area else 'Not assigned',
+                'status': latest_appointment.status if latest_appointment else 'No appointments',
+                'date': patient.user.date_joined.strftime('%Y-%m-%d'),
+                'therapist_name': latest_appointment.therapist.user.get_full_name() if latest_appointment and latest_appointment.therapist else None,
+            })
+        
+        # Prepare response data
         response_data = {
             "stats": {
-                "total_referrals": 0,
-                "active_patients": 0,
-                "new_referrals_this_month": 0
+                "total_referrals": total_patients,
+                "active_patients": active_patients_count,
+                "new_referrals_this_month": new_this_month
             },
-            "recent_referrals": []
+            "recent_referrals": recent_referrals,
+            "is_sample_data": total_patients == 0  # Flag for frontend to show sample notice
         }
 
         return Response(response_data)

@@ -120,7 +120,7 @@ const TreatmentPlanWizard = ({
         setPatients(patientsResponse.data || []);
 
         // Load therapists (admin only)
-        if (user?.is_admin) {
+        if (user?.role === 'admin' || user?.is_admin) {
           try {
             const therapistsResponse = await therapistService.getAll();
             setTherapists(therapistsResponse.data || []);

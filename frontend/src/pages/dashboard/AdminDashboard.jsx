@@ -10,6 +10,7 @@ import ActivityFeed from '../../components/dashboard/ActivityFeed';
 import BarChart from '../../components/charts/BarChart';
 import LineChart from '../../components/charts/LineChart';
 import DoughnutChart from '../../components/charts/DoughnutChart';
+import { AdminSessionDiscrepancies } from '../../components/attendance';
 import adminDashboardService from '../../services/adminDashboardService';
 import rescheduleRequestService from '../../services/rescheduleRequestService';
 import { alertService } from '../../services/visitsService';
@@ -375,13 +376,20 @@ const AdminDashboard = () => {
   const usingMockData = dashboardData && checkIsMockData({ data: dashboardData });
 
   return (
-    <DashboardLayout title={`Admin Dashboard${user ? ` - ${user.firstName || 'Admin'}` : ''}`}>
-      {/* Dashboard Controls */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center">
-          <span className="text-sm text-gray-500 mr-4">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </span>
+    <DashboardLayout title="Admin Dashboard">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Welcome Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+              Welcome back, <span className="text-red-600">{user?.firstName || 'Admin'}</span>!
+            </h1>
+            <p className="mt-2 text-gray-500">Complete overview of your physiotherapy platform</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
           <button
             onClick={fetchDashboardData}
             className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
@@ -553,6 +561,11 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Session Time Discrepancies */}
+      <div className="mb-6">
+        <AdminSessionDiscrepancies />
+      </div>
 
       {/* Overview Metrics Panel */}
       <div className="mb-6">
@@ -1252,7 +1265,7 @@ const AdminDashboard = () => {
         />
       </div>
 
-
+      </div>
     </DashboardLayout>
   );
 };

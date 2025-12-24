@@ -13,6 +13,7 @@ router.register(r'holidays', views.HolidayViewSet)
 router.register(r'leave', views.LeaveViewSet, basename='leave')
 router.register(r'change-requests', views.AttendanceChangeRequestViewSet, basename='attendance-change-request')
 router.register(r'availability', views.AvailabilityViewSet, basename='availability')
+router.register(r'session-time', views.SessionTimeLogViewSet, basename='session-time-log')
 
 urlpatterns = [
     path('availability/', views.get_availability, name='get_availability'),

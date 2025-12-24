@@ -54,6 +54,8 @@ urlpatterns = [
     path('api/areas/', include('areas.urls')),
     # Notifications
     path('api/notifications/', include('notifications.urls')),
+    # Site Settings - Public API for frontend customization
+    path('api/site-settings/', include('site_settings.urls')),
 ]
 
 # Serve media files in development

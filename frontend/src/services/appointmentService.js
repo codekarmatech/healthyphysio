@@ -111,6 +111,49 @@ class AppointmentService extends BaseService {
   cancelWithReason(id, reason) {
     return this.performAction(id, 'cancel', { reason });
   }
+
+  /**
+   * Check therapist availability on a specific date
+   * @param {string|number} therapistId - Therapist ID
+   * @param {string} date - Date in YYYY-MM-DD format
+   * @param {string} time - (optional) Time in HH:MM format
+   * @param {number} duration - (optional) Duration in minutes
+   * @returns {Promise} API response with availability info
+   */
+  checkTherapistAvailability(therapistId, date, time = null, duration = 60) {
+    let url = `${this.basePath}check-therapist-availability/?therapist=${therapistId}&date=${date}`;
+    if (time) {
+      url += `&time=${time}&duration=${duration}`;
+    }
+    return api.get(url);
+  }
+
+  /**
+   * Create a treatment cycle with auto-generated daily appointments
+   * @param {Object} data - Treatment cycle data
+   * @param {string|number} data.patient_id - Patient ID
+   * @param {string|number} data.therapist_id - Therapist ID
+   * @param {string|number} data.treatment_plan_id - Treatment plan ID (optional)
+   * @param {string} data.treatment_start_date - Start date in YYYY-MM-DD format
+   * @param {string} data.treatment_end_date - End date in YYYY-MM-DD format
+   * @param {string} data.time - Time in HH:MM format
+   * @param {number} data.duration_minutes - Duration in minutes (default 60)
+   * @param {string} data.issue - Reason for visit (optional)
+   * @param {string} data.notes - Additional notes (optional)
+   * @returns {Promise} API response with master and child appointments
+   */
+  createTreatmentCycle(data) {
+    return api.post(`${this.basePath}create-treatment-cycle/`, data);
+  }
+
+  /**
+   * Get child appointments for a master appointment
+   * @param {string|number} masterAppointmentId - Master appointment ID
+   * @returns {Promise} API response with child appointments
+   */
+  getChildAppointments(masterAppointmentId) {
+    return api.get(`${this.basePath}?master_appointment=${masterAppointmentId}`);
+  }
 }
 
 // Create and export a singleton instance

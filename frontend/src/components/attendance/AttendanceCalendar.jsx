@@ -3,6 +3,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, i
 // Use the imported utilities from dateUtils
 import { dayFormat, isSameDay } from '../../utils/dateUtils';
 import attendanceService from '../../services/attendanceService';
+import sessionTimeService from '../../services/sessionTimeService';
 
 const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData = false }) => {
   const [submitting, setSubmitting] = useState(false);
@@ -10,6 +11,8 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedDayDetails, setSelectedDayDetails] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState(null);
@@ -74,14 +77,10 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
 
     // For days with existing attendance, show a modal with details and option to request change
     if (dayData && dayData.status !== 'upcoming') {
-      // Show details modal or change request option
+      // Show details modal with attendance and appointment info
       console.log("Attendance already submitted for this date:", dayData);
-      // We could add a modal here to show attendance details
-
-      // For now, just notify the parent component
-      if (onAttendanceUpdated) {
-        onAttendanceUpdated('view_details', date);
-      }
+      setSelectedDayDetails(dayData);
+      setShowDetailsModal(true);
       return;
     }
 
@@ -537,6 +536,161 @@ const AttendanceCalendar = ({ days, currentDate, onAttendanceUpdated, isMockData
               >
                 Record Cancellation
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance Details Modal */}
+      {showDetailsModal && selectedDayDetails && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Attendance Details
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {selectedDate ? format(selectedDate, 'EEEE, MMMM d, yyyy') : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedDayDetails(null);
+                }}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Status Badge */}
+            <div className="mb-4">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                selectedDayDetails.status === 'present' ? 'bg-green-100 text-green-800' :
+                selectedDayDetails.status === 'absent' ? 'bg-red-100 text-red-800' :
+                selectedDayDetails.status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
+                selectedDayDetails.status === 'approved_leave' ? 'bg-purple-100 text-purple-800' :
+                selectedDayDetails.status === 'expected' ? 'bg-blue-100 text-blue-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {selectedDayDetails.display_status || selectedDayDetails.status?.replace(/_/g, ' ')}
+              </span>
+              {selectedDayDetails.is_approved && (
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Approved
+                </span>
+              )}
+            </div>
+
+            {/* Attendance Info */}
+            <div className="space-y-3 mb-4">
+              {selectedDayDetails.check_in_time && (
+                <div className="flex items-center text-sm">
+                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="text-gray-600">Check-in:</span>
+                  <span className="ml-2 font-medium">{sessionTimeService.formatTimeIST(selectedDayDetails.check_in_time)}</span>
+                </div>
+              )}
+              {selectedDayDetails.check_out_time && (
+                <div className="flex items-center text-sm">
+                  <svg className="w-5 h-5 text-orange-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="text-gray-600">Check-out:</span>
+                  <span className="ml-2 font-medium">{sessionTimeService.formatTimeIST(selectedDayDetails.check_out_time)}</span>
+                </div>
+              )}
+              {selectedDayDetails.submitted_at && (
+                <div className="flex items-center text-sm">
+                  <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-gray-600">Submitted:</span>
+                  <span className="ml-2 font-medium">{selectedDayDetails.submitted_at}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Appointments Section */}
+            {selectedDayDetails.has_appointments && (
+              <div className="border-t border-gray-200 pt-4 mb-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                  <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Appointments
+                </h4>
+                {selectedDayDetails.appointments && selectedDayDetails.appointments.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedDayDetails.appointments.map((apt, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{apt.patient_name || 'Patient'}</p>
+                            <p className="text-xs text-gray-500">{apt.time || apt.datetime}</p>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            apt.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            apt.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                            apt.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {apt.status || 'Scheduled'}
+                          </span>
+                        </div>
+                        {apt.session_code && (
+                          <p className="text-xs text-gray-500 mt-1">Session: {apt.session_code}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Appointment details not available</p>
+                )}
+              </div>
+            )}
+
+            {/* Notes */}
+            {selectedDayDetails.notes && (
+              <div className="border-t border-gray-200 pt-4 mb-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Notes</h4>
+                <p className="text-sm text-gray-600 bg-gray-50 rounded p-3">{selectedDayDetails.notes}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="border-t border-gray-200 pt-4 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedDayDetails(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+              {selectedDayDetails.has_appointments && (
+                <button
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    if (onAttendanceUpdated) {
+                      onAttendanceUpdated('view_appointments', selectedDate, selectedDayDetails);
+                    }
+                  }}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                >
+                  View Appointments
+                </button>
+              )}
             </div>
           </div>
         </div>

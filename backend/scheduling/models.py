@@ -64,6 +64,37 @@ class Appointment(models.Model):
         help_text="Specific daily treatment within the plan"
     )
 
+    # Actual treatment dates for this patient's appointment cycle
+    treatment_start_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Actual start date of treatment for this appointment cycle"
+    )
+    treatment_end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Actual end date of treatment for this appointment cycle"
+    )
+    treatment_day_number = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Day number within the treatment cycle (1, 2, 3, etc.)"
+    )
+
+    # Master appointment relationship for multi-day treatment cycles
+    is_master_appointment = models.BooleanField(
+        default=False,
+        help_text="True if this is the master appointment that generated child appointments"
+    )
+    master_appointment = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='child_appointments',
+        help_text="Reference to the master appointment for child appointments"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -119,49 +150,129 @@ class Appointment(models.Model):
 
     @property
     def treatment_cycle_info(self):
-        """Get treatment cycle information with flexible duration support"""
+        """Get treatment cycle information with flexible duration support and session time tracking"""
         if not self.treatment_plan:
             return None
 
-        # Get all appointments in this treatment plan
-        cycle_appointments = Appointment.objects.filter(
-            treatment_plan=self.treatment_plan
-        ).order_by('datetime')
+        # Import here to avoid circular imports
+        from attendance.models import SessionTimeLog
+
+        # Determine which appointments to consider for the cycle
+        # If this is part of a master/child relationship, use those
+        # Otherwise, fall back to treatment_plan based grouping
+        if self.master_appointment:
+            # This is a child appointment - get siblings from master
+            cycle_appointments = Appointment.objects.filter(
+                master_appointment=self.master_appointment
+            ).order_by('datetime')
+        elif self.is_master_appointment:
+            # This is a master appointment - get children
+            cycle_appointments = self.child_appointments.all().order_by('datetime')
+        else:
+            # Fallback to treatment plan based grouping
+            cycle_appointments = Appointment.objects.filter(
+                treatment_plan=self.treatment_plan
+            ).order_by('datetime')
 
         total_appointments = cycle_appointments.count()
-        completed_appointments = cycle_appointments.filter(status=self.Status.COMPLETED).count()
+        
+        # Count completed appointments based on multiple criteria:
+        # 1. Appointment status is COMPLETED
+        # 2. OR SessionTimeLog exists with therapist_leaving_time (therapist completed the session)
+        # 3. OR SessionTimeLog exists with patient_confirmed_departure (patient confirmed completion)
+        completed_appointments = 0
+        verified_sessions = 0
+        
+        for apt in cycle_appointments:
+            # Check if appointment is marked as completed
+            if apt.status == self.Status.COMPLETED:
+                completed_appointments += 1
+                continue
+            
+            # Check SessionTimeLog for this appointment
+            try:
+                session_log = SessionTimeLog.objects.filter(appointment=apt).first()
+                if session_log:
+                    # Count as completed if therapist has left
+                    if session_log.therapist_leaving_time:
+                        completed_appointments += 1
+                        # Count as verified if patient also confirmed
+                        if session_log.patient_confirmed_departure:
+                            verified_sessions += 1
+            except Exception:
+                pass
 
-        # Calculate cycle duration from treatment plan dates or appointment count
-        if self.treatment_plan.start_date and self.treatment_plan.end_date:
-            cycle_duration_days = (self.treatment_plan.end_date - self.treatment_plan.start_date).days + 1
+        # Use actual appointment dates first, then fall back to treatment plan dates
+        actual_start_date = self.treatment_start_date
+        actual_end_date = self.treatment_end_date
+        
+        # If no actual dates on this appointment, check master appointment
+        if not actual_start_date and self.master_appointment:
+            actual_start_date = self.master_appointment.treatment_start_date
+            actual_end_date = self.master_appointment.treatment_end_date
+        
+        # Fall back to treatment plan dates if no actual dates
+        if not actual_start_date:
+            actual_start_date = self.treatment_plan.start_date
+        if not actual_end_date:
+            actual_end_date = self.treatment_plan.end_date
+
+        # Calculate cycle duration from actual dates or appointment count
+        if actual_start_date and actual_end_date:
+            cycle_duration_days = (actual_end_date - actual_start_date).days + 1
         else:
             # Fallback to daily treatments count or appointment count
             daily_treatments_count = self.treatment_plan.daily_treatments.count()
             cycle_duration_days = daily_treatments_count if daily_treatments_count > 0 else total_appointments
 
-        # Find current appointment position
-        current_position = 1
-        for i, apt in enumerate(cycle_appointments, 1):
-            if apt.id == self.id:
-                current_position = i
-                break
+        # Use treatment_day_number if available, otherwise find position
+        if self.treatment_day_number:
+            current_day = self.treatment_day_number
+        elif self.daily_treatment:
+            current_day = self.daily_treatment.day_number
+        else:
+            # Find current appointment position
+            current_day = 1
+            for i, apt in enumerate(cycle_appointments, 1):
+                if apt.id == self.id:
+                    current_day = i
+                    break
 
-        # Use daily treatment day number if available, otherwise use position
-        current_day = self.daily_treatment.day_number if self.daily_treatment else current_position
+        # Get session time log for current appointment
+        current_session_log = None
+        try:
+            current_session_log = SessionTimeLog.objects.filter(appointment=self).first()
+        except Exception:
+            pass
+
+        session_info = None
+        if current_session_log:
+            session_info = {
+                'therapist_reached': current_session_log.therapist_reached_time is not None,
+                'therapist_left': current_session_log.therapist_leaving_time is not None,
+                'patient_confirmed_arrival': current_session_log.patient_confirmed_arrival is not None,
+                'patient_confirmed_departure': current_session_log.patient_confirmed_departure is not None,
+                'therapist_duration_minutes': current_session_log.therapist_duration_minutes,
+                'patient_duration_minutes': current_session_log.patient_confirmed_duration_minutes,
+                'status': current_session_log.status,
+                'has_discrepancy': current_session_log.has_discrepancy,
+            }
 
         return {
             'treatment_plan_title': self.treatment_plan.title,
-            'start_date': self.treatment_plan.start_date,
-            'end_date': self.treatment_plan.end_date,
+            'start_date': actual_start_date,
+            'end_date': actual_end_date,
             'current_day': current_day,
             'total_days': cycle_duration_days,
             'total_appointments': total_appointments,
             'completed_days': completed_appointments,
+            'verified_sessions': verified_sessions,
             'progress_percentage': round((completed_appointments / total_appointments) * 100, 1) if total_appointments > 0 else 0,
             'daily_treatment_title': self.daily_treatment.title if self.daily_treatment else None,
             'cycle_duration_days': cycle_duration_days,
             'is_appointment_based': total_appointments > 0,
-            'remaining_appointments': total_appointments - completed_appointments
+            'remaining_appointments': total_appointments - completed_appointments,
+            'session_info': session_info,
         }
 
     def __str__(self):
@@ -175,18 +286,77 @@ class RescheduleRequest(models.Model):
         PENDING = 'pending', 'Pending'
         APPROVED = 'approved', 'Approved'
         REJECTED = 'rejected', 'Rejected'
+        FORWARDED = 'forwarded', 'Forwarded to Therapist'
+
+    class RequestSource(models.TextChoices):
+        PATIENT = 'patient', 'Patient'
+        THERAPIST = 'therapist', 'Therapist'
+        ADMIN = 'admin', 'Admin'
 
     appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='reschedule_requests')
     requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reschedule_requests')
     requested_datetime = models.DateTimeField()
     reason = models.TextField()
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     admin_notes = models.TextField(blank=True)
+    
+    # Request source tracking
+    request_source = models.CharField(
+        max_length=20,
+        choices=RequestSource.choices,
+        default=RequestSource.THERAPIST,
+        help_text="Who initiated this reschedule request"
+    )
+    
+    # Patient-specific fields
+    patient_note = models.TextField(
+        blank=True,
+        help_text="Note from patient explaining the change request"
+    )
+    
+    # Admin to therapist communication
+    admin_note_to_therapist = models.TextField(
+        blank=True,
+        help_text="Note from admin to therapist about this request"
+    )
+    forwarded_to_therapist = models.BooleanField(
+        default=False,
+        help_text="Whether this request has been forwarded to the therapist"
+    )
+    forwarded_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the request was forwarded to the therapist"
+    )
+    
+    # Approval tracking
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_reschedule_requests',
+        help_text="Admin who approved this request"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Reschedule request for {self.appointment.session_code} by {self.requested_by.username}"
+        source_label = f" ({self.get_request_source_display()})" if self.request_source else ""
+        return f"Reschedule request for {self.appointment.session_code} by {self.requested_by.username}{source_label}"
+    
+    def forward_to_therapist(self, admin_user, note=''):
+        """Forward this request to the therapist with optional admin note"""
+        self.forwarded_to_therapist = True
+        self.forwarded_at = timezone.now()
+        if note:
+            self.admin_note_to_therapist = note
+        elif self.request_source == self.RequestSource.PATIENT:
+            self.admin_note_to_therapist = "Change requested by patient"
+        self.save()
+        return True
 
 
 class Session(models.Model):

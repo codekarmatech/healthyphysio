@@ -35,6 +35,8 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
     createNewTreatmentPlan: false,
     // Revenue calculator integration
     totalFee: '',
+    dailyCharges: '',
+    numberOfDays: '',
     adminEarnings: '',
     therapistEarnings: '',
     doctorEarnings: '',
@@ -152,18 +154,22 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
   // This allows for more flexibility in appointment scheduling
 
   // Revenue calculation function
-  const calculateRevenue = (totalFee) => {
+  const calculateRevenue = (totalFee, days = 1) => {
     const fee = parseFloat(totalFee) || 0;
+    const numDays = parseInt(days) || 1;
     if (fee <= 0) return null;
 
     // Fixed 3% platform fee
     const platformFeeAmount = (fee * 3) / 100;
     const distributableAmount = fee - platformFeeAmount;
 
-    // Default distribution: Admin 40%, Therapist 40%, Doctor 20%
-    const adminAmount = (distributableAmount * 40) / 100;
-    const therapistAmount = (distributableAmount * 40) / 100;
-    const doctorAmount = (distributableAmount * 20) / 100;
+    // Correct distribution: Admin 39%, Therapist 39%, Doctor 19%
+    const adminAmount = (distributableAmount * 39) / 100;
+    const therapistAmount = (distributableAmount * 39) / 100;
+    const doctorAmount = (distributableAmount * 19) / 100;
+
+    // Calculate daily charges
+    const dailyCharges = numDays > 0 ? fee / numDays : fee;
 
     return {
       total: fee,
@@ -171,8 +177,20 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
       adminEarnings: adminAmount,
       therapistEarnings: therapistAmount,
       doctorEarnings: doctorAmount,
-      distributableAmount
+      distributableAmount,
+      dailyCharges,
+      numberOfDays: numDays
     };
+  };
+
+  // Calculate number of days between start and end dates
+  const calculateNumberOfDays = (startDate, endDate) => {
+    if (!startDate || !endDate) return 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+    return diffDays;
   };
 
   const handleChange = (e) => {
@@ -184,18 +202,98 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
       [name]: type === 'checkbox' ? checked : value
     };
 
-    // Auto-calculate revenue when total fee changes
+    // Auto-calculate number of days when dates change
+    if ((name === 'startDate' || name === 'endDate') && user.role === 'admin') {
+      const startDate = name === 'startDate' ? value : formData.startDate;
+      const endDate = name === 'endDate' ? value : formData.endDate;
+      const days = calculateNumberOfDays(startDate, endDate);
+      
+      if (days > 0) {
+        newFormData.numberOfDays = days.toString();
+        
+        // If we have daily charges, calculate total fee
+        if (formData.dailyCharges && parseFloat(formData.dailyCharges) > 0) {
+          const totalFee = parseFloat(formData.dailyCharges) * days;
+          newFormData.totalFee = totalFee.toFixed(2);
+          const calculation = calculateRevenue(totalFee, days);
+          if (calculation) {
+            newFormData.adminEarnings = calculation.adminEarnings.toFixed(2);
+            newFormData.therapistEarnings = calculation.therapistEarnings.toFixed(2);
+            newFormData.doctorEarnings = calculation.doctorEarnings.toFixed(2);
+            newFormData.platformFee = calculation.platformFee.toFixed(2);
+            setRevenueCalculation(calculation);
+          }
+        }
+        // If we have total fee, calculate daily charges
+        else if (formData.totalFee && parseFloat(formData.totalFee) > 0) {
+          const dailyCharges = parseFloat(formData.totalFee) / days;
+          newFormData.dailyCharges = dailyCharges.toFixed(2);
+          const calculation = calculateRevenue(formData.totalFee, days);
+          if (calculation) {
+            setRevenueCalculation(calculation);
+          }
+        }
+      }
+    }
+
+    // Auto-calculate when total fee changes
     if (name === 'totalFee' && user.role === 'admin') {
-      const calculation = calculateRevenue(value);
+      const days = parseInt(newFormData.numberOfDays) || 1;
+      const calculation = calculateRevenue(value, days);
       if (calculation) {
-        newFormData = {
-          ...newFormData,
-          adminEarnings: calculation.adminEarnings.toFixed(2),
-          therapistEarnings: calculation.therapistEarnings.toFixed(2),
-          doctorEarnings: calculation.doctorEarnings.toFixed(2),
-          platformFee: calculation.platformFee.toFixed(2)
-        };
+        newFormData.adminEarnings = calculation.adminEarnings.toFixed(2);
+        newFormData.therapistEarnings = calculation.therapistEarnings.toFixed(2);
+        newFormData.doctorEarnings = calculation.doctorEarnings.toFixed(2);
+        newFormData.platformFee = calculation.platformFee.toFixed(2);
+        // Calculate daily charges if we have number of days
+        if (days > 0) {
+          newFormData.dailyCharges = (parseFloat(value) / days).toFixed(2);
+        }
         setRevenueCalculation(calculation);
+      }
+    }
+
+    // Auto-calculate when daily charges changes
+    if (name === 'dailyCharges' && user.role === 'admin') {
+      const days = parseInt(newFormData.numberOfDays) || parseInt(formData.numberOfDays) || 1;
+      if (days > 0 && parseFloat(value) > 0) {
+        const totalFee = parseFloat(value) * days;
+        newFormData.totalFee = totalFee.toFixed(2);
+        const calculation = calculateRevenue(totalFee, days);
+        if (calculation) {
+          newFormData.adminEarnings = calculation.adminEarnings.toFixed(2);
+          newFormData.therapistEarnings = calculation.therapistEarnings.toFixed(2);
+          newFormData.doctorEarnings = calculation.doctorEarnings.toFixed(2);
+          newFormData.platformFee = calculation.platformFee.toFixed(2);
+          setRevenueCalculation(calculation);
+        }
+      }
+    }
+
+    // Auto-calculate when number of days changes manually
+    if (name === 'numberOfDays' && user.role === 'admin') {
+      const days = parseInt(value) || 1;
+      // If we have daily charges, recalculate total
+      if (formData.dailyCharges && parseFloat(formData.dailyCharges) > 0) {
+        const totalFee = parseFloat(formData.dailyCharges) * days;
+        newFormData.totalFee = totalFee.toFixed(2);
+        const calculation = calculateRevenue(totalFee, days);
+        if (calculation) {
+          newFormData.adminEarnings = calculation.adminEarnings.toFixed(2);
+          newFormData.therapistEarnings = calculation.therapistEarnings.toFixed(2);
+          newFormData.doctorEarnings = calculation.doctorEarnings.toFixed(2);
+          newFormData.platformFee = calculation.platformFee.toFixed(2);
+          setRevenueCalculation(calculation);
+        }
+      }
+      // If we have total fee, recalculate daily charges
+      else if (formData.totalFee && parseFloat(formData.totalFee) > 0) {
+        const dailyCharges = parseFloat(formData.totalFee) / days;
+        newFormData.dailyCharges = dailyCharges.toFixed(2);
+        const calculation = calculateRevenue(formData.totalFee, days);
+        if (calculation) {
+          setRevenueCalculation(calculation);
+        }
       }
     }
 
@@ -788,8 +886,54 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
                     </div>
                   </div>
 
+                  {/* Daily Charges */}
+                  <div className="sm:col-span-2">
+                    <label htmlFor="dailyCharges" className="block text-sm font-medium text-gray-700">
+                      Daily Charges (₹)
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="number"
+                        name="dailyCharges"
+                        id="dailyCharges"
+                        min="0"
+                        step="0.01"
+                        value={formData.dailyCharges}
+                        onChange={handleChange}
+                        className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        placeholder="Per day rate"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter daily rate to auto-calculate total
+                    </p>
+                  </div>
+
+                  {/* Number of Days */}
+                  <div className="sm:col-span-2">
+                    <label htmlFor="numberOfDays" className="block text-sm font-medium text-gray-700">
+                      Number of Days
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="number"
+                        name="numberOfDays"
+                        id="numberOfDays"
+                        min="1"
+                        step="1"
+                        value={formData.numberOfDays}
+                        onChange={handleChange}
+                        className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        placeholder="Treatment days"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Auto-calculated from dates or enter manually
+                    </p>
+                  </div>
+
                   {/* Total Fee */}
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-2">
                     <label htmlFor="totalFee" className="block text-sm font-medium text-gray-700">
                       Total Fee (₹)
                     </label>
@@ -803,13 +947,16 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
                         value={formData.totalFee}
                         onChange={handleChange}
                         className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                        placeholder="Enter total appointment fee"
+                        placeholder="Total fee"
                       />
                     </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      = Daily Charges × Number of Days
+                    </p>
                   </div>
 
                   {/* Show Revenue Calculator Button */}
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Revenue Distribution
                     </label>
@@ -833,15 +980,15 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
                             <p className="text-lg font-semibold text-red-600">₹{revenueCalculation.platformFee.toFixed(2)}</p>
                           </div>
                           <div className="text-center">
-                            <p className="text-xs text-gray-500">Admin Earnings (40%)</p>
+                            <p className="text-xs text-gray-500">Admin Earnings (39%)</p>
                             <p className="text-lg font-semibold text-blue-600">₹{revenueCalculation.adminEarnings.toFixed(2)}</p>
                           </div>
                           <div className="text-center">
-                            <p className="text-xs text-gray-500">Therapist Earnings (40%)</p>
+                            <p className="text-xs text-gray-500">Therapist Earnings (39%)</p>
                             <p className="text-lg font-semibold text-green-600">₹{revenueCalculation.therapistEarnings.toFixed(2)}</p>
                           </div>
                           <div className="text-center">
-                            <p className="text-xs text-gray-500">Doctor Earnings (20%)</p>
+                            <p className="text-xs text-gray-500">Doctor Earnings (19%)</p>
                             <p className="text-lg font-semibold text-purple-600">₹{revenueCalculation.doctorEarnings.toFixed(2)}</p>
                           </div>
                         </div>
@@ -854,6 +1001,12 @@ const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
                             <span className="text-sm text-gray-600">Distributable Amount:</span>
                             <span className="text-sm text-gray-600">₹{revenueCalculation.distributableAmount.toFixed(2)}</span>
                           </div>
+                          {revenueCalculation.numberOfDays > 1 && (
+                            <div className="flex justify-between mt-1">
+                              <span className="text-sm text-gray-600">Daily Charges ({revenueCalculation.numberOfDays} days):</span>
+                              <span className="text-sm text-gray-600">₹{revenueCalculation.dailyCharges.toFixed(2)}/day</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

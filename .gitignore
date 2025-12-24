@@ -70,3 +70,5 @@ docker-compose.override.yml
 # Logs
 logs/
 *.log
+Physiotherapy_Conditions_by_Category.pdf
+images list.pdf

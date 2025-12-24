@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import Navbar from '../../components/layout/Navbar';
+import { COMPANY_INFO, CSS_CLASSES } from '../../constants';
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
@@ -117,17 +119,48 @@ const Login = () => {
     }
   };
 
+  useEffect(() => {
+    document.title = 'Login - PhysioWay | Access Your Account';
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 className="text-center text-3xl font-extrabold text-gray-900">PhysioWay</h1>
-        <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
-          Sign in to your account
-        </h2>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 relative overflow-hidden">
+      <Navbar />
+      <div className="flex flex-col justify-center py-12 sm:px-6 lg:px-8 pt-20">
+      {/* Background Elements */}
+      <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary-100/20 to-transparent"></div>
+      <div className="absolute bottom-0 left-0 w-1/4 h-1/2 bg-gradient-to-t from-secondary-100/20 to-transparent"></div>
+      <div className="absolute top-20 right-20 w-20 h-20 bg-primary-200/30 rounded-full animate-float"></div>
+      <div className="absolute bottom-32 left-20 w-16 h-16 bg-secondary-200/30 rounded-full animate-pulse-slow"></div>
+      
+      <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Logo and Header */}
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-flex items-center group">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
+              <span className="text-3xl text-white">🏥</span>
+            </div>
+            <div className="text-left">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-500 bg-clip-text text-transparent">
+                {COMPANY_INFO.name}
+              </h1>
+              <p className="text-sm text-gray-600 font-medium">{COMPANY_INFO.tagline}</p>
+            </div>
+          </Link>
+        </div>
+        
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome Back
+          </h2>
+          <p className="text-gray-600">
+            Sign in to access your physiotherapy dashboard
+          </p>
+        </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+      <div className="relative mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white/80 backdrop-blur-sm py-10 px-8 shadow-2xl rounded-3xl border border-white/20">
           {error && (
             <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
               <div className="flex">
@@ -143,39 +176,48 @@ const Login = () => {
             </div>
           )}
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username / Email / Mobile
-              </label>
-              <div className="mt-1">
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  value={credentials.username}
-                  onChange={handleChange}
-                  placeholder="Enter username, email or mobile number"
-                />
+          <form className="space-y-8" onSubmit={handleSubmit}>
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="username" className="block text-sm font-semibold text-gray-800 mb-2">
+                  Username / Email / Mobile
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-400">👤</span>
+                  </div>
+                  <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    required
+                    className="block w-full pl-12 pr-4 py-4 border border-gray-200 rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white/70 backdrop-blur-sm transition-all duration-300 text-gray-900"
+                    value={credentials.username}
+                    onChange={handleChange}
+                    placeholder="Enter username, email or mobile number"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  value={credentials.password}
-                  onChange={handleChange}
-                />
+              <div>
+                <label htmlFor="password" className="block text-sm font-semibold text-gray-800 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-400">🔒</span>
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    className="block w-full pl-12 pr-4 py-4 border border-gray-200 rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white/70 backdrop-blur-sm transition-all duration-300 text-gray-900"
+                    value={credentials.password}
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                  />
+                </div>
               </div>
             </div>
 
@@ -199,42 +241,72 @@ const Login = () => {
               </div>
             </div>
 
-            <div>
+            <div className="pt-4">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                className={`${CSS_CLASSES.button.primary} w-full py-4 text-lg font-semibold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
               >
-                {loading ? 'Signing in...' : 'Sign in'}
+                {loading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Signing in...
+                  </div>
+                ) : (
+                  'Sign In'
+                )}
               </button>
             </div>
           </form>
 
-          <div className="mt-6">
+          <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
+                <div className="w-full border-t border-gray-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  Or
+                <span className="px-4 bg-white/80 text-gray-500 font-medium">
+                  New to PhysioWay?
                 </span>
               </div>
             </div>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
-                  Create a new account
+            <div className="mt-6 text-center space-y-4">
+              <Link 
+                to="/register" 
+                className="block w-full py-3 px-4 border-2 border-primary-200 rounded-2xl text-primary-600 font-semibold hover:bg-primary-50 hover:border-primary-300 transition-all duration-300 transform hover:scale-105"
+              >
+                Create New Account
+              </Link>
+              
+              <div className="flex items-center justify-center space-x-4 text-sm">
+                <Link to="/forgot-password" className="text-primary-600 hover:text-primary-700 font-medium transition-colors">
+                  Forgot Password?
                 </Link>
-              </p>
-              <p className="mt-2 text-xs text-gray-500">
-                Contact us: <a href="mailto:contact@physioway.com" className="text-primary-600">contact@physioway.com</a> | <a href="tel:+916353202177" className="text-primary-600">+91 6353202177</a>
-              </p>
+                <span className="text-gray-300">•</span>
+                <Link to="/contact" className="text-gray-600 hover:text-primary-600 transition-colors">
+                  Need Help?
+                </Link>
+              </div>
+              
+              <div className="pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-2">
+                  24/7 Support Available
+                </p>
+                <div className="flex items-center justify-center space-x-4 text-xs">
+                  <a href={`mailto:${COMPANY_INFO.email}`} className="text-primary-600 hover:text-primary-700 transition-colors">
+                    📧 {COMPANY_INFO.email}
+                  </a>
+                  <span className="text-gray-300">•</span>
+                  <a href={`tel:${COMPANY_INFO.phone}`} className="text-primary-600 hover:text-primary-700 transition-colors">
+                    📞 {COMPANY_INFO.phone}
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

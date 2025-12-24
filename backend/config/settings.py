@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'treatment_plans',  # Treatment plans app
     'areas',       # Area management app
     'notifications',  # User notifications app
+    'site_settings',  # Admin-controlled site customization
 ]
 
 # Add our custom middleware

@@ -5,6 +5,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import appointmentService from '../../services/appointmentService';
 import sessionService from '../../services/sessionService';
 import TreatmentCycleProgress from '../../components/treatmentCycles/TreatmentCycleProgress';
+import { SessionTimeTracker } from '../../components/attendance';
 
 const AppointmentDetailPage = () => {
   const { id } = useParams();
@@ -356,6 +357,13 @@ const AppointmentDetailPage = () => {
                 {appointment.is_part_of_treatment_cycle && appointment.treatment_cycle_info && (
                   <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
                     <TreatmentCycleProgress treatmentCycleInfo={appointment.treatment_cycle_info} />
+                  </div>
+                )}
+
+                {/* Session Time Tracking - For therapists to mark arrival/departure */}
+                {(user?.role === 'therapist' || user?.role === 'patient' || user?.is_admin) && (
+                  <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+                    <SessionTimeTracker appointmentId={id} />
                   </div>
                 )}
 

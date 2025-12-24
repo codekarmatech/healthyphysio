@@ -3,6 +3,7 @@ import React from 'react';
 /**
  * TreatmentCycleProgress Component
  * Displays progress information for a treatment cycle
+ * Now includes session time tracking data
  */
 const TreatmentCycleProgress = ({ treatmentCycleInfo, className = '' }) => {
   if (!treatmentCycleInfo) {
@@ -16,8 +17,10 @@ const TreatmentCycleProgress = ({ treatmentCycleInfo, className = '' }) => {
     current_day,
     total_days,
     completed_days,
+    verified_sessions,
     progress_percentage,
-    daily_treatment_title
+    daily_treatment_title,
+    session_info
   } = treatmentCycleInfo;
 
   const progressBarWidth = Math.min(progress_percentage, 100);
@@ -63,13 +66,13 @@ const TreatmentCycleProgress = ({ treatmentCycleInfo, className = '' }) => {
           <div>
             <span className="font-medium text-gray-700">Start:</span>
             <span className="ml-2 text-gray-600">
-              {new Date(start_date).toLocaleDateString()}
+              {start_date ? new Date(start_date).toLocaleDateString() : 'N/A'}
             </span>
           </div>
           <div>
             <span className="font-medium text-gray-700">End:</span>
             <span className="ml-2 text-gray-600">
-              {new Date(end_date).toLocaleDateString()}
+              {end_date ? new Date(end_date).toLocaleDateString() : 'N/A'}
             </span>
           </div>
         </div>
@@ -88,6 +91,59 @@ const TreatmentCycleProgress = ({ treatmentCycleInfo, className = '' }) => {
             <div className="text-xs text-gray-500">Remaining</div>
           </div>
         </div>
+
+        {/* Session Status for Current Appointment */}
+        {session_info && (
+          <div className="pt-3 border-t border-gray-100">
+            <h4 className="text-xs font-medium text-gray-700 mb-2">Current Session Status</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <div className={`flex items-center text-xs ${session_info.therapist_reached ? 'text-green-600' : 'text-gray-400'}`}>
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                {session_info.therapist_reached ? 'Therapist Arrived' : 'Awaiting Arrival'}
+              </div>
+              <div className={`flex items-center text-xs ${session_info.therapist_left ? 'text-green-600' : 'text-gray-400'}`}>
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                {session_info.therapist_left ? 'Session Complete' : 'In Progress'}
+              </div>
+              <div className={`flex items-center text-xs ${session_info.patient_confirmed_arrival ? 'text-green-600' : 'text-gray-400'}`}>
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {session_info.patient_confirmed_arrival ? 'Patient Confirmed' : 'Awaiting Confirmation'}
+              </div>
+              <div className={`flex items-center text-xs ${session_info.patient_confirmed_departure ? 'text-green-600' : 'text-gray-400'}`}>
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {session_info.patient_confirmed_departure ? 'Verified' : 'Pending Verification'}
+              </div>
+            </div>
+            {session_info.therapist_duration_minutes && (
+              <div className="mt-2 text-xs text-gray-600">
+                <span className="font-medium">Duration:</span> {session_info.therapist_duration_minutes} minutes
+              </div>
+            )}
+            {session_info.has_discrepancy && (
+              <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-600 flex items-center">
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Time discrepancy detected
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Verified Sessions Count */}
+        {verified_sessions > 0 && (
+          <div className="pt-2 text-xs text-gray-500">
+            <span className="text-green-600 font-medium">{verified_sessions}</span> sessions verified by patients
+          </div>
+        )}
       </div>
     </div>
   );

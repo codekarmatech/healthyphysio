@@ -1,0 +1,108 @@
+/* 
+ * Gradient Text Fix - Root Solution for Text Cutting Issues
+ * This file provides comprehensive fixes for gradient text clipping across all browsers
+ */
+
+/* Base gradient text utility with proper spacing */
+.gradient-text-safe {
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  
+  /* Prevent text cutting */
+  padding-bottom: 0.1em !important;
+  line-height: 1.1 !important;
+  display: inline-block !important;
+  
+  /* Ensure proper rendering */
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  
+  /* Fix for Safari and older browsers */
+  -webkit-transform: translateZ(0) !important;
+  transform: translateZ(0) !important;
+}
+
+/* Block-level gradient text for larger headings */
+.gradient-text-block {
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  
+  /* Enhanced spacing for block elements */
+  padding-bottom: 0.15em !important;
+  line-height: 1.15 !important;
+  display: block !important;
+  
+  /* Ensure proper rendering */
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  
+  /* Fix for Safari and older browsers */
+  -webkit-transform: translateZ(0) !important;
+  transform: translateZ(0) !important;
+  
+  /* Prevent overflow issues and artifacts */
+  overflow: visible !important;
+  position: relative !important;
+  
+  /* Fix blue line artifact */
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+  
+  /* Ensure clean rendering */
+  isolation: isolate !important;
+}
+
+/* Fallback for browsers that don't support background-clip: text */
+@supports not (background-clip: text) {
+  .gradient-text-safe,
+  .gradient-text-block {
+    background: linear-gradient(45deg, #3b82f6, #14b8a6) !important;
+    -webkit-text-fill-color: initial !important;
+    color: #3b82f6 !important;
+  }
+}
+
+/* Fix for Firefox - using media query instead of @-moz-document */
+@media screen and (-moz-images-in-menus: 0) {
+  .gradient-text-safe,
+  .gradient-text-block {
+    background: linear-gradient(45deg, #3b82f6, #14b8a6) !important;
+    -webkit-text-fill-color: initial !important;
+    color: #3b82f6 !important;
+  }
+}
+
+/* Ensure proper spacing in containers */
+.gradient-text-container {
+  overflow: visible !important;
+  padding: 0.2em 0 !important;
+}
+
+/* Additional utility for headings with gradient text */
+.heading-with-gradient {
+  overflow: visible !important;
+  padding-bottom: 0.2em !important;
+}
+
+/* Fix for mobile devices */
+@media (max-width: 768px) {
+  .gradient-text-safe,
+  .gradient-text-block {
+    padding-bottom: 0.2em !important;
+    line-height: 1.2 !important;
+  }
+}
+
+/* High DPI display fixes */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .gradient-text-safe,
+  .gradient-text-block {
+    -webkit-font-smoothing: subpixel-antialiased !important;
+  }
+}

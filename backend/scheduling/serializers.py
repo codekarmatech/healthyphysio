@@ -34,7 +34,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'patient_details', 'therapist_details', 'payment_status', 'attendance_status',
             'fee', 'start_time', 'end_time', 'date', 'therapist_name', 'doctor_name',
             # Treatment cycle fields
-            'treatment_plan', 'daily_treatment', 'treatment_cycle_info', 'is_part_of_treatment_cycle'
+            'treatment_plan', 'daily_treatment', 'treatment_cycle_info', 'is_part_of_treatment_cycle',
+            # Actual treatment dates and master/child relationship
+            'treatment_start_date', 'treatment_end_date', 'treatment_day_number',
+            'is_master_appointment', 'master_appointment'
         ]
         read_only_fields = ['id', 'session_code', 'created_at', 'updated_at']
 
@@ -125,15 +128,21 @@ class AppointmentSerializer(serializers.ModelSerializer):
 class RescheduleRequestSerializer(serializers.ModelSerializer):
     appointment_details = AppointmentSerializer(source='appointment', read_only=True)
     requested_by_details = serializers.SerializerMethodField()
+    approved_by_details = serializers.SerializerMethodField()
+    request_source_display = serializers.SerializerMethodField()
 
     class Meta:
         model = RescheduleRequest
         fields = [
             'id', 'appointment', 'requested_by', 'requested_datetime',
             'reason', 'status', 'admin_notes', 'created_at', 'updated_at',
-            'appointment_details', 'requested_by_details'
+            'appointment_details', 'requested_by_details',
+            # New fields for patient request workflow
+            'request_source', 'request_source_display', 'patient_note',
+            'admin_note_to_therapist', 'forwarded_to_therapist', 'forwarded_at',
+            'approved_by', 'approved_by_details', 'approved_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'forwarded_at', 'approved_at']
 
     def get_requested_by_details(self, obj):
         if obj.requested_by:
@@ -145,6 +154,20 @@ class RescheduleRequestSerializer(serializers.ModelSerializer):
                 'role': obj.requested_by.role
             }
         return None
+
+    def get_approved_by_details(self, obj):
+        if obj.approved_by:
+            return {
+                'id': obj.approved_by.id,
+                'first_name': obj.approved_by.first_name,
+                'last_name': obj.approved_by.last_name,
+                'email': obj.approved_by.email,
+                'role': obj.approved_by.role
+            }
+        return None
+
+    def get_request_source_display(self, obj):
+        return obj.get_request_source_display() if obj.request_source else None
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)

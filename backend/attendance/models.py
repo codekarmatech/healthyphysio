@@ -27,6 +27,7 @@ class Holiday(models.Model):
 
 class Attendance(models.Model):
     STATUS_CHOICES = (
+        ('expected', 'Expected'),  # Auto-created when appointment is scheduled
         ('present', 'Present'),
         ('absent', 'Absent'),
         ('half_day', 'Half Day'),
@@ -336,3 +337,231 @@ class Leave(models.Model):
             date__range=(self.start_date, self.end_date),
             notes__contains=f"leave application #{self.id}"
         ).delete()
+
+
+class SessionTimeLog(models.Model):
+    """
+    Track session times from both therapist and patient perspectives.
+    Used to verify attendance and detect discrepancies between reported times.
+    All times are stored in IST (Asia/Kolkata timezone).
+    """
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('therapist_reached', 'Therapist Reached'),
+        ('in_progress', 'In Progress'),
+        ('therapist_left', 'Therapist Left'),
+        ('patient_confirmed', 'Patient Confirmed'),
+        ('verified', 'Verified'),
+        ('disputed', 'Disputed'),
+    )
+
+    appointment = models.ForeignKey(
+        'scheduling.Appointment',
+        on_delete=models.CASCADE,
+        related_name='session_time_logs'
+    )
+    therapist = models.ForeignKey(
+        'users.Therapist',
+        on_delete=models.CASCADE,
+        related_name='session_time_logs'
+    )
+    patient = models.ForeignKey(
+        'users.Patient',
+        on_delete=models.CASCADE,
+        related_name='session_time_logs'
+    )
+    date = models.DateField()
+
+    # Therapist timestamps (IST)
+    therapist_reached_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Time when therapist clicked 'Reached Patient House' button"
+    )
+    therapist_leaving_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Time when therapist clicked 'Leaving Patient House' button"
+    )
+
+    # Patient confirmation timestamps (IST)
+    patient_confirmed_arrival = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Time when patient confirmed therapist arrival"
+    )
+    patient_confirmed_departure = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Time when patient confirmed therapist departure"
+    )
+
+    # Calculated durations (in minutes)
+    therapist_duration_minutes = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Duration calculated from therapist timestamps"
+    )
+    patient_confirmed_duration_minutes = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Duration calculated from patient confirmation timestamps"
+    )
+
+    # Discrepancy tracking
+    has_discrepancy = models.BooleanField(
+        default=False,
+        help_text="True if therapist and patient times differ significantly"
+    )
+    discrepancy_minutes = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Difference in minutes between therapist and patient reported durations"
+    )
+    discrepancy_notes = models.TextField(
+        blank=True,
+        help_text="Admin notes about the discrepancy"
+    )
+    discrepancy_resolved = models.BooleanField(
+        default=False,
+        help_text="True if admin has reviewed and resolved the discrepancy"
+    )
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='resolved_session_discrepancies'
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    # Status
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('appointment', 'date')
+        ordering = ['-date', '-created_at']
+
+    def __str__(self):
+        return f"Session {self.appointment.session_code} - {self.date} - {self.status}"
+
+    def therapist_reached(self):
+        """Record therapist arrival at patient's house"""
+        now = timezone.now().astimezone(INDIAN_TZ)
+        self.therapist_reached_time = now
+        self.status = 'therapist_reached'
+        self.save()
+        return True
+
+    def therapist_leaving(self):
+        """Record therapist departure from patient's house"""
+        if not self.therapist_reached_time:
+            return False
+
+        now = timezone.now().astimezone(INDIAN_TZ)
+        self.therapist_leaving_time = now
+
+        # Calculate duration
+        duration = now - self.therapist_reached_time
+        self.therapist_duration_minutes = int(duration.total_seconds() / 60)
+
+        self.status = 'therapist_left'
+        self.save()
+
+        # Check for discrepancy if patient has already confirmed
+        self._check_discrepancy()
+        return True
+
+    def patient_confirm_arrival(self):
+        """Patient confirms therapist has arrived"""
+        now = timezone.now().astimezone(INDIAN_TZ)
+        self.patient_confirmed_arrival = now
+
+        if self.status == 'pending':
+            self.status = 'in_progress'
+        self.save()
+        return True
+
+    def patient_confirm_departure(self):
+        """Patient confirms therapist has left"""
+        if not self.patient_confirmed_arrival:
+            return False
+
+        now = timezone.now().astimezone(INDIAN_TZ)
+        self.patient_confirmed_departure = now
+
+        # Calculate duration
+        duration = now - self.patient_confirmed_arrival
+        self.patient_confirmed_duration_minutes = int(duration.total_seconds() / 60)
+
+        self.status = 'patient_confirmed'
+        self.save()
+
+        # Check for discrepancy
+        self._check_discrepancy()
+        return True
+
+    def _check_discrepancy(self):
+        """Check if there's a significant discrepancy between therapist and patient times"""
+        if self.therapist_duration_minutes and self.patient_confirmed_duration_minutes:
+            difference = abs(self.therapist_duration_minutes - self.patient_confirmed_duration_minutes)
+
+            # Flag if difference is more than 10 minutes
+            if difference > 10:
+                self.has_discrepancy = True
+                self.discrepancy_minutes = difference
+            else:
+                self.has_discrepancy = False
+                self.status = 'verified'
+
+            self.save()
+
+    def resolve_discrepancy(self, admin_user, notes=''):
+        """Admin resolves a discrepancy"""
+        self.discrepancy_resolved = True
+        self.resolved_by = admin_user
+        self.resolved_at = timezone.now()
+        self.discrepancy_notes = notes
+        self.status = 'verified'
+        self.save()
+        return True
+
+    @property
+    def is_complete(self):
+        """Check if both therapist and patient have recorded times"""
+        return (
+            self.therapist_reached_time and
+            self.therapist_leaving_time and
+            self.patient_confirmed_arrival and
+            self.patient_confirmed_departure
+        )
+
+    @property
+    def therapist_duration_display(self):
+        """Display therapist duration in human-readable format"""
+        if not self.therapist_duration_minutes:
+            return None
+        hours = self.therapist_duration_minutes // 60
+        minutes = self.therapist_duration_minutes % 60
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
+
+    @property
+    def patient_duration_display(self):
+        """Display patient confirmed duration in human-readable format"""
+        if not self.patient_confirmed_duration_minutes:
+            return None
+        hours = self.patient_confirmed_duration_minutes // 60
+        minutes = self.patient_confirmed_duration_minutes % 60
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
