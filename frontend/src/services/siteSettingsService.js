@@ -106,7 +106,7 @@ const DEFAULT_SETTINGS = {
 // Cache for settings
 let settingsCache = null;
 let cacheTimestamp = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 30 * 1000; // 30 seconds (for easy admin changes)
 
 /**
  * Check if cache is valid
@@ -275,39 +275,39 @@ export const getPageContent = async (pageName) => {
  */
 export const applyThemeColors = (theme) => {
   if (!theme) return;
-  
+
   const root = document.documentElement;
-  
+
   // Primary colors
   root.style.setProperty('--color-primary', theme.primary_color);
   root.style.setProperty('--color-primary-light', theme.primary_light);
   root.style.setProperty('--color-primary-dark', theme.primary_dark);
-  
+
   // Secondary colors
   root.style.setProperty('--color-secondary', theme.secondary_color);
   root.style.setProperty('--color-secondary-light', theme.secondary_light);
   root.style.setProperty('--color-secondary-dark', theme.secondary_dark);
-  
+
   // Text colors
   root.style.setProperty('--color-text-primary', theme.text_primary);
   root.style.setProperty('--color-text-secondary', theme.text_secondary);
   root.style.setProperty('--color-text-muted', theme.text_muted);
-  
+
   // Background colors
   root.style.setProperty('--color-bg-primary', theme.bg_primary);
   root.style.setProperty('--color-bg-secondary', theme.bg_secondary);
   root.style.setProperty('--color-bg-dark', theme.bg_dark);
-  
+
   // Status colors
   root.style.setProperty('--color-success', theme.success_color);
   root.style.setProperty('--color-warning', theme.warning_color);
   root.style.setProperty('--color-error', theme.error_color);
   root.style.setProperty('--color-info', theme.info_color);
-  
+
   // Typography
   root.style.setProperty('--font-heading', theme.font_family_heading);
   root.style.setProperty('--font-body', theme.font_family_body);
-  
+
   // Borders
   root.style.setProperty('--border-radius', theme.border_radius);
   root.style.setProperty('--border-color', theme.border_color);

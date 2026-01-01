@@ -270,6 +270,29 @@ class HeroSection(SingletonModel):
         return 'Hero Section'
 
 
+class HeroImage(models.Model):
+    """
+    Multiple hero images for carousel/slider on landing page
+    """
+    image = models.ImageField(
+        upload_to='hero/',
+        help_text='Hero image for landing page carousel (recommended: 1200x900px)'
+    )
+    alt_text = models.CharField(max_length=200, default='Physiotherapy Treatment')
+    caption = models.CharField(max_length=200, blank=True, help_text='Optional caption overlay')
+    order = models.PositiveIntegerField(default=0, help_text='Display order (lower = first)')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['order', '-created_at']
+        verbose_name = 'Hero Image'
+        verbose_name_plural = 'Hero Images (Carousel)'
+    
+    def __str__(self):
+        return f'Hero Image {self.order}: {self.alt_text[:30]}'
+
+
 class SectionSettings(models.Model):
     """
     Settings for individual page sections (stats, services, testimonials, etc.)
@@ -518,14 +541,17 @@ class ProcessStep(models.Model):
 
 class Service(models.Model):
     """
-    Services offered - displayed on landing page
+    Services offered - displayed on landing page and service detail pages
     """
+    slug = models.SlugField(max_length=100, unique=True, help_text='URL-friendly identifier (auto-generated from title)')
     icon = models.CharField(max_length=10, help_text='Emoji icon')
     title = models.CharField(max_length=100)
     description = models.TextField()
+    long_description = models.TextField(blank=True, help_text='Detailed description for service detail page')
     features = models.TextField(help_text='Comma-separated list of features')
+    conditions = models.TextField(blank=True, help_text='Comma-separated list of conditions treated')
     image = models.ImageField(upload_to='services/', blank=True, null=True)
-    link = models.CharField(max_length=200, default='/services', help_text='Link to service detail page')
+    hero_image = models.ImageField(upload_to='services/hero/', blank=True, null=True, help_text='Hero image for service detail page')
     order = models.PositiveIntegerField(default=0)
     is_featured = models.BooleanField(default=True, help_text='Show on landing page')
     is_active = models.BooleanField(default=True)
@@ -538,9 +564,19 @@ class Service(models.Model):
     def __str__(self):
         return self.title
     
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.title)
+        super().save(*args, **kwargs)
+    
     def get_features_list(self):
         """Return features as a list"""
         return [f.strip() for f in self.features.split(',') if f.strip()]
+    
+    def get_conditions_list(self):
+        """Return conditions as a list"""
+        return [c.strip() for c in self.conditions.split(',') if c.strip()]
 
 
 class WhyChooseUs(models.Model):

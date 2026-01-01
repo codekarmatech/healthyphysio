@@ -38,7 +38,7 @@ const FloatingActions = () => {
                 </svg>
             ),
             color: 'bg-brand-orange',
-            href: 'tel:+919876543210', // Replace with dynamic phone if possible
+            href: 'tel:+916353202177', // Replace with dynamic phone if possible
             isExternal: true
         },
         {
@@ -49,7 +49,7 @@ const FloatingActions = () => {
                 </svg>
             ),
             color: 'bg-[#25D366]',
-            href: 'https://wa.me/919876543210', // Replace with dynamic
+            href: 'https://wa.me/916353202177', // Replace with dynamic
             isExternal: true
         }
     ];

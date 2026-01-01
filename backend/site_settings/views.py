@@ -8,7 +8,7 @@ from rest_framework.permissions import AllowAny
 from django.core.cache import cache
 
 from .models import (
-    ThemeSettings, BrandingSettings, HeroSection, SectionSettings,
+    ThemeSettings, BrandingSettings, HeroSection, HeroImage, SectionSettings,
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
@@ -16,7 +16,7 @@ from .models import (
 )
 from .serializers import (
     ThemeSettingsSerializer, BrandingSettingsSerializer, HeroSectionSerializer,
-    SectionSettingsSerializer, TestimonialSerializer, StatisticSerializer,
+    HeroImageSerializer, SectionSettingsSerializer, TestimonialSerializer, StatisticSerializer,
     TrustedPartnerSerializer, FooterSettingsSerializer, NavbarSettingsSerializer,
     SEOSettingsSerializer, PageContentSerializer, ProcessStepSerializer,
     ServiceSerializer, WhyChooseUsSerializer, CTASectionSerializer,
@@ -55,6 +55,10 @@ class SiteSettingsViewSet(viewsets.ViewSet):
             ).data,
             'hero': HeroSectionSerializer(
                 HeroSection.load(), context=context
+            ).data,
+            'hero_images': HeroImageSerializer(
+                HeroImage.objects.filter(is_active=True).order_by('order'),
+                many=True, context=context
             ).data,
             'sections': SectionSettingsSerializer(
                 SectionSettings.objects.filter(is_visible=True).order_by('order'),
@@ -188,3 +192,21 @@ class SiteSettingsViewSet(viewsets.ViewSet):
         return Response(PageContentSerializer(
             content, many=True, context={'request': request}
         ).data)
+
+
+class ServiceViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Public API for services - provides list and detail endpoints
+    GET /api/services/ - List all active services
+    GET /api/services/{slug}/ - Get single service by slug
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    serializer_class = ServiceSerializer
+    lookup_field = 'slug'
+    
+    def get_queryset(self):
+        return Service.objects.filter(is_active=True).order_by('order')
+    
+    def get_serializer_context(self):
+        return {'request': self.request}

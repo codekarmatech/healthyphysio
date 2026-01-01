@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import FloatingActions from '../components/layout/FloatingActions';
 import SignupModal from '../components/ui/SignupModal';
-import { COMPANY_INFO, STATS, SERVICES, WHY_CHOOSE_US } from '../constants';
+import { SERVICES, WHY_CHOOSE_US } from '../constants';
 import { getAllSettings, applyThemeColors, DEFAULT_SETTINGS } from '../services/siteSettingsService';
 
 /* --- Components --- */
@@ -89,6 +89,7 @@ const ProcessStep = ({ step, index }) => (
 const Landing = () => {
   const [siteSettings, setSiteSettings] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 500], [0, 100]);
   const y2 = useTransform(scrollY, [0, 500], [0, -100]);
@@ -111,6 +112,19 @@ const Landing = () => {
     fetchSettings();
   }, []);
 
+  // Extract heroImages early for carousel effect (must be before any returns)
+  const heroImages = siteSettings?.hero_images || [];
+
+  // Hero image carousel - auto-rotate every 5 seconds (must be called before any returns)
+  useEffect(() => {
+    if (heroImages.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
+      }, 5000); // 5 seconds
+      return () => clearInterval(interval);
+    }
+  }, [heroImages.length]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-pastel-gray">
@@ -128,7 +142,9 @@ const Landing = () => {
   const servicesList = siteSettings?.services?.length > 0 ? siteSettings.services : SERVICES.main;
   const whyChooseUsList = siteSettings?.why_choose_us?.length > 0 ? siteSettings.why_choose_us : WHY_CHOOSE_US;
   const testimonialsList = siteSettings?.testimonials?.length > 0 ? siteSettings.testimonials : DEFAULT_SETTINGS.testimonials;
-  const footer = siteSettings?.footer || DEFAULT_SETTINGS.footer;
+  const statisticsList = siteSettings?.statistics?.length > 0 ? siteSettings.statistics : DEFAULT_SETTINGS.statistics;
+  const partnersList = siteSettings?.partners || [];
+  const ctaData = siteSettings?.cta || {};
 
   const defaultProcessSteps = [
     { title: 'Book Online', description: 'Schedule instantly', icon: '📅' },
@@ -138,6 +154,11 @@ const Landing = () => {
     { title: 'Recovery', description: 'Get back to life', icon: '🌟' },
   ];
   const processSteps = siteSettings?.process_steps?.length > 0 ? siteSettings.process_steps : defaultProcessSteps;
+
+  // Get current hero image (carousel or fallback)
+  const primaryHeroImage = heroImages.length > 0
+    ? heroImages[currentImageIndex]?.image_url || heroImages[0]?.image_url
+    : (hero.hero_image_url || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80");
 
   return (
     <div className="min-h-screen bg-pastel-gray font-sans selection:bg-brand-orange/20 selection:text-brand-dark overflow-x-hidden">
@@ -205,17 +226,35 @@ const Landing = () => {
               className="relative mx-auto w-full max-w-lg lg:max-w-none"
             >
               <div className="relative z-10 rounded-[3rem] overflow-hidden shadow-2xl shadow-brand-blue/20 border-8 border-white/50 bg-white aspect-[4/5] lg:aspect-[3/4]">
-                <img
-                  src={hero.hero_image_url || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80"}
-                  alt="Physiotherapy"
-                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700"
+                <motion.img
+                  key={currentImageIndex}
+                  src={primaryHeroImage}
+                  alt={heroImages[currentImageIndex]?.alt_text || hero.hero_image_alt || "Physiotherapy"}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.8 }}
+                  className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/80 via-transparent to-transparent"></div>
+
+                {/* Carousel Indicators */}
+                {heroImages.length > 1 && (
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                    {heroImages.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentImageIndex(i)}
+                        className={`w-2 h-2 rounded-full transition-all ${i === currentImageIndex ? 'bg-white w-6' : 'bg-white/50'}`}
+                      />
+                    ))}
+                  </div>
+                )}
                 <div className="absolute bottom-8 left-8 right-8 text-white">
                   <div className="flex items-end gap-4">
                     <div className="flex-1">
-                      <p className="text-5xl font-bold font-heading">5000+</p>
-                      <p className="text-pastel-blue text-lg font-medium">Happy Patients</p>
+                      <p className="text-5xl font-bold font-heading">{statisticsList[0]?.value || '5000+'}</p>
+                      <p className="text-pastel-blue text-lg font-medium">{statisticsList[0]?.label || 'Happy Patients'}</p>
                     </div>
                     <div className="hidden sm:flex -space-x-4">
                       {[
@@ -380,20 +419,42 @@ const Landing = () => {
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-orange/20 rounded-full blur-3xl"></div>
 
             <div className="relative z-10">
-              <h2 className="font-heading text-4xl lg:text-5xl font-bold mb-6">Ready to start your recovery?</h2>
-              <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">Join thousands of satisfied patients who have reclaimed their active lives with PhysioWay.</p>
+              <h2 className="font-heading text-4xl lg:text-5xl font-bold mb-6">{ctaData.headline || 'Ready to start your recovery?'}</h2>
+              <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">{ctaData.subheadline || 'Join thousands of satisfied patients who have reclaimed their active lives with PhysioWay.'}</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/book-consultation" className="px-8 py-4 bg-white text-brand-blue font-bold rounded-2xl shadow-lg hover:bg-slate-50 transition-colors">
-                  Book Free Consultation
+                <Link to={ctaData.primary_button_link || "/book-consultation"} className="px-8 py-4 bg-white text-brand-blue font-bold rounded-2xl shadow-lg hover:bg-slate-50 transition-colors">
+                  {ctaData.primary_button_text || 'Book Free Consultation'}
                 </Link>
-                <a href={`tel:${branding.phone}`} className="px-8 py-4 bg-brand-orange text-white font-bold rounded-2xl shadow-lg hover:bg-brand-orange/90 transition-colors">
-                  Call Us Now
-                </a>
+                {(ctaData.show_phone_button !== false) && (
+                  <a href={`tel:${branding.phone}`} className="px-8 py-4 bg-brand-orange text-white font-bold rounded-2xl shadow-lg hover:bg-brand-orange/90 transition-colors">
+                    Call Us Now
+                  </a>
+                )}
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* --- TRUSTED PARTNERS SECTION --- */}
+      {partnersList.length > 0 && (
+        <section className="py-12 bg-white/60">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p className="text-center text-slate-500 text-sm font-medium mb-8 uppercase tracking-wider">Trusted By Leading Healthcare Providers</p>
+            <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-16">
+              {partnersList.map((partner, i) => (
+                <div key={i} className="grayscale hover:grayscale-0 transition-all opacity-60 hover:opacity-100">
+                  {partner.logo_url ? (
+                    <img src={partner.logo_url} alt={partner.name} className="h-10 object-contain" />
+                  ) : (
+                    <span className="text-slate-600 font-semibold text-lg">{partner.name}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* --- FAQ SECTION --- */}
       <section className="section-padding relative bg-white/40">

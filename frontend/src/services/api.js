@@ -5,8 +5,36 @@ import axios from 'axios';
  * This is the single source of truth for API communication
  */
 
+/**
+ * Get the API base URL dynamically based on environment
+ * - In production: Uses REACT_APP_API_URL environment variable
+ * - In development: Uses the current hostname to support mobile testing
+ * - Fallback: Uses localhost for pure local development
+ */
+const getApiBaseUrl = () => {
+  // First priority: Environment variable (for production deployments)
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Second priority: Dynamic hostname for development (supports mobile testing)
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+    // If accessing from localhost or 127.0.0.1, use localhost
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000/api';
+    }
+    // If accessing from any other hostname (e.g., local IP for mobile testing)
+    // Use the same hostname with backend port
+    return `http://${hostname}:8000/api`;
+  }
+  
+  // Fallback for SSR or non-browser environments
+  return 'http://localhost:8000/api';
+};
+
 // API configuration
-export const API_BASE_URL = 'http://localhost:8000/api';
+export const API_BASE_URL = getApiBaseUrl();
 
 // Create axios instance with consistent configuration
 const api = axios.create({

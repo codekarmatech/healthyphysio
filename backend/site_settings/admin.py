@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
-    ThemeSettings, BrandingSettings, HeroSection, SectionSettings,
+    ThemeSettings, BrandingSettings, HeroSection, HeroImage, SectionSettings,
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
@@ -64,8 +64,9 @@ class ThemeSettingsAdmin(SingletonModelAdmin):
 @admin.register(BrandingSettings)
 class BrandingSettingsAdmin(SingletonModelAdmin):
     fieldsets = (
-        ('Logo & Favicon', {
+        ('Logo & Favicon (Navbar)', {
             'fields': ('logo', 'logo_dark', 'favicon'),
+            'description': '⚠️ NAVBAR LOGO: Upload your company logo here. This will appear in the website navbar/header. Recommended: PNG or SVG with transparency, 200x60px. Do NOT upload hero/banner images here.'
         }),
         ('Company Information', {
             'fields': ('company_name', 'tagline', 'description'),
@@ -113,6 +114,20 @@ class HeroSectionAdmin(SingletonModelAdmin):
             ),
         }),
     )
+
+
+@admin.register(HeroImage)
+class HeroImageAdmin(admin.ModelAdmin):
+    list_display = ('image_preview', 'alt_text', 'caption', 'order', 'is_active')
+    list_editable = ('order', 'is_active')
+    list_filter = ('is_active',)
+    ordering = ('order',)
+    
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;"/>', obj.image.url)
+        return '-'
+    image_preview.short_description = 'Preview'
 
 
 @admin.register(SectionSettings)

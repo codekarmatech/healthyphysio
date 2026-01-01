@@ -376,7 +376,7 @@ class VisitsService extends BaseService {
           first_name: 'Test',
           last_name: 'Therapist',
           full_name: 'Test Therapist',
-          phone: '+919876543210',
+          phone: '+916353202177',
           role: 'therapist'
         },
         specialization: 'Physiotherapy',

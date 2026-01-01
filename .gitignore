@@ -51,6 +51,7 @@ build/
 *.swp
 *.swo
 .DS_Store
+.trae/
 
 # Encryption keys
 /backend/keys/

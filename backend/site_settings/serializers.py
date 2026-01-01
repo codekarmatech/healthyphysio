@@ -3,7 +3,7 @@ Site Settings Serializers - API serialization for frontend consumption
 """
 from rest_framework import serializers
 from .models import (
-    ThemeSettings, BrandingSettings, HeroSection, SectionSettings,
+    ThemeSettings, BrandingSettings, HeroSection, HeroImage, SectionSettings,
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
@@ -102,6 +102,22 @@ class SectionSettingsSerializer(serializers.ModelSerializer):
         exclude = ['id', 'updated_at']
 
 
+class HeroImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = HeroImage
+        fields = ['id', 'image_url', 'alt_text', 'caption', 'order']
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
+
 class TestimonialSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     
@@ -198,11 +214,13 @@ class ProcessStepSerializer(serializers.ModelSerializer):
 
 class ServiceSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
+    hero_image_url = serializers.SerializerMethodField()
     features = serializers.SerializerMethodField()
+    conditions = serializers.SerializerMethodField()
     
     class Meta:
         model = Service
-        fields = ['id', 'icon', 'title', 'description', 'features', 'image_url', 'link', 'order']
+        fields = ['id', 'slug', 'icon', 'title', 'description', 'long_description', 'features', 'conditions', 'image_url', 'hero_image_url', 'order']
     
     def get_image_url(self, obj):
         if obj.image:
@@ -212,8 +230,19 @@ class ServiceSerializer(serializers.ModelSerializer):
             return obj.image.url
         return None
     
+    def get_hero_image_url(self, obj):
+        if obj.hero_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.hero_image.url)
+            return obj.hero_image.url
+        return None
+    
     def get_features(self, obj):
         return obj.get_features_list()
+    
+    def get_conditions(self, obj):
+        return obj.get_conditions_list()
 
 
 class WhyChooseUsSerializer(serializers.ModelSerializer):

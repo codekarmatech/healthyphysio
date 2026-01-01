@@ -1,8 +1,5 @@
-import api from './api';
+import api, { API_BASE_URL } from './api';
 import axios from 'axios';
-
-// Fallback API for direct calls when needed
-const API_BASE_URL = 'http://localhost:8000/api';
 
 const equipmentService = {
   // Equipment Categories

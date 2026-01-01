@@ -29,6 +29,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
 from users.views import CustomTokenObtainPairView
+from site_settings.urls import services_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -56,6 +57,8 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     # Site Settings - Public API for frontend customization
     path('api/site-settings/', include('site_settings.urls')),
+    # Services - Public API for services list and detail
+    path('api/services/', include(services_urlpatterns)),
 ]
 
 # Serve media files in development

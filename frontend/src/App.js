@@ -106,13 +106,8 @@ import Landing from './pages/Landing';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 
-// Service Pages
-import OrthopedicPhysiotherapy from './pages/services/OrthopedicPhysiotherapy';
-import NeurologicalPhysiotherapy from './pages/services/NeurologicalPhysiotherapy';
-import CardiopulmonaryPhysiotherapy from './pages/services/CardiopulmonaryPhysiotherapy';
-import PediatricPhysiotherapy from './pages/services/PediatricPhysiotherapy';
-import GeriatricPhysiotherapy from './pages/services/GeriatricPhysiotherapy';
-import WomensHealthPhysiotherapy from './pages/services/WomensHealthPhysiotherapy';
+// Service Pages - Dynamic template for all services
+import ServiceTemplate from './pages/services/ServiceTemplate';
 
 // Static Pages
 import AboutUs from './pages/AboutUs';
@@ -167,13 +162,8 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           
-          {/* Service Pages */}
-          <Route path="/services/orthopedic" element={<OrthopedicPhysiotherapy />} />
-          <Route path="/services/neurological" element={<NeurologicalPhysiotherapy />} />
-          <Route path="/services/cardiopulmonary" element={<CardiopulmonaryPhysiotherapy />} />
-          <Route path="/services/pediatric" element={<PediatricPhysiotherapy />} />
-          <Route path="/services/geriatric" element={<GeriatricPhysiotherapy />} />
-          <Route path="/services/womens-health" element={<WomensHealthPhysiotherapy />} />
+          {/* Service Pages - Dynamic route for all services */}
+          <Route path="/services/:serviceId" element={<ServiceTemplate />} />
           
           {/* Static Pages */}
           <Route path="/about" element={<AboutUs />} />

@@ -4,19 +4,25 @@ import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import PageHeader from '../components/common/PageHeader';
 import { getAllSettings } from '../services/siteSettingsService';
+import { getAllServices } from '../services/servicesService';
 import { SERVICES, COMPANY_INFO } from '../constants';
 
 const Services = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [settings, setSettings] = useState(null);
+  const [services, setServices] = useState([]);
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      const data = await getAllSettings();
-      setSettings(data);
-      document.title = `Our Services - ${data?.branding?.company_name || 'PhysioWay'}`;
+    const fetchData = async () => {
+      const [settingsData, servicesData] = await Promise.all([
+        getAllSettings(),
+        getAllServices()
+      ]);
+      setSettings(settingsData);
+      setServices(servicesData.length > 0 ? servicesData : SERVICES.main);
+      document.title = `Our Services - ${settingsData?.branding?.company_name || 'PhysioWay'}`;
     };
-    fetchSettings();
+    fetchData();
   }, []);
 
   const branding = settings?.branding || COMPANY_INFO;
@@ -29,12 +35,13 @@ const Services = () => {
   ];
 
   const filteredServices = selectedCategory === 'all'
-    ? SERVICES.main
-    : SERVICES.main.filter(service => {
+    ? services
+    : services.filter(service => {
+      const serviceSlug = service.slug || service.id;
       if (selectedCategory === 'specialized') {
-        return ['pediatric', 'geriatric', 'womens-health'].includes(service.id);
+        return ['pediatric', 'geriatric', 'womens-health'].includes(serviceSlug);
       }
-      return service.id === selectedCategory;
+      return serviceSlug === selectedCategory;
     });
 
   return (
@@ -74,7 +81,7 @@ const Services = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredServices.map((service, index) => (
-              <div key={service.id} className="glass-card group p-8 rounded-3xl hover:-translate-y-2 transition-transform duration-300 border border-white/50 animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
+              <div key={service.slug || service.id} className="glass-card group p-8 rounded-3xl hover:-translate-y-2 transition-transform duration-300 border border-white/50 animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
                 <div className="text-center mb-6">
                   <div className="w-20 h-20 mx-auto mb-4 bg-brand-light/50 rounded-2xl flex items-center justify-center text-4xl group-hover:scale-110 transition-transform duration-300 shadow-inner">
                     {service.icon}
@@ -85,7 +92,7 @@ const Services = () => {
 
                 <div className="space-y-3 mb-6 bg-slate-50/50 rounded-xl p-4 border border-slate-100/50">
                   <h4 className="font-semibold text-brand-dark text-sm uppercase tracking-wide mb-2 border-b border-slate-100 pb-2">Key Features</h4>
-                  {service.features.slice(0, 3).map((feature, idx) => (
+                  {(service.features || []).slice(0, 3).map((feature, idx) => (
                     <div key={idx} className="flex items-center text-sm text-slate-600">
                       <span className="text-brand-blue mr-2 font-bold">✓</span>
                       {feature}
@@ -95,7 +102,7 @@ const Services = () => {
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-4 border-t border-slate-100">
                   <Link
-                    to={`/services/${service.id}`}
+                    to={`/services/${service.slug || service.id}`}
                     className="flex-1 px-4 py-2 border border-brand-blue text-brand-blue font-bold rounded-xl hover:bg-brand-blue hover:text-white transition-all text-center text-sm uppercase tracking-wider"
                   >
                     Details
