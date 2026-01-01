@@ -26,6 +26,7 @@ const Services = () => {
   }, []);
 
   const branding = settings?.branding || COMPANY_INFO;
+  const pageSettings = settings?.page_settings?.services || {};
   const categories = [
     { id: 'all', name: 'All Services', icon: '🏥' },
     { id: 'orthopedic', name: 'Orthopedic', icon: '🦴' },
@@ -49,9 +50,9 @@ const Services = () => {
       <Navbar />
 
       <PageHeader
-        title="Our Services"
-        subtitle="Comprehensive physiotherapy treatments delivered by certified professionals in the comfort of your home."
-        bgImage="https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"
+        title={pageSettings.hero_title || "Our Services"}
+        subtitle={pageSettings.hero_subtitle || "Comprehensive physiotherapy treatments delivered by certified professionals in the comfort of your home."}
+        bgImage={pageSettings.hero_background_image_url || "https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"}
       />
 
       {/* Service Categories Filter */}
@@ -210,7 +211,7 @@ const Services = () => {
         </div>
       </section>
 
-      <Footer branding={branding} />
+      <Footer branding={branding} services={services} />
     </div>
   );
 };

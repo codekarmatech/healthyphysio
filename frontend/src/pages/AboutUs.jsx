@@ -19,6 +19,11 @@ const AboutUs = () => {
   }, []);
 
   const branding = settings?.branding || COMPANY_INFO;
+  const founders = settings?.founders || [];
+  const services = settings?.services || [];
+  const pageSettings = settings?.page_settings?.about || {};
+  const physioFounder = founders.find(f => f.founder_type === 'physio');
+  const techFounder = founders.find(f => f.founder_type === 'tech');
 
   const values = [
     { title: 'Excellence', description: 'We strive for the highest standards in everything we do.', icon: '⭐' },
@@ -32,9 +37,9 @@ const AboutUs = () => {
       <Navbar />
 
       <PageHeader
-        title={`About ${branding.company_name || 'PhysioWay'}`}
-        subtitle="Revolutionizing physiotherapy by bringing world-class treatment directly to your home."
-        bgImage="https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"
+        title={pageSettings.hero_title || `About ${branding.company_name || 'PhysioWay'}`}
+        subtitle={pageSettings.hero_subtitle || "Revolutionizing physiotherapy by bringing world-class treatment directly to your home."}
+        bgImage={pageSettings.hero_background_image_url || "https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"}
       />
 
       {/* Mission & Vision Section */}
@@ -98,129 +103,92 @@ const AboutUs = () => {
         </div>
       </section>
 
-      {/* Founder Section */}
+      {/* Founders Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 animate-fade-in">
-            <h2 className="text-3xl font-heading font-bold text-brand-dark">Meet Our Founder</h2>
-            <p className="text-slate-600 mt-4 max-w-2xl mx-auto">Led by experienced professionals committed to your health.</p>
+            <h2 className="text-3xl font-heading font-bold text-brand-dark">Meet Our <span className="text-brand-blue">Founders</span></h2>
+            <p className="text-slate-600 mt-4 max-w-2xl mx-auto">Led by experienced professionals committed to your health and innovation.</p>
           </div>
 
-          <div className="glass-card p-8 lg:p-12 rounded-[3rem] max-w-5xl mx-auto animate-slide-up">
-            <div className="flex flex-col md:flex-row items-center gap-12">
-              <div className="relative">
-                <div className="w-48 h-48 bg-gray-200 rounded-full overflow-hidden border-4 border-white shadow-xl">
-                  {/* Placeholder for founder image */}
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-blue to-brand-dark text-white text-4xl font-heading">
-                    {COMPANY_INFO.founder.name.charAt(0)}
-                  </div>
-                </div>
-                <div className="absolute bottom-0 right-0 bg-brand-orange text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg">FOUNDER</div>
-              </div>
-
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-3xl font-heading font-bold text-brand-dark mb-2">{COMPANY_INFO.founder.name}</h3>
-                <p className="text-brand-blue font-medium mb-6 uppercase tracking-wider text-sm">{COMPANY_INFO.founder.title}</p>
-                <p className="text-slate-600 leading-relaxed mb-6 italic">"{COMPANY_INFO.founder.description}"</p>
-                <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                  {COMPANY_INFO.founder.qualifications.map((q, i) => (
-                    <span key={i} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium border border-slate-200">{q}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* IT Partner Section */}
-      <section className="py-20 border-t border-slate-200 bg-slate-50/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 animate-fade-in">
-            <h3 className="text-3xl font-bold text-brand-dark mb-4">
-              Our Technology <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-orange">Partner</span>
-            </h3>
-            <p className="text-xl text-slate-600">
-              Powered by cutting-edge technology solutions
-            </p>
-          </div>
-
-          <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
-            <div className="animate-slide-in-left">
-              <div className="bg-gradient-to-br from-brand-blue to-brand-dark rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-orange/10 rounded-full blur-3xl -ml-16 -mb-16"></div>
-
-                <div className="relative z-10">
-                  <div className="text-center mb-8">
-                    <div className="w-24 h-24 mx-auto mb-6 bg-white rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-all duration-500">
-                      <div className="text-3xl font-bold bg-gradient-to-r from-brand-blue to-brand-dark bg-clip-text text-transparent">
-                        CB
-                      </div>
-                    </div>
-                    <h4 className="text-2xl font-bold mb-2">{COMPANY_INFO.itPartner.fullName}</h4>
-                    <p className="text-blue-100">Technology Excellence Partner</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    {[
-                      { icon: '🚀', title: 'Innovation', desc: 'Cutting-edge healthcare technology' },
-                      { icon: '🔧', title: 'Development', desc: 'Custom software solutions' },
-                      { icon: '☁️', title: 'Infrastructure', desc: 'Scalable cloud architecture' },
-                      { icon: '🛡️', title: 'Security', desc: 'Enterprise-grade data protection' }
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center bg-white/10 p-3 rounded-xl backdrop-blur-sm">
-                        <span className="text-2xl mr-4">{item.icon}</span>
-                        <div>
-                          <h5 className="font-semibold">{item.title}</h5>
-                          <p className="text-blue-100 text-sm">{item.desc}</p>
+          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+            {/* PhysioWay Founder */}
+            {physioFounder && (
+              <div className="glass-card p-8 rounded-3xl animate-slide-up bg-white border-2 border-slate-200 hover:shadow-2xl hover:border-brand-blue/30 transition-all duration-300">
+                <div className="text-center">
+                  <div className="relative inline-block mb-6">
+                    <div className="w-56 h-56 bg-gray-100 rounded-2xl overflow-hidden border-4 border-brand-blue/20 shadow-2xl">
+                      {physioFounder.image_url ? (
+                        <img src={physioFounder.image_url} alt={physioFounder.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-blue to-brand-dark text-white text-5xl font-heading">
+                          {physioFounder.name.charAt(0)}
                         </div>
-                      </div>
+                      )}
+                    </div>
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-brand-blue text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-lg uppercase tracking-wider">
+                      Founder
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-heading font-bold text-brand-dark mb-2">{physioFounder.name}</h3>
+                  <p className="text-brand-blue font-medium mb-4 uppercase tracking-wider text-xs">{physioFounder.title}</p>
+                  <p className="text-slate-600 leading-relaxed mb-6 text-sm italic">"{physioFounder.description}"</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {(physioFounder.qualifications || []).map((q, i) => (
+                      <span key={i} className="px-3 py-1 bg-brand-blue/10 text-brand-blue rounded-lg text-xs font-medium">{q}</span>
                     ))}
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="mt-12 lg:mt-0 animate-slide-in-right">
-              <h4 className="text-2xl font-bold text-brand-dark mb-6">Technology Partnership</h4>
-              <p className="text-lg text-slate-600 mb-6 leading-relaxed">
-                {COMPANY_INFO.itPartner.description}
-              </p>
-
-              <div className="space-y-4">
-                {[
-                  { title: 'Web Platform', desc: 'Modern, responsive web application built with React and advanced UI/UX design', icon: '🌐' },
-                  { title: 'Mobile Solutions', desc: 'Cross-platform mobile applications for seamless patient and therapist experience', icon: '📱' },
-                  { title: 'Integration', desc: 'Seamless integration with healthcare systems and third-party services', icon: '🔄' }
-                ].map((item, i) => (
-                  <div key={i} className="glass-panel bg-white p-4 rounded-xl shadow-md border border-slate-100 hover:shadow-lg transition-all duration-300">
-                    <div className="flex items-start">
-                      <span className="text-2xl mr-3">{item.icon}</span>
-                      <div>
-                        <h5 className="font-semibold text-brand-dark mb-1">{item.title}</h5>
-                        <p className="text-slate-600 text-sm">{item.desc}</p>
-                      </div>
+            {/* Technology Partner Founder */}
+            {techFounder && (
+              <div className="glass-card p-8 rounded-3xl animate-slide-up bg-white border-2 border-slate-200 hover:shadow-2xl hover:border-brand-orange/30 transition-all duration-300" style={{ animationDelay: '0.1s' }}>
+                <div className="text-center">
+                  <div className="relative inline-block mb-6">
+                    <div className="w-56 h-56 bg-gray-100 rounded-2xl overflow-hidden border-4 border-brand-orange/20 shadow-2xl">
+                      {techFounder.image_url ? (
+                        <img src={techFounder.image_url} alt={techFounder.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-orange to-brand-dark text-white text-5xl font-heading">
+                          {techFounder.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-brand-orange text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-lg uppercase tracking-wider">
+                      Tech Partner
                     </div>
                   </div>
-                ))}
+                  <h3 className="text-2xl font-heading font-bold text-brand-dark mb-2">{techFounder.name}</h3>
+                  <p className="text-brand-orange font-medium mb-1 uppercase tracking-wider text-xs">{techFounder.title}</p>
+                  {techFounder.company_name && (
+                    <p className="text-slate-500 text-sm mb-4">{techFounder.company_name}</p>
+                  )}
+                  <p className="text-slate-600 leading-relaxed mb-6 text-sm italic">"{techFounder.description}"</p>
+                  <div className="flex flex-wrap gap-2 justify-center mb-4">
+                    {(techFounder.qualifications || []).map((q, i) => (
+                      <span key={i} className="px-3 py-1 bg-brand-orange/10 text-brand-orange rounded-lg text-xs font-medium">{q}</span>
+                    ))}
+                  </div>
+                  {techFounder.company_website && (
+                    <a 
+                      href={techFounder.company_website} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2 bg-brand-orange text-white font-bold rounded-xl hover:bg-brand-orange/90 transition-colors text-sm"
+                    >
+                      Visit {techFounder.company_name || 'Website'}
+                      <span>→</span>
+                    </a>
+                  )}
+                </div>
               </div>
-
-              <div className="mt-8">
-                <a
-                  href={COMPANY_INFO.itPartner.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center px-8 py-3 bg-brand-blue text-white font-bold rounded-xl hover:bg-brand-blue/90 transition-colors shadow-lg shadow-brand-blue/20"
-                >
-                  Visit {COMPANY_INFO.itPartner.name}
-                  <span className="ml-2">→</span>
-                </a>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
+
 
       {/* Values Section */}
       <section className="py-20 bg-slate-50">
@@ -262,7 +230,7 @@ const AboutUs = () => {
         </div>
       </section>
 
-      <Footer branding={branding} />
+      <Footer branding={branding} services={services} />
     </div>
   );
 };

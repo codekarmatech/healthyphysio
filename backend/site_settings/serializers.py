@@ -7,7 +7,7 @@ from .models import (
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
-    TestimonialsSectionSettings, WhyChooseUsSectionSettings
+    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings
 )
 
 
@@ -207,9 +207,19 @@ class PageContentSerializer(serializers.ModelSerializer):
 
 
 class ProcessStepSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = ProcessStep
-        fields = ['step_number', 'icon', 'title', 'description']
+        fields = ['step_number', 'icon', 'image_url', 'title', 'description']
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class ServiceSerializer(serializers.ModelSerializer):
@@ -246,9 +256,19 @@ class ServiceSerializer(serializers.ModelSerializer):
 
 
 class WhyChooseUsSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = WhyChooseUs
-        fields = ['id', 'icon', 'title', 'description', 'order']
+        fields = ['id', 'icon', 'image_url', 'title', 'description', 'order']
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class CTASectionSerializer(serializers.ModelSerializer):
@@ -279,6 +299,43 @@ class WhyChooseUsSectionSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhyChooseUsSectionSettings
         exclude = ['id', 'updated_at']
+
+
+class FounderSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    qualifications = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Founder
+        fields = ['id', 'name', 'title', 'founder_type', 'image_url', 'description', 
+                  'qualifications', 'company_name', 'company_website', 'order']
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+    
+    def get_qualifications(self, obj):
+        return obj.get_qualifications_list()
+
+
+class PageSettingsSerializer(serializers.ModelSerializer):
+    hero_background_image_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PageSettings
+        fields = ['page', 'hero_background_image_url', 'hero_title', 'hero_subtitle']
+    
+    def get_hero_background_image_url(self, obj):
+        if obj.hero_background_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.hero_background_image.url)
+            return obj.hero_background_image.url
+        return None
 
 
 class AllSettingsSerializer(serializers.Serializer):

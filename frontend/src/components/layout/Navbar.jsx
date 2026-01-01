@@ -34,6 +34,7 @@ const Navbar = () => {
 
   const logoUrl = branding.logo_url || branding.logo;
   const companyName = branding.company_name || COMPANY_INFO.name;
+  const companyFullName = branding.company_full_name || 'PhysioWay Active Health LLP';
   const phone = branding.phone || COMPANY_INFO.phone;
   const whatsappNumber = phone?.replace(/[^0-9]/g, '');
 
@@ -63,9 +64,14 @@ const Navbar = () => {
                 </div>
               )}
             </div>
-            <span className="font-heading font-bold text-2xl text-brand-dark tracking-tight">
-              {companyName}
-            </span>
+            <div className="flex flex-col">
+              <span className="font-heading font-bold text-xl text-brand-dark tracking-tight leading-tight">
+                {companyName}
+              </span>
+              <span className="text-[10px] text-slate-500 font-medium tracking-wide hidden sm:block">
+                {companyFullName.replace(companyName, '').trim()}
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Nav */}

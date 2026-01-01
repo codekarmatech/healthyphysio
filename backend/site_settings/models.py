@@ -172,6 +172,11 @@ class BrandingSettings(SingletonModel):
     
     # Company Info
     company_name = models.CharField(max_length=100, default='PhysioWay')
+    company_full_name = models.CharField(
+        max_length=200, 
+        default='PhysioWay Active Health LLP',
+        help_text='Full legal company name for footer and legal pages'
+    )
     tagline = models.CharField(max_length=200, default='Your Health, Our Priority')
     description = models.TextField(
         default='Professional physiotherapy services delivered to your doorstep.',
@@ -526,6 +531,7 @@ class ProcessStep(models.Model):
     """
     step_number = models.PositiveIntegerField(unique=True, help_text='Step number (1, 2, 3...)')
     icon = models.CharField(max_length=10, help_text='Emoji icon for the step')
+    image = models.ImageField(upload_to='process/', blank=True, null=True, help_text='Illustration image for the step')
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=200)
     is_active = models.BooleanField(default=True)
@@ -584,6 +590,7 @@ class WhyChooseUs(models.Model):
     Why Choose Us / PhysioWay Difference items
     """
     icon = models.CharField(max_length=10, help_text='Emoji icon')
+    image = models.ImageField(upload_to='why_choose_us/', blank=True, null=True, help_text='Feature illustration image')
     title = models.CharField(max_length=100)
     description = models.TextField()
     order = models.PositiveIntegerField(default=0)
@@ -691,3 +698,62 @@ class WhyChooseUsSectionSettings(SingletonModel):
     
     def __str__(self):
         return 'Why Choose Us Section Settings'
+
+
+class Founder(models.Model):
+    """
+    Founder/Team member information for About Us page
+    """
+    FOUNDER_TYPE_CHOICES = [
+        ('physio', 'PhysioWay Founder'),
+        ('tech', 'Technology Partner Founder'),
+    ]
+    
+    name = models.CharField(max_length=100)
+    title = models.CharField(max_length=200)
+    founder_type = models.CharField(max_length=20, choices=FOUNDER_TYPE_CHOICES)
+    image = models.ImageField(upload_to='founders/', blank=True, null=True, help_text='Square image recommended (400x400)')
+    description = models.TextField()
+    qualifications = models.TextField(blank=True, help_text='Comma-separated qualifications')
+    company_name = models.CharField(max_length=100, blank=True, help_text='Company name for tech partners')
+    company_website = models.URLField(blank=True, help_text='Company website URL')
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Founder'
+        verbose_name_plural = 'Founders'
+    
+    def __str__(self):
+        return f'{self.name} ({self.get_founder_type_display()})'
+    
+    def get_qualifications_list(self):
+        return [q.strip() for q in self.qualifications.split(',') if q.strip()]
+
+
+class PageSettings(models.Model):
+    """
+    Page-specific settings including hero background images
+    """
+    PAGE_CHOICES = [
+        ('services', 'Services Page'),
+        ('about', 'About Us Page'),
+        ('blog', 'Blog Page'),
+        ('contact', 'Contact Page'),
+        ('book', 'Book Consultation Page'),
+    ]
+    
+    page = models.CharField(max_length=20, choices=PAGE_CHOICES, unique=True)
+    hero_background_image = models.ImageField(upload_to='pages/', blank=True, null=True, help_text='Hero section background image')
+    hero_title = models.CharField(max_length=200, blank=True)
+    hero_subtitle = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Page Settings'
+        verbose_name_plural = 'Page Settings'
+    
+    def __str__(self):
+        return self.get_page_display()

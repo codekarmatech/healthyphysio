@@ -12,7 +12,7 @@ from .models import (
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
-    TestimonialsSectionSettings, WhyChooseUsSectionSettings
+    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings
 )
 from .serializers import (
     ThemeSettingsSerializer, BrandingSettingsSerializer, HeroSectionSerializer,
@@ -21,7 +21,8 @@ from .serializers import (
     SEOSettingsSerializer, PageContentSerializer, ProcessStepSerializer,
     ServiceSerializer, WhyChooseUsSerializer, CTASectionSerializer,
     ProcessSectionSettingsSerializer, ServicesSectionSettingsSerializer,
-    TestimonialsSectionSettingsSerializer, WhyChooseUsSectionSettingsSerializer
+    TestimonialsSectionSettingsSerializer, WhyChooseUsSectionSettingsSerializer,
+    FounderSerializer, PageSettingsSerializer
 )
 
 
@@ -112,6 +113,14 @@ class SiteSettingsViewSet(viewsets.ViewSet):
             'why_choose_us_section': WhyChooseUsSectionSettingsSerializer(
                 WhyChooseUsSectionSettings.load(), context=context
             ).data,
+            'founders': FounderSerializer(
+                Founder.objects.filter(is_active=True).order_by('order'),
+                many=True, context=context
+            ).data,
+            'page_settings': {
+                ps.page: PageSettingsSerializer(ps, context=context).data
+                for ps in PageSettings.objects.filter(is_active=True)
+            },
         }
         
         # Cache for 5 minutes

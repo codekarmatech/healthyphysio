@@ -21,6 +21,8 @@ const Blog = () => {
   }, []);
 
   const branding = settings?.branding || COMPANY_INFO;
+  const services = settings?.services || [];
+  const pageSettings = settings?.page_settings?.blog || {};
 
   // Sample blog posts - in real app, this would come from API/CMS
   const blogPosts = [
@@ -121,9 +123,9 @@ const Blog = () => {
       <Navbar />
 
       <PageHeader
-        title="Health & Wellness Blog"
-        subtitle="Stay informed with the latest insights, tips, and expert advice on physiotherapy, health, and wellness."
-        bgImage="https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"
+        title={pageSettings.hero_title || "Health & Wellness Blog"}
+        subtitle={pageSettings.hero_subtitle || "Stay informed with the latest insights, tips, and expert advice on physiotherapy, health, and wellness."}
+        bgImage={pageSettings.hero_background_image_url || "https://images.unsplash.com/photo-1576091160550-2187d80aeff2?auto=format&fit=crop&q=80"}
       />
 
       {/* Search and Filter */}
@@ -281,7 +283,7 @@ const Blog = () => {
 
 
 
-      <Footer branding={branding} />
+      <Footer branding={branding} services={services} />
     </div>
   );
 };

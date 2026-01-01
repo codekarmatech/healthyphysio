@@ -5,7 +5,7 @@ from .models import (
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
-    TestimonialsSectionSettings, WhyChooseUsSectionSettings
+    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings
 )
 
 
@@ -334,3 +334,59 @@ class WhyChooseUsSectionSettingsAdmin(SingletonModelAdmin):
             'description': 'Settings for "The PhysioWay Difference" section'
         }),
     )
+
+
+@admin.register(Founder)
+class FounderAdmin(admin.ModelAdmin):
+    list_display = ['name', 'title', 'founder_type', 'image_preview', 'order', 'is_active']
+    list_filter = ['founder_type', 'is_active']
+    list_editable = ['order', 'is_active']
+    search_fields = ['name', 'title', 'company_name']
+    ordering = ['order']
+    
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('name', 'title', 'founder_type', 'image'),
+        }),
+        ('Details', {
+            'fields': ('description', 'qualifications'),
+        }),
+        ('Company Info (for Tech Partners)', {
+            'fields': ('company_name', 'company_website'),
+            'classes': ('collapse',),
+        }),
+        ('Display Settings', {
+            'fields': ('order', 'is_active'),
+        }),
+    )
+    
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;"/>', obj.image.url)
+        return '-'
+    image_preview.short_description = 'Image'
+
+
+@admin.register(PageSettings)
+class PageSettingsAdmin(admin.ModelAdmin):
+    list_display = ['page', 'hero_title', 'image_preview', 'is_active']
+    list_filter = ['page', 'is_active']
+    list_editable = ['is_active']
+    
+    fieldsets = (
+        ('Page', {
+            'fields': ('page',),
+        }),
+        ('Hero Section', {
+            'fields': ('hero_background_image', 'hero_title', 'hero_subtitle'),
+        }),
+        ('Settings', {
+            'fields': ('is_active',),
+        }),
+    )
+    
+    def image_preview(self, obj):
+        if obj.hero_background_image:
+            return format_html('<img src="{}" style="width:80px;height:40px;object-fit:cover;border-radius:4px;"/>', obj.hero_background_image.url)
+        return '-'
+    image_preview.short_description = 'Background'

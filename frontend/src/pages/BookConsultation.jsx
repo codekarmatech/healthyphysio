@@ -57,6 +57,8 @@ const BookConsultation = () => {
   }, []);
 
   const branding = settings?.branding || COMPANY_INFO;
+  const services = settings?.services || [];
+  const pageSettings = settings?.page_settings?.book || {};
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -106,9 +108,9 @@ const BookConsultation = () => {
       <Navbar />
 
       <PageHeader
-        title="Book Free Consultation"
-        subtitle="Take the first step towards better health. Our expert physiotherapists will assess your condition and create a personalized treatment plan."
-        bgImage="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80"
+        title={pageSettings.hero_title || "Book Free Consultation"}
+        subtitle={pageSettings.hero_subtitle || "Take the first step towards better health. Our expert physiotherapists will assess your condition and create a personalized treatment plan."}
+        bgImage={pageSettings.hero_background_image_url || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80"}
       />
 
       {/* Progress Steps */}
@@ -585,7 +587,7 @@ const BookConsultation = () => {
         </div>
       </section>
 
-      <Footer branding={branding} />
+      <Footer branding={branding} services={services} />
     </div>
   );
 };

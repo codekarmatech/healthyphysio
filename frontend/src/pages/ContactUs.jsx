@@ -25,6 +25,8 @@ const ContactUs = () => {
   }, []);
 
   const branding = settings?.branding || COMPANY_INFO;
+  const services = settings?.services || [];
+  const pageSettings = settings?.page_settings?.contact || {};
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -83,9 +85,9 @@ const ContactUs = () => {
       <Navbar />
 
       <PageHeader
-        title="Get in Touch"
-        subtitle="Have questions about our services? Need to book an appointment? We're here to help."
-        bgImage="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80"
+        title={pageSettings.hero_title || "Get in Touch"}
+        subtitle={pageSettings.hero_subtitle || "Have questions about our services? Need to book an appointment? We're here to help."}
+        bgImage={pageSettings.hero_background_image_url || "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80"}
       />
 
       {/* Contact Methods */}
@@ -272,7 +274,7 @@ const ContactUs = () => {
         </div>
       </section>
 
-      <Footer branding={branding} />
+      <Footer branding={branding} services={services} />
     </div>
   );
 };

@@ -364,7 +364,7 @@ const Landing = () => {
               <motion.div
                 key={i}
                 whileHover={{ scale: 1.05 }}
-                className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 hover:border-brand-orange/50 transition-colors"
+                className="bg-white/5 backdrop-blur-md p-6 rounded-2xl border border-white/10 hover:border-brand-orange/50 transition-colors overflow-hidden"
               >
                 <div className="text-3xl mb-4">{item.icon}</div>
                 <h3 className="font-bold text-lg mb-2">{item.title}</h3>
@@ -480,7 +480,7 @@ const Landing = () => {
         </div>
       </section>
 
-      <Footer branding={branding} />
+      <Footer branding={branding} services={servicesList} />
       <SignupModal />
     </div >
   );

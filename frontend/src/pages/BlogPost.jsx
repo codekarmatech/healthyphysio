@@ -19,6 +19,7 @@ const BlogPost = () => {
   }, []);
 
   const branding = settings?.branding || COMPANY_INFO;
+  const services = settings?.services || [];
 
   useEffect(() => {
     // In real app, this would be an API call
@@ -129,7 +130,7 @@ const BlogPost = () => {
             <h1 className="text-2xl font-bold text-slate-400 mb-4">Loading Article...</h1>
           </div>
         </div>
-        <Footer branding={branding} />
+        <Footer branding={branding} services={services} />
       </div>
     );
   }
@@ -314,7 +315,7 @@ const BlogPost = () => {
         </div>
       </section>
 
-      <Footer branding={branding} />
+      <Footer branding={branding} services={services} />
     </div>
   );
 };
