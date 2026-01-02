@@ -4,17 +4,17 @@ import api from './api';
 const MOCK_DASHBOARD_DATA = {
   stats: {
     totalPatients: 48,
-    activeReferrals: 12,
+    pendingApprovals: 3,
     pendingReports: 5,
-    completedTreatments: 23
+    totalEarnings: 45000
   },
-  referrals: [
+  patients: [
     {
       id: 1,
       patientName: 'John Smith',
       condition: 'Lower Back Pain',
       date: '2024-01-15',
-      status: 'active',
+      approvalStatus: 'approved',
       therapistId: 1,
       therapistName: 'Dr. Sarah Johnson'
     },
@@ -23,7 +23,7 @@ const MOCK_DASHBOARD_DATA = {
       patientName: 'Emily Davis',
       condition: 'Shoulder Rehabilitation',
       date: '2024-01-12',
-      status: 'active',
+      approvalStatus: 'approved',
       therapistId: 2,
       therapistName: 'Dr. Michael Chen'
     },
@@ -32,16 +32,16 @@ const MOCK_DASHBOARD_DATA = {
       patientName: 'Robert Wilson',
       condition: 'Knee Replacement Recovery',
       date: '2024-01-10',
-      status: 'completed',
-      therapistId: 1,
-      therapistName: 'Dr. Sarah Johnson'
+      approvalStatus: 'pending',
+      therapistId: null,
+      therapistName: null
     },
     {
       id: 4,
       patientName: 'Lisa Thompson',
       condition: 'Tennis Elbow',
       date: '2024-01-08',
-      status: 'active',
+      approvalStatus: 'approved',
       therapistId: 3,
       therapistName: 'Dr. Amanda Williams'
     }
@@ -85,28 +85,27 @@ const doctorService = {
       
       // Check if API returned meaningful data
       const hasRealData = data && (
-        (data.stats && (data.stats.total_referrals > 0 || data.stats.active_patients > 0)) ||
-        (data.recent_referrals && data.recent_referrals.length > 0)
+        (data.stats && (data.stats.total_patients > 0 || data.stats.active_patients > 0)) ||
+        (data.recent_patients && data.recent_patients.length > 0)
       );
       
       if (hasRealData) {
         // Transform API response to match frontend expected format
         return {
           stats: {
-            totalPatients: data.stats?.active_patients || 0,
-            activeReferrals: data.stats?.total_referrals || 0,
+            totalPatients: data.stats?.active_patients || data.stats?.total_patients || 0,
+            pendingApprovals: data.stats?.pending_approvals || 0,
             pendingReports: data.stats?.pending_reports || 0,
-            completedTreatments: data.stats?.completed_treatments || 0,
-            newReferralsThisMonth: data.stats?.new_referrals_this_month || 0
+            totalEarnings: data.stats?.total_earnings || 0
           },
-          referrals: (data.recent_referrals || []).map(ref => ({
-            id: ref.id,
-            patientName: ref.patient_name || ref.patientName,
-            condition: ref.condition,
-            date: ref.date || ref.created_at,
-            status: ref.status,
-            therapistId: ref.therapist_id || ref.therapistId,
-            therapistName: ref.therapist_name || ref.therapistName
+          patients: (data.recent_patients || []).map(patient => ({
+            id: patient.id,
+            patientName: patient.patient_name || patient.patientName || `${patient.user?.first_name} ${patient.user?.last_name}`,
+            condition: patient.disease || patient.condition,
+            date: patient.created_at || patient.date,
+            approvalStatus: patient.approval_status || patient.approvalStatus,
+            therapistId: patient.assigned_therapist || patient.therapistId,
+            therapistName: patient.assigned_therapist_name || patient.therapistName
           })),
           reports: (data.recent_reports || []).map(report => ({
             id: report.id,
@@ -134,66 +133,53 @@ const doctorService = {
   },
 
   /**
-   * Get list of patients under doctor's care
+   * Get list of patients added by or assigned to the doctor
    */
-  getPatients: async (params = {}) => {
+  getMyPatients: async (params = {}) => {
     try {
-      const response = await api.get('/users/patients/', { params });
+      const response = await api.get('/users/patients/my-patients/', { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching patients:', error);
+      console.error('Error fetching my patients:', error);
       throw error;
     }
   },
 
   /**
-   * Get list of referrals made by the doctor
+   * Get patients pending admin approval (added by this doctor)
    */
-  getReferrals: async (params = {}) => {
+  getPendingApprovals: async () => {
     try {
-      const response = await api.get('/scheduling/referrals/', { params });
+      const response = await api.get('/users/patients/my-pending-approvals/');
       return response.data;
     } catch (error) {
-      console.error('Error fetching referrals:', error);
+      console.error('Error fetching pending approvals:', error);
       throw error;
     }
   },
 
   /**
-   * Create a new patient referral
+   * Create a new patient (requires admin approval)
    */
-  createReferral: async (referralData) => {
+  createPatient: async (patientData) => {
     try {
-      const response = await api.post('/scheduling/referrals/', referralData);
+      const response = await api.post('/users/patients/', patientData);
       return response.data;
     } catch (error) {
-      console.error('Error creating referral:', error);
+      console.error('Error creating patient:', error);
       throw error;
     }
   },
 
   /**
-   * Get referral details by ID
+   * Get patient details by ID
    */
-  getReferralById: async (referralId) => {
+  getPatientById: async (patientId) => {
     try {
-      const response = await api.get(`/scheduling/referrals/${referralId}/`);
+      const response = await api.get(`/users/patients/${patientId}/`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching referral:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Update a referral
-   */
-  updateReferral: async (referralId, referralData) => {
-    try {
-      const response = await api.patch(`/scheduling/referrals/${referralId}/`, referralData);
-      return response.data;
-    } catch (error) {
-      console.error('Error updating referral:', error);
+      console.error('Error fetching patient:', error);
       throw error;
     }
   },
@@ -238,7 +224,33 @@ const doctorService = {
   },
 
   /**
-   * Get available therapists for referral assignment
+   * Get doctor's earnings summary
+   */
+  getEarningsSummary: async () => {
+    try {
+      const response = await api.get('/earnings/doctor/summary/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching earnings summary:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get doctor's earnings history
+   */
+  getEarningsHistory: async (params = {}) => {
+    try {
+      const response = await api.get('/earnings/doctor/history/', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching earnings history:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get available therapists
    */
   getAvailableTherapists: async (params = {}) => {
     try {

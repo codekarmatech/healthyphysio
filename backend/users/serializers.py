@@ -150,6 +150,10 @@ class UserSerializer(serializers.ModelSerializer):
 class PatientSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     area_name = serializers.SerializerMethodField(read_only=True)
+    added_by_doctor_name = serializers.SerializerMethodField(read_only=True)
+    assigned_doctor_name = serializers.SerializerMethodField(read_only=True)
+    assigned_therapist_name = serializers.SerializerMethodField(read_only=True)
+    approved_by_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Patient
@@ -157,13 +161,42 @@ class PatientSerializer(serializers.ModelSerializer):
                  'address', 'city', 'state', 'zip_code', 'referred_by',
                  'reference_detail', 'treatment_location', 'disease',
                  'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
-                 'area', 'area_name']
-        read_only_fields = ['id']
+                 'area', 'area_name',
+                 'added_by_doctor', 'added_by_doctor_name',
+                 'assigned_doctor', 'assigned_doctor_name',
+                 'assigned_therapist', 'assigned_therapist_name',
+                 'approval_status', 'approved_by', 'approved_by_name', 'approved_at', 'denial_reason',
+                 'created_at', 'updated_at']
+        read_only_fields = ['id', 'approved_by', 'approved_at', 'created_at', 'updated_at']
 
     def get_area_name(self, obj):
         """Return the name of the patient's area if available"""
         if obj.area:
             return f"{obj.area.name}, {obj.area.city}, {obj.area.state}"
+        return None
+
+    def get_added_by_doctor_name(self, obj):
+        """Return the name of the doctor who added this patient"""
+        if obj.added_by_doctor:
+            return obj.added_by_doctor.user.get_full_name() or obj.added_by_doctor.user.username
+        return None
+
+    def get_assigned_doctor_name(self, obj):
+        """Return the name of the assigned doctor"""
+        if obj.assigned_doctor:
+            return obj.assigned_doctor.user.get_full_name() or obj.assigned_doctor.user.username
+        return None
+
+    def get_assigned_therapist_name(self, obj):
+        """Return the name of the assigned therapist"""
+        if obj.assigned_therapist:
+            return obj.assigned_therapist.user.get_full_name() or obj.assigned_therapist.user.username
+        return None
+
+    def get_approved_by_name(self, obj):
+        """Return the name of the admin who approved this patient"""
+        if obj.approved_by:
+            return obj.approved_by.get_full_name() or obj.approved_by.username
         return None
 
     def create(self, validated_data):

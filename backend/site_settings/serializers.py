@@ -7,7 +7,8 @@ from .models import (
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
-    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings
+    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings,
+    BlogPost
 )
 
 
@@ -336,6 +337,94 @@ class PageSettingsSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.hero_background_image.url)
             return obj.hero_background_image.url
         return None
+
+
+class BlogPostSerializer(serializers.ModelSerializer):
+    """
+    Blog post serializer with SEO fields
+    """
+    featured_image_url = serializers.SerializerMethodField()
+    author_image_url = serializers.SerializerMethodField()
+    tags_list = serializers.SerializerMethodField()
+    category_display = serializers.SerializerMethodField()
+    meta_title_computed = serializers.SerializerMethodField()
+    meta_description_computed = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BlogPost
+        fields = [
+            'id', 'title', 'slug', 'excerpt', 'content',
+            'featured_image', 'featured_image_url', 'featured_image_alt',
+            'category', 'category_display', 'tags', 'tags_list',
+            'author_name', 'author_title', 'author_image', 'author_image_url', 'author_bio',
+            'read_time_minutes',
+            'meta_title', 'meta_title_computed', 'meta_description', 'meta_description_computed', 'meta_keywords',
+            'is_featured', 'is_published',
+            'published_at', 'created_at', 'updated_at',
+            'view_count'
+        ]
+    
+    def get_featured_image_url(self, obj):
+        if obj.featured_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.featured_image.url)
+            return obj.featured_image.url
+        return None
+    
+    def get_author_image_url(self, obj):
+        if obj.author_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.author_image.url)
+            return obj.author_image.url
+        return None
+    
+    def get_tags_list(self, obj):
+        return obj.get_tags_list()
+    
+    def get_category_display(self, obj):
+        return obj.get_category_display()
+    
+    def get_meta_title_computed(self, obj):
+        return obj.get_meta_title()
+    
+    def get_meta_description_computed(self, obj):
+        return obj.get_meta_description()
+
+
+class BlogPostListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for blog list views
+    """
+    featured_image_url = serializers.SerializerMethodField()
+    tags_list = serializers.SerializerMethodField()
+    category_display = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BlogPost
+        fields = [
+            'id', 'title', 'slug', 'excerpt',
+            'featured_image_url', 'featured_image_alt',
+            'category', 'category_display', 'tags_list',
+            'author_name', 'author_title',
+            'read_time_minutes', 'is_featured',
+            'published_at', 'view_count'
+        ]
+    
+    def get_featured_image_url(self, obj):
+        if obj.featured_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.featured_image.url)
+            return obj.featured_image.url
+        return None
+    
+    def get_tags_list(self, obj):
+        return obj.get_tags_list()
+    
+    def get_category_display(self, obj):
+        return obj.get_category_display()
 
 
 class AllSettingsSerializer(serializers.Serializer):

@@ -41,7 +41,7 @@ export const COMPANY_INFO = {
   phone: '+91 6353202177',
   email: 'contact@physioway.com',
   website: 'https://physioway.com',
-  serviceAreas: ['Delhi NCR', 'Mumbai', 'Bangalore'],
+  serviceAreas: ['Ahmedabad', 'Gujarat', 'India'],
   workingHours: {
     weekdays: 'Mon-Sat: 8AM-8PM',
     weekend: 'Sun: 10AM-6PM'

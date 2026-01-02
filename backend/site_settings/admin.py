@@ -5,7 +5,8 @@ from .models import (
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
-    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings
+    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings,
+    BlogPost
 )
 
 
@@ -390,3 +391,47 @@ class PageSettingsAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="width:80px;height:40px;object-fit:cover;border-radius:4px;"/>', obj.hero_background_image.url)
         return '-'
     image_preview.short_description = 'Background'
+
+
+@admin.register(BlogPost)
+class BlogPostAdmin(admin.ModelAdmin):
+    list_display = ['title', 'category', 'author_name', 'is_published', 'is_featured', 'published_at', 'view_count']
+    list_filter = ['category', 'is_published', 'is_featured', 'published_at']
+    list_editable = ['is_published', 'is_featured']
+    search_fields = ['title', 'excerpt', 'content', 'tags']
+    prepopulated_fields = {'slug': ('title',)}
+    date_hierarchy = 'published_at'
+    ordering = ['-published_at', '-created_at']
+    
+    fieldsets = (
+        ('Content', {
+            'fields': ('title', 'slug', 'excerpt', 'content'),
+            'description': 'Main blog post content'
+        }),
+        ('Featured Image', {
+            'fields': ('featured_image', 'featured_image_alt'),
+            'description': 'Main image for the post (1200x630 recommended for social sharing)'
+        }),
+        ('Categorization', {
+            'fields': ('category', 'tags'),
+            'description': 'Category and tags for organization and SEO'
+        }),
+        ('Author', {
+            'fields': ('author_name', 'author_title', 'author_image', 'author_bio'),
+            'classes': ('collapse',),
+        }),
+        ('SEO Settings', {
+            'fields': ('meta_title', 'meta_description', 'meta_keywords'),
+            'classes': ('collapse',),
+            'description': 'Search engine optimization fields'
+        }),
+        ('Publishing', {
+            'fields': ('is_published', 'is_featured', 'published_at', 'read_time_minutes'),
+        }),
+        ('Statistics', {
+            'fields': ('view_count',),
+            'classes': ('collapse',),
+        }),
+    )
+    
+    readonly_fields = ['view_count', 'created_at', 'updated_at']

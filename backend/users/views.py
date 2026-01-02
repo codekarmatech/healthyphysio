@@ -2,6 +2,7 @@
 Purpose: API views for user management
 Connected to: User authentication and profile management
 """
+from django.db import models  # For Q objects
 from rest_framework import status, serializers  # Add serializers import here
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -50,18 +51,265 @@ class PatientViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_admin:
-            return Patient.objects.all()
+            # Admin can filter by approval_status
+            queryset = Patient.objects.all()
+            approval_status = self.request.query_params.get('approval_status')
+            if approval_status:
+                queryset = queryset.filter(approval_status=approval_status)
+            return queryset
         elif user.is_therapist:
             # Therapists can only see their assigned patients
             try:
                 therapist = Therapist.objects.get(user=user)
-                return Patient.objects.filter(appointments__therapist=therapist).distinct()
+                return Patient.objects.filter(
+                    models.Q(appointments__therapist=therapist) | 
+                    models.Q(assigned_therapist=therapist),
+                    approval_status='approved'
+                ).distinct()
             except Therapist.DoesNotExist:
+                return Patient.objects.none()
+        elif user.is_doctor:
+            # Doctors can see patients they added or are assigned to
+            try:
+                doctor = Doctor.objects.get(user=user)
+                return Patient.objects.filter(
+                    models.Q(added_by_doctor=doctor) | 
+                    models.Q(assigned_doctor=doctor)
+                ).distinct()
+            except Doctor.DoesNotExist:
                 return Patient.objects.none()
         elif user.is_patient:
             # Patients can only see their own profile
             return Patient.objects.filter(user=user)
         return Patient.objects.none()
+
+    @action(detail=False, methods=['get'], url_path='pending-approvals')
+    def pending_approvals(self, request):
+        """Get all patients pending approval (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can view pending approvals"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        patients = Patient.objects.filter(approval_status='pending')
+        serializer = self.get_serializer(patients, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_patient(self, request, pk=None):
+        """Approve a patient (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can approve patients"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        patient = self.get_object()
+        if patient.approval_status != 'pending':
+            return Response(
+                {"error": f"Patient is already {patient.approval_status}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        patient.approval_status = 'approved'
+        patient.approved_by = request.user
+        patient.approved_at = timezone.now()
+        patient.save()
+        
+        serializer = self.get_serializer(patient)
+        return Response({
+            "message": "Patient approved successfully",
+            "patient": serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='deny')
+    def deny_patient(self, request, pk=None):
+        """Deny a patient (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can deny patients"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        patient = self.get_object()
+        if patient.approval_status != 'pending':
+            return Response(
+                {"error": f"Patient is already {patient.approval_status}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        reason = request.data.get('reason', '')
+        if not reason:
+            return Response(
+                {"error": "Denial reason is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        patient.approval_status = 'denied'
+        patient.approved_by = request.user
+        patient.approved_at = timezone.now()
+        patient.denial_reason = reason
+        patient.save()
+        
+        serializer = self.get_serializer(patient)
+        return Response({
+            "message": "Patient denied",
+            "patient": serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='assign-doctor')
+    def assign_doctor(self, request, pk=None):
+        """Assign a doctor to a patient (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can assign doctors"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        patient = self.get_object()
+        doctor_id = request.data.get('doctor_id')
+        
+        if not doctor_id:
+            return Response(
+                {"error": "Doctor ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            doctor = Doctor.objects.get(id=doctor_id)
+            patient.assigned_doctor = doctor
+            patient.save()
+            
+            serializer = self.get_serializer(patient)
+            return Response({
+                "message": f"Doctor {doctor.user.get_full_name()} assigned to patient",
+                "patient": serializer.data
+            })
+        except Doctor.DoesNotExist:
+            return Response(
+                {"error": "Doctor not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['post'], url_path='assign-therapist')
+    def assign_therapist(self, request, pk=None):
+        """Assign a therapist to a patient (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can assign therapists"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        patient = self.get_object()
+        therapist_id = request.data.get('therapist_id')
+        
+        if not therapist_id:
+            return Response(
+                {"error": "Therapist ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            therapist = Therapist.objects.get(id=therapist_id)
+            patient.assigned_therapist = therapist
+            patient.save()
+            
+            serializer = self.get_serializer(patient)
+            return Response({
+                "message": f"Therapist {therapist.user.get_full_name()} assigned to patient",
+                "patient": serializer.data
+            })
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=['get'], url_path='doctor-patient-assignments')
+    def doctor_patient_assignments(self, request):
+        """Get full view of doctor-patient-therapist assignments (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only administrators can view assignments"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        patients = Patient.objects.select_related(
+            'user', 'added_by_doctor__user', 'assigned_doctor__user', 'assigned_therapist__user'
+        ).all()
+        
+        assignments = []
+        for patient in patients:
+            assignments.append({
+                'patient_id': patient.id,
+                'patient_name': patient.user.get_full_name() or patient.user.username,
+                'patient_email': patient.user.email,
+                'patient_phone': patient.user.phone,
+                'added_by_doctor': {
+                    'id': patient.added_by_doctor.id if patient.added_by_doctor else None,
+                    'name': patient.added_by_doctor.user.get_full_name() if patient.added_by_doctor else 'Self-Registered'
+                },
+                'assigned_doctor': {
+                    'id': patient.assigned_doctor.id if patient.assigned_doctor else None,
+                    'name': patient.assigned_doctor.user.get_full_name() if patient.assigned_doctor else 'Not Assigned'
+                },
+                'assigned_therapist': {
+                    'id': patient.assigned_therapist.id if patient.assigned_therapist else None,
+                    'name': patient.assigned_therapist.user.get_full_name() if patient.assigned_therapist else 'Not Assigned'
+                },
+                'approval_status': patient.approval_status,
+                'created_at': patient.created_at,
+                'approved_at': patient.approved_at,
+                'disease': patient.disease,
+                'area': patient.area.name if patient.area else None
+            })
+        
+        return Response(assignments)
+
+    @action(detail=False, methods=['get'], url_path='my-patients')
+    def my_patients(self, request):
+        """Get patients for the current doctor (added by or assigned to)"""
+        if not request.user.is_doctor:
+            return Response(
+                {"error": "Only doctors can access this endpoint"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            doctor = Doctor.objects.get(user=request.user)
+            patients = Patient.objects.filter(
+                models.Q(added_by_doctor=doctor) | models.Q(assigned_doctor=doctor)
+            ).distinct()
+            serializer = self.get_serializer(patients, many=True)
+            return Response(serializer.data)
+        except Doctor.DoesNotExist:
+            return Response(
+                {"error": "Doctor profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=['get'], url_path='my-pending-approvals')
+    def my_pending_approvals(self, request):
+        """Get pending approval patients for the current doctor"""
+        if not request.user.is_doctor:
+            return Response(
+                {"error": "Only doctors can access this endpoint"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            doctor = Doctor.objects.get(user=request.user)
+            patients = Patient.objects.filter(
+                added_by_doctor=doctor,
+                approval_status='pending'
+            )
+            serializer = self.get_serializer(patients, many=True)
+            return Response(serializer.data)
+        except Doctor.DoesNotExist:
+            return Response(
+                {"error": "Doctor profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class TherapistViewSet(viewsets.ModelViewSet):
     queryset = Therapist.objects.all()
@@ -666,11 +914,25 @@ def register_user(request):
                 # Add area to patient_data
                 patient_data['area'] = area
 
+                # If the patient is being added by a doctor, set added_by_doctor and approval_status
+                if request.user.is_authenticated and request.user.role == 'doctor':
+                    try:
+                        doctor = Doctor.objects.get(user=request.user)
+                        patient_data['added_by_doctor'] = doctor
+                        patient_data['assigned_doctor'] = doctor
+                        patient_data['approval_status'] = 'pending'
+                        print(f"Patient being added by doctor: {doctor.user.get_full_name()}")
+                    except Doctor.DoesNotExist:
+                        print(f"Doctor profile not found for user {request.user.username}")
+                else:
+                    # Self-registered patients are auto-approved
+                    patient_data['approval_status'] = 'approved'
+
                 # Create the patient with all data including area
                 # The Patient.save() method will automatically handle the PatientArea relationship
                 try:
                     patient = Patient.objects.create(user=user, **patient_data)
-                    print(f"Created patient {patient.id} with area {area.id} ({area.name})")
+                    print(f"Created patient {patient.id} with area {area.id} ({area.name}), approval_status={patient.approval_status}")
                     # No need to create PatientArea relationship explicitly - the Patient.save() method handles this
                 except Exception as e:
                     if "duplicate key value violates unique constraint" in str(e) and "patient_id, area_id" in str(e):

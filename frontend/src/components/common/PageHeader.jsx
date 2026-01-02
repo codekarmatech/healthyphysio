@@ -3,13 +3,13 @@ import { motion } from 'framer-motion';
 
 const PageHeader = ({ title, subtitle, bgImage }) => {
     return (
-        <div className="relative pt-20 lg:pt-24 overflow-hidden bg-gradient-to-br from-slate-50 via-teal-50/50 to-emerald-50/30">
+        <div className="relative pt-20 lg:pt-24 overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30">
             {/* Luxury pastel background elements */}
             <div className="absolute inset-0 overflow-hidden">
                 {/* Soft gradient orbs */}
-                <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-gradient-to-br from-teal-200/40 to-emerald-100/30 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-cyan-100/40 to-teal-50/30 rounded-full blur-3xl" />
-                <div className="absolute top-1/2 left-0 w-[400px] h-[400px] bg-gradient-to-br from-emerald-100/30 to-transparent rounded-full blur-3xl -translate-y-1/2" />
+                <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-gradient-to-br from-blue-100/50 to-indigo-100/30 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-violet-100/40 to-blue-50/30 rounded-full blur-3xl" />
+                <div className="absolute top-1/2 left-0 w-[400px] h-[400px] bg-gradient-to-br from-sky-100/30 to-transparent rounded-full blur-3xl -translate-y-1/2" />
                 
                 {/* Subtle pattern overlay */}
                 <div className="absolute inset-0 opacity-[0.03]" style={{ 
@@ -25,10 +25,10 @@ const PageHeader = ({ title, subtitle, bgImage }) => {
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-teal-100 shadow-sm mb-6"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-blue-100 shadow-sm mb-6"
                         >
-                            <span className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
-                            <span className="text-sm font-medium text-teal-700">Premium Healthcare</span>
+                            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                            <span className="text-sm font-medium text-blue-700">Premium Healthcare</span>
                         </motion.div>
                         
                         <motion.h1
@@ -58,14 +58,14 @@ const PageHeader = ({ title, subtitle, bgImage }) => {
                             className="flex flex-wrap items-center justify-center lg:justify-start gap-6 mt-8"
                         >
                             <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center">
-                                    <span className="text-teal-600">✓</span>
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <span className="text-blue-600">✓</span>
                                 </div>
                                 <span>Certified Experts</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                                    <span className="text-emerald-600">★</span>
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                    <span className="text-indigo-600">★</span>
                                 </div>
                                 <span>5000+ Patients</span>
                             </div>
@@ -81,14 +81,14 @@ const PageHeader = ({ title, subtitle, bgImage }) => {
                     >
                         <div className="relative">
                             {/* Decorative elements */}
-                            <div className="absolute -top-4 -left-4 w-24 h-24 bg-gradient-to-br from-teal-400/20 to-emerald-300/20 rounded-full blur-2xl" />
-                            <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-gradient-to-br from-cyan-300/20 to-teal-200/20 rounded-full blur-2xl" />
+                            <div className="absolute -top-4 -left-4 w-24 h-24 bg-gradient-to-br from-blue-400/20 to-indigo-300/20 rounded-full blur-2xl" />
+                            <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-gradient-to-br from-violet-300/20 to-blue-200/20 rounded-full blur-2xl" />
                             
                             {/* Main image container */}
                             <div className="relative w-full max-w-md lg:max-w-lg">
                                 {/* Floating accent shapes */}
-                                <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-2xl rotate-12 opacity-80" />
-                                <div className="absolute -bottom-3 -left-3 w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-400 rounded-xl -rotate-12 opacity-80" />
+                                <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl rotate-12 opacity-80" />
+                                <div className="absolute -bottom-3 -left-3 w-16 h-16 bg-gradient-to-br from-orange-400 to-amber-500 rounded-xl -rotate-12 opacity-80" />
                                 
                                 {/* Image frame */}
                                 <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-white p-2 shadow-2xl shadow-slate-200/50">

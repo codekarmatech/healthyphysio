@@ -29,7 +29,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
 from users.views import CustomTokenObtainPairView
-from site_settings.urls import services_urlpatterns
+from site_settings.urls import services_urlpatterns, blog_urlpatterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -59,6 +59,8 @@ urlpatterns = [
     path('api/site-settings/', include('site_settings.urls')),
     # Services - Public API for services list and detail
     path('api/services/', include(services_urlpatterns)),
+    # Blog - Public API for blog posts
+    path('api/blog/', include(blog_urlpatterns)),
 ]
 
 # Serve media files in development

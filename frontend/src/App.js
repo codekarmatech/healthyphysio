@@ -53,6 +53,7 @@ import PatientsPage from './pages/patients/PatientsPage';
 import PatientDetailPage from './pages/patients/PatientDetailPage';
 import TherapistPatientsPage from './pages/patients/TherapistPatientsPage';
 import TherapistPatientDetailPage from './pages/patients/TherapistPatientDetailPage';
+import NewPatientPage from './pages/patients/NewPatientPage';
 
 // Assessment Pages
 import AssessmentsPage from './pages/assessments/AssessmentsPage';
@@ -73,6 +74,19 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import DashboardLayout from './components/layout/DashboardLayout';
 import AuditDashboardPage from './pages/admin/AuditDashboardPage';
 import PaymentStatusManagement from './pages/admin/PaymentStatusManagement';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminPatientApprovalsPage from './pages/admin/AdminPatientApprovalsPage';
+import AdminUserDetailPage from './pages/admin/AdminUserDetailPage';
+import AdminNewTherapistPage from './pages/admin/AdminNewTherapistPage';
+import AdminTherapistsPage from './pages/admin/AdminTherapistsPage';
+import AdminEditTherapistPage from './pages/admin/AdminEditTherapistPage';
+
+// Doctor Pages
+import DoctorPatientsPage from './pages/doctor/DoctorPatientsPage';
+import DoctorPendingApprovalsPage from './pages/doctor/DoctorPendingApprovalsPage';
+import DoctorReportsPage from './pages/doctor/DoctorReportsPage';
+import DoctorEarningsPage from './pages/doctor/DoctorEarningsPage';
+import DoctorPatientDetailPage from './pages/doctor/DoctorPatientDetailPage';
 
 // Dashboard Components
 import AreaManagementDashboard from './components/dashboard/AreaManagementDashboard';
@@ -171,7 +185,7 @@ function App() {
           <Route path="/services" element={<Services />} />
           <Route path="/areas" element={<Areas />} />
           <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/:id" element={<BlogPost />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/book-consultation" element={<BookConsultation />} />
 
           {/* Protected Routes - Common for all roles */}
@@ -200,11 +214,13 @@ function App() {
 
           {/* Admin-only Routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/appointments" element={<AppointmentsPage />} />
             <Route path="/admin/appointments/new" element={<NewAppointmentPage />} />
             <Route path="/admin/appointments/:id" element={<AppointmentDetailPage />} />
             <Route path="/admin/appointments/:id/edit" element={<EditAppointmentPage />} />
             <Route path="/patients" element={<PatientsPage />} />
+            <Route path="/patients/new" element={<NewPatientPage />} />
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/admin/equipment" element={<EquipmentListPage />} />
             <Route path="/admin/equipment/new" element={<EquipmentFormPage />} />
@@ -262,6 +278,15 @@ function App() {
             <Route path="/admin/treatment-plans" element={<AdminTreatmentPlansPage />} />
             {/* Audit Dashboard */}
             <Route path="/admin/audit-dashboard" element={<AuditDashboardPage />} />
+            {/* User Management */}
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
+            {/* Patient Approvals */}
+            <Route path="/admin/patient-approvals" element={<AdminPatientApprovalsPage />} />
+            {/* Therapist Management */}
+            <Route path="/admin/therapists" element={<AdminTherapistsPage />} />
+            <Route path="/admin/therapists/new" element={<AdminNewTherapistPage />} />
+            <Route path="/admin/therapists/:id/edit" element={<AdminEditTherapistPage />} />
           </Route>
 
           {/* Basic Therapist Routes - Accessible to all therapists */}
@@ -327,15 +352,12 @@ function App() {
           {/* Doctor Routes */}
           <Route element={<ProtectedRoute allowedRoles={['doctor']} />}>
             <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-            <Route path="/doctor/patients" element={<PatientsPage />} />
-            <Route path="/doctor/patients/:id" element={<PatientDetailPage />} />
-            <Route path="/doctor/referrals" element={<DoctorDashboard />} />
-            <Route path="/doctor/reports" element={<DoctorDashboard />} />
-          </Route>
-
-          {/* Admin Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route path="/admin/*" element={<AdminDashboard />} />
+            <Route path="/doctor/patients" element={<DoctorPatientsPage />} />
+            <Route path="/doctor/patients/new" element={<NewPatientPage />} />
+            <Route path="/doctor/patients/:id" element={<DoctorPatientDetailPage />} />
+            <Route path="/doctor/pending-approvals" element={<DoctorPendingApprovalsPage />} />
+            <Route path="/doctor/reports" element={<DoctorReportsPage />} />
+            <Route path="/doctor/earnings" element={<DoctorEarningsPage />} />
           </Route>
 
           {/* Error Pages */}

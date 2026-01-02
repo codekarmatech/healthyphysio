@@ -139,6 +139,63 @@ class Patient(models.Model):
                             related_name='direct_patients',
                             help_text="Patient's residential area (required)")
 
+    # Doctor who added this patient to the platform (null if self-registered)
+    added_by_doctor = models.ForeignKey(
+        'Doctor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='added_patients',
+        help_text="Doctor who added this patient to the platform"
+    )
+
+    # Assigned doctor for earnings distribution (can be different from who added, or assigned later by admin)
+    assigned_doctor = models.ForeignKey(
+        'Doctor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_patients',
+        help_text="Doctor assigned to this patient for earnings distribution"
+    )
+
+    # Assigned therapist
+    assigned_therapist = models.ForeignKey(
+        'Therapist',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_patients',
+        help_text="Therapist assigned to this patient"
+    )
+
+    # Approval status for doctor-added patients
+    class ApprovalStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending Approval'
+        APPROVED = 'approved', 'Approved'
+        DENIED = 'denied', 'Denied'
+
+    approval_status = models.CharField(
+        max_length=20,
+        choices=ApprovalStatus.choices,
+        default=ApprovalStatus.APPROVED,
+        help_text="Approval status for doctor-added patients (self-registered are auto-approved)"
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_patients',
+        help_text="Admin who approved this patient"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True, help_text="When the patient was approved")
+    denial_reason = models.TextField(blank=True, help_text="Reason for denial if applicable")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
     # Custom manager
     objects = PatientManager()
 

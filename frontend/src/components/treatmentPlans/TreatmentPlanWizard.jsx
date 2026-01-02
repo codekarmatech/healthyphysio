@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import treatmentPlanService from '../../services/treatmentPlanService';
 import patientService from '../../services/patientService';
@@ -21,7 +21,6 @@ const TreatmentPlanWizard = ({
 }) => {
   const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [patients, setPatients] = useState([]);

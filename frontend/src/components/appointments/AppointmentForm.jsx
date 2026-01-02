@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
-import { toast } from 'react-toastify';
 import appointmentService from '../../services/appointmentService';
 import therapistService from '../../services/therapistService';
 import patientService from '../../services/patientService';
 import treatmentPlanService from '../../services/treatmentPlanService';
-import financialDashboardService from '../../services/financialDashboardService';
 
 const AppointmentForm = ({ editMode = false, appointmentId = null }) => {
   const navigate = useNavigate();

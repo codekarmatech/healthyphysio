@@ -12,7 +12,8 @@ from .models import (
     Testimonial, Statistic, TrustedPartner, FooterSettings,
     NavbarSettings, SEOSettings, PageContent, ProcessStep, Service,
     WhyChooseUs, CTASection, ProcessSectionSettings, ServicesSectionSettings,
-    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings
+    TestimonialsSectionSettings, WhyChooseUsSectionSettings, Founder, PageSettings,
+    BlogPost
 )
 from .serializers import (
     ThemeSettingsSerializer, BrandingSettingsSerializer, HeroSectionSerializer,
@@ -22,7 +23,7 @@ from .serializers import (
     ServiceSerializer, WhyChooseUsSerializer, CTASectionSerializer,
     ProcessSectionSettingsSerializer, ServicesSectionSettingsSerializer,
     TestimonialsSectionSettingsSerializer, WhyChooseUsSectionSettingsSerializer,
-    FounderSerializer, PageSettingsSerializer
+    FounderSerializer, PageSettingsSerializer, BlogPostSerializer, BlogPostListSerializer
 )
 
 
@@ -219,3 +220,60 @@ class ServiceViewSet(viewsets.ReadOnlyModelViewSet):
     
     def get_serializer_context(self):
         return {'request': self.request}
+
+
+class BlogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Public API for blog posts - provides list and detail endpoints
+    GET /api/blog/ - List all published blog posts
+    GET /api/blog/{slug}/ - Get single blog post by slug
+    GET /api/blog/featured/ - Get featured blog posts
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    lookup_field = 'slug'
+    
+    def get_queryset(self):
+        return BlogPost.objects.filter(is_published=True).order_by('-published_at')
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return BlogPostListSerializer
+        return BlogPostSerializer
+    
+    def get_serializer_context(self):
+        return {'request': self.request}
+    
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.view_count += 1
+        instance.save(update_fields=['view_count'])
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def featured(self, request):
+        """GET /api/blog/featured/ - Get featured blog posts"""
+        featured = self.get_queryset().filter(is_featured=True)[:3]
+        serializer = BlogPostListSerializer(featured, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def categories(self, request):
+        """GET /api/blog/categories/ - Get all blog categories"""
+        return Response(BlogPost.CATEGORY_CHOICES)
+    
+    @action(detail=False, methods=['get'], url_path='category/(?P<category>[^/.]+)')
+    def by_category(self, request, category=None):
+        """GET /api/blog/category/{category}/ - Get posts by category"""
+        posts = self.get_queryset().filter(category=category)
+        serializer = BlogPostListSerializer(posts, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def related(self, request, slug=None):
+        """GET /api/blog/{slug}/related/ - Get related blog posts"""
+        post = self.get_object()
+        related = self.get_queryset().filter(category=post.category).exclude(id=post.id)[:3]
+        serializer = BlogPostListSerializer(related, many=True, context={'request': request})
+        return Response(serializer.data)

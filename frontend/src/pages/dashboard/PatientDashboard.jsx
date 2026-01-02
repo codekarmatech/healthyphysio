@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { StatCard, ChartCard, SampleDataNotice, ProgressRing, QuickActionCard, ActivityList } from '../../components/dashboard/ui';
+import { StatCard, ChartCard, SampleDataNotice, ProgressRing, QuickActionCard } from '../../components/dashboard/ui';
 import { PatientSessionConfirmation } from '../../components/attendance';
 import api from '../../services/api';
 

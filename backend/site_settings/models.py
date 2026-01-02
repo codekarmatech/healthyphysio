@@ -732,6 +732,74 @@ class Founder(models.Model):
         return [q.strip() for q in self.qualifications.split(',') if q.strip()]
 
 
+class BlogPost(models.Model):
+    """
+    Blog post model for SEO-optimized content management
+    """
+    CATEGORY_CHOICES = [
+        ('treatment-tips', 'Treatment Tips'),
+        ('recovery', 'Recovery & Rehabilitation'),
+        ('wellness', 'Health & Wellness'),
+        ('exercises', 'Exercises & Techniques'),
+        ('news', 'News & Updates'),
+        ('patient-stories', 'Patient Stories'),
+    ]
+    
+    title = models.CharField(max_length=200, help_text='SEO-friendly title (60-70 characters ideal)')
+    slug = models.SlugField(max_length=200, unique=True, help_text='URL-friendly version of title')
+    excerpt = models.TextField(max_length=300, help_text='Brief summary for previews and meta description (150-160 chars ideal)')
+    content = models.TextField(help_text='Full blog content in HTML format')
+    
+    featured_image = models.ImageField(upload_to='blog/', blank=True, null=True, help_text='Main image (1200x630 for social sharing)')
+    featured_image_alt = models.CharField(max_length=200, blank=True, help_text='Alt text for featured image (SEO)')
+    
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='treatment-tips')
+    tags = models.CharField(max_length=500, blank=True, help_text='Comma-separated tags for SEO')
+    
+    author_name = models.CharField(max_length=100, default='PhysioWay Team')
+    author_title = models.CharField(max_length=200, blank=True, help_text='Author credentials/title')
+    author_image = models.ImageField(upload_to='blog/authors/', blank=True, null=True)
+    author_bio = models.TextField(blank=True, help_text='Short author bio')
+    
+    read_time_minutes = models.PositiveIntegerField(default=5, help_text='Estimated reading time in minutes')
+    
+    meta_title = models.CharField(max_length=70, blank=True, help_text='SEO meta title (leave blank to use title)')
+    meta_description = models.CharField(max_length=160, blank=True, help_text='SEO meta description (leave blank to use excerpt)')
+    meta_keywords = models.CharField(max_length=300, blank=True, help_text='SEO keywords (comma-separated)')
+    
+    is_featured = models.BooleanField(default=False, help_text='Show in featured section')
+    is_published = models.BooleanField(default=False, help_text='Publish the post')
+    
+    published_at = models.DateTimeField(blank=True, null=True, help_text='Publication date')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    view_count = models.PositiveIntegerField(default=0)
+    
+    class Meta:
+        ordering = ['-published_at', '-created_at']
+        verbose_name = 'Blog Post'
+        verbose_name_plural = 'Blog Posts'
+    
+    def __str__(self):
+        return self.title
+    
+    def get_tags_list(self):
+        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
+    
+    def get_meta_title(self):
+        return self.meta_title or self.title
+    
+    def get_meta_description(self):
+        return self.meta_description or self.excerpt[:160]
+    
+    def save(self, *args, **kwargs):
+        if self.is_published and not self.published_at:
+            from django.utils import timezone
+            self.published_at = timezone.now()
+        super().save(*args, **kwargs)
+
+
 class PageSettings(models.Model):
     """
     Page-specific settings including hero background images
