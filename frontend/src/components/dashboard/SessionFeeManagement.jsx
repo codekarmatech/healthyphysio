@@ -1,16 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, TextField, Button,
-         Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-         Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-         CircularProgress, IconButton, Tooltip } from '@mui/material';
-import { Edit, History, Add } from '@mui/icons-material';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import DashboardSection from './DashboardSection';
-import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
 
 const SessionFeeManagement = () => {
-  const { authTokens } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [feeConfigs, setFeeConfigs] = useState([]);
@@ -28,42 +20,30 @@ const SessionFeeManagement = () => {
     notes: ''
   });
 
-  // Fetch fee configurations
+  // Fetch fee configurations and patients
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [feeConfigsRes, patientsRes] = await Promise.all([
+        api.get('/earnings/fee-configs/'),
+        api.get('/users/patients/')
+      ]);
+      
+      setFeeConfigs(feeConfigsRes.data || []);
+      setPatients(patientsRes.data || []);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchFeeConfigs = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get('/api/earnings/fee-configs/', {
-          headers: {
-            'Authorization': `Bearer ${authTokens?.access}`
-          }
-        });
-        setFeeConfigs(response.data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching fee configurations:', err);
-        setError('Failed to load fee configurations. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchPatients = async () => {
-      try {
-        const response = await axios.get('/api/users/patients/', {
-          headers: {
-            'Authorization': `Bearer ${authTokens?.access}`
-          }
-        });
-        setPatients(response.data);
-      } catch (err) {
-        console.error('Error fetching patients:', err);
-      }
-    };
-
-    fetchFeeConfigs();
-    fetchPatients();
-  }, [authTokens]);
+    fetchData();
+  }, [fetchData]);
 
   // Handle opening edit dialog
   const handleOpenEditDialog = (feeConfig) => {
@@ -76,19 +56,17 @@ const SessionFeeManagement = () => {
   // Handle closing edit dialog
   const handleCloseEditDialog = () => {
     setOpenEditDialog(false);
+    setSelectedPatient(null);
   };
 
   // Handle opening history dialog
   const handleOpenHistoryDialog = async (feeConfig) => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/earnings/fee-changes/', {
-        params: { patient_id: feeConfig.patient },
-        headers: {
-          'Authorization': `Bearer ${authTokens?.access}`
-        }
+      const response = await api.get('/earnings/fee-changes/', {
+        params: { patient_id: feeConfig.patient }
       });
-      setFeeHistory(response.data);
+      setFeeHistory(response.data || []);
       setSelectedPatient(feeConfig);
       setOpenHistoryDialog(true);
     } catch (err) {
@@ -102,6 +80,7 @@ const SessionFeeManagement = () => {
   // Handle closing history dialog
   const handleCloseHistoryDialog = () => {
     setOpenHistoryDialog(false);
+    setSelectedPatient(null);
   };
 
   // Handle opening new fee config dialog
@@ -125,13 +104,9 @@ const SessionFeeManagement = () => {
 
     try {
       setLoading(true);
-      const response = await axios.post(`/api/earnings/fee-configs/${selectedPatient.id}/update_fee/`, {
+      const response = await api.post(`/earnings/fee-configs/${selectedPatient.id}/update_fee/`, {
         new_fee: parseFloat(newFee),
         reason: feeChangeReason
-      }, {
-        headers: {
-          'Authorization': `Bearer ${authTokens?.access}`
-        }
       });
 
       // Update the fee configs list
@@ -154,14 +129,10 @@ const SessionFeeManagement = () => {
 
     try {
       setLoading(true);
-      const response = await axios.post('/api/earnings/fee-configs/', {
+      const response = await api.post('/earnings/fee-configs/', {
         patient: newFeeConfig.patient,
         base_fee: parseFloat(newFeeConfig.base_fee),
         notes: newFeeConfig.notes
-      }, {
-        headers: {
-          'Authorization': `Bearer ${authTokens?.access}`
-        }
       });
 
       // Add the new fee config to the list
@@ -176,224 +147,306 @@ const SessionFeeManagement = () => {
     }
   };
 
-  // We'll use the patient_name field from the API response instead of this function
-  // const getPatientName = (patientId) => {
-  //   const patient = patients.find(p => p.id === patientId);
-  //   return patient ? `${patient.user.first_name} ${patient.user.last_name}` : 'Unknown Patient';
-  // };
-
   return (
     <DashboardLayout title="Session Fee Management">
-      {loading && !openEditDialog && !openHistoryDialog && !openNewDialog ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-          <Typography color="error">{error}</Typography>
-        </Box>
-      ) : (
-        <>
-          <DashboardSection title="Session Fee Configurations">
-            <Box display="flex" justifyContent="flex-end" mb={2}>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<Add />}
-                onClick={handleOpenNewDialog}
-              >
-                New Fee Configuration
-              </Button>
-            </Box>
-
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Patient</TableCell>
-                    <TableCell align="right">Base Fee (₹)</TableCell>
-                    <TableCell align="right">Custom Fee (₹)</TableCell>
-                    <TableCell align="right">Current Fee (₹)</TableCell>
-                    <TableCell>Notes</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {feeConfigs.map((config) => (
-                    <TableRow key={config.id}>
-                      <TableCell component="th" scope="row">
-                        {config.patient_name}
-                      </TableCell>
-                      <TableCell align="right">{config.base_fee}</TableCell>
-                      <TableCell align="right">{config.custom_fee || '-'}</TableCell>
-                      <TableCell align="right">{config.current_fee}</TableCell>
-                      <TableCell>{config.notes}</TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="Edit Fee">
-                          <IconButton onClick={() => handleOpenEditDialog(config)}>
-                            <Edit />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="View History">
-                          <IconButton onClick={() => handleOpenHistoryDialog(config)}>
-                            <History />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </DashboardSection>
-
-          {/* Edit Fee Dialog */}
-          <Dialog open={openEditDialog} onClose={handleCloseEditDialog}>
-            <DialogTitle>Update Fee for {selectedPatient?.patient_name}</DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                Current fee is ₹{selectedPatient?.current_fee}. Enter the new fee amount and reason for the change.
-              </DialogContentText>
-              <TextField
-                autoFocus
-                margin="dense"
-                label="New Fee (₹)"
-                type="number"
-                fullWidth
-                value={newFee}
-                onChange={(e) => setNewFee(e.target.value)}
-                InputProps={{
-                  startAdornment: <Typography variant="body1">₹</Typography>,
-                }}
-              />
-              <TextField
-                margin="dense"
-                label="Reason for Change"
-                type="text"
-                fullWidth
-                multiline
-                rows={3}
-                value={feeChangeReason}
-                onChange={(e) => setFeeChangeReason(e.target.value)}
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseEditDialog} color="primary">
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateFee} color="primary" variant="contained">
-                Update Fee
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* Fee History Dialog */}
-          <Dialog
-            open={openHistoryDialog}
-            onClose={handleCloseHistoryDialog}
-            maxWidth="md"
-            fullWidth
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Session Fee Management</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage session fees for patients
+            </p>
+          </div>
+          <button
+            onClick={handleOpenNewDialog}
+            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
           >
-            <DialogTitle>Fee History for {selectedPatient?.patient_name}</DialogTitle>
-            <DialogContent>
-              {feeHistory.length === 0 ? (
-                <Typography>No fee changes recorded for this patient.</Typography>
-              ) : (
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell align="right">Previous Fee (₹)</TableCell>
-                        <TableCell align="right">New Fee (₹)</TableCell>
-                        <TableCell>Changed By</TableCell>
-                        <TableCell>Reason</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {feeHistory.map((change) => (
-                        <TableRow key={change.id}>
-                          <TableCell>
-                            {new Date(change.changed_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell align="right">{change.previous_fee}</TableCell>
-                          <TableCell align="right">{change.new_fee}</TableCell>
-                          <TableCell>{change.changed_by_name}</TableCell>
-                          <TableCell>{change.reason}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseHistoryDialog} color="primary">
-                Close
-              </Button>
-            </DialogActions>
-          </Dialog>
+            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            New Fee Configuration
+          </button>
+        </div>
 
-          {/* New Fee Config Dialog */}
-          <Dialog open={openNewDialog} onClose={handleCloseNewDialog}>
-            <DialogTitle>Create New Fee Configuration</DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                Set up a new session fee configuration for a patient.
-              </DialogContentText>
-              <Box mt={2}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Patient"
-                  value={newFeeConfig.patient}
-                  onChange={(e) => setNewFeeConfig({...newFeeConfig, patient: e.target.value})}
-                  SelectProps={{
-                    native: true,
-                  }}
+        {/* Error */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && !openEditDialog && !openHistoryDialog && !openNewDialog ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        ) : (
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Patient
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Base Fee (₹)
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Custom Fee (₹)
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Current Fee (₹)
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Notes
+                  </th>
+                  <th scope="col" className="relative px-6 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {feeConfigs.length > 0 ? (
+                  feeConfigs.map((config) => (
+                    <tr key={config.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{config.patient_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        ₹{config.base_fee}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {config.custom_fee ? `₹${config.custom_fee}` : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                        ₹{config.current_fee}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {config.notes || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                        <button
+                          onClick={() => handleOpenEditDialog(config)}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Edit Fee"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleOpenHistoryDialog(config)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View History"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                      No fee configurations found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Edit Fee Modal */}
+        {openEditDialog && selectedPatient && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-6 border w-full max-w-md shadow-lg rounded-lg bg-white">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Update Fee for {selectedPatient.patient_name}</h3>
+                <button onClick={handleCloseEditDialog} className="text-gray-400 hover:text-gray-600">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-4">
+                Current fee is ₹{selectedPatient.current_fee}. Enter the new fee amount and reason for the change.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Fee (₹)</label>
+                  <input
+                    type="number"
+                    value={newFee}
+                    onChange={(e) => setNewFee(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    placeholder="Enter new fee"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Change</label>
+                  <textarea
+                    value={feeChangeReason}
+                    onChange={(e) => setFeeChangeReason(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    placeholder="Enter reason for fee change"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={handleCloseEditDialog}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
                 >
-                  <option value=""></option>
-                  {patients.map((patient) => (
-                    <option key={patient.id} value={patient.id}>
-                      {patient.user.first_name} {patient.user.last_name}
-                    </option>
-                  ))}
-                </TextField>
-              </Box>
-              <Box mt={2}>
-                <TextField
-                  fullWidth
-                  label="Base Fee (₹)"
-                  type="number"
-                  value={newFeeConfig.base_fee}
-                  onChange={(e) => setNewFeeConfig({...newFeeConfig, base_fee: e.target.value})}
-                  InputProps={{
-                    startAdornment: <Typography variant="body1">₹</Typography>,
-                  }}
-                />
-              </Box>
-              <Box mt={2}>
-                <TextField
-                  fullWidth
-                  label="Notes"
-                  multiline
-                  rows={3}
-                  value={newFeeConfig.notes}
-                  onChange={(e) => setNewFeeConfig({...newFeeConfig, notes: e.target.value})}
-                />
-              </Box>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseNewDialog} color="primary">
-                Cancel
-              </Button>
-              <Button onClick={handleCreateFeeConfig} color="primary" variant="contained">
-                Create
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </>
-      )}
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateFee}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Update Fee
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fee History Modal */}
+        {openHistoryDialog && selectedPatient && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-10 mx-auto p-6 border w-full max-w-3xl shadow-lg rounded-lg bg-white">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Fee History for {selectedPatient.patient_name}</h3>
+                <button onClick={handleCloseHistoryDialog} className="text-gray-400 hover:text-gray-600">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {feeHistory.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No fee changes recorded for this patient.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Previous Fee (₹)</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">New Fee (₹)</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Changed By</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {feeHistory.map((change) => (
+                        <tr key={change.id}>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {new Date(change.changed_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 text-right">₹{change.previous_fee}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 text-right">₹{change.new_fee}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{change.changed_by_name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{change.reason || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleCloseHistoryDialog}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* New Fee Config Modal */}
+        {openNewDialog && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-6 border w-full max-w-md shadow-lg rounded-lg bg-white">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Create New Fee Configuration</h3>
+                <button onClick={handleCloseNewDialog} className="text-gray-400 hover:text-gray-600">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-4">
+                Set up a new session fee configuration for a patient.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Patient</label>
+                  <select
+                    value={newFeeConfig.patient}
+                    onChange={(e) => setNewFeeConfig({...newFeeConfig, patient: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Select a patient</option>
+                    {patients.map((patient) => (
+                      <option key={patient.id} value={patient.id}>
+                        {patient.user?.first_name} {patient.user?.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Fee (₹)</label>
+                  <input
+                    type="number"
+                    value={newFeeConfig.base_fee}
+                    onChange={(e) => setNewFeeConfig({...newFeeConfig, base_fee: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    placeholder="Enter base fee"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={newFeeConfig.notes}
+                    onChange={(e) => setNewFeeConfig({...newFeeConfig, notes: e.target.value})}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    placeholder="Enter any notes"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={handleCloseNewDialog}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateFeeConfig}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </DashboardLayout>
   );
 };

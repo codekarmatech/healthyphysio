@@ -6,3 +6,4 @@ channels
 psycopg2-binary
 django-encrypted-files
 daphne
+psutil

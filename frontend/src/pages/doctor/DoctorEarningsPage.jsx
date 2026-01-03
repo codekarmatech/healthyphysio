@@ -139,7 +139,7 @@ const DoctorEarningsPage = () => {
     };
 
     fetchEarnings();
-  }, []);
+  }, [selectedPeriod]);
 
   // Update filtered history when period changes
   useEffect(() => {

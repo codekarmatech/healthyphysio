@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { StatCard, ChartCard, SampleDataNotice, ProgressRing, QuickActionCard } from '../../components/dashboard/ui';
 import { PatientSessionConfirmation } from '../../components/attendance';
+import PatientPaymentSection from '../../components/patient/PatientPaymentSection';
 import api from '../../services/api';
 
 const PatientDashboard = () => {
@@ -288,6 +289,9 @@ const PatientDashboard = () => {
             )}
           </ChartCard>
         </div>
+
+        {/* Payment Section */}
+        <PatientPaymentSection />
 
         {/* Quick Actions & Exercises */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

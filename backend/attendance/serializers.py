@@ -4,7 +4,7 @@ Connected to: Session management and assessments
 """
 
 from rest_framework import serializers
-from .models import Attendance, Holiday, Leave, Availability, SessionTimeLog, INDIAN_TZ
+from .models import Attendance, Holiday, Leave, Availability, SessionTimeLog, PatientConcern, INDIAN_TZ
 from .admin_requests import AttendanceChangeRequest
 from django.utils import timezone
 import datetime
@@ -517,3 +517,87 @@ class SessionTimeLogListSerializer(serializers.ModelSerializer):
 
     def get_appointment_session_code(self, obj):
         return obj.appointment.session_code
+
+
+class PatientConcernSerializer(serializers.ModelSerializer):
+    """Serializer for patient concerns/feedback about therapy sessions"""
+    patient_name = serializers.SerializerMethodField()
+    therapist_name = serializers.SerializerMethodField()
+    responded_by_name = serializers.SerializerMethodField()
+    category_display = serializers.SerializerMethodField()
+    status_display = serializers.SerializerMethodField()
+    priority_display = serializers.SerializerMethodField()
+    created_at_ist = serializers.SerializerMethodField()
+    responded_at_ist = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientConcern
+        fields = [
+            'id', 'patient', 'patient_name', 'therapist', 'therapist_name',
+            'appointment', 'session_date', 'category', 'category_display',
+            'subject', 'description', 'status', 'status_display',
+            'priority', 'priority_display', 'admin_response',
+            'responded_by', 'responded_by_name', 'responded_at', 'responded_at_ist',
+            'requires_call', 'call_completed', 'call_notes',
+            'created_at', 'created_at_ist', 'updated_at'
+        ]
+        read_only_fields = [
+            'patient', 'admin_response', 'responded_by', 'responded_at',
+            'requires_call', 'call_completed', 'call_notes', 'created_at', 'updated_at'
+        ]
+
+    def get_patient_name(self, obj):
+        return obj.patient.user.get_full_name() if obj.patient else None
+
+    def get_therapist_name(self, obj):
+        return obj.therapist.user.get_full_name() if obj.therapist else None
+
+    def get_responded_by_name(self, obj):
+        return obj.responded_by.get_full_name() if obj.responded_by else None
+
+    def get_category_display(self, obj):
+        return obj.get_category_display()
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
+    def get_priority_display(self, obj):
+        return obj.get_priority_display()
+
+    def get_created_at_ist(self, obj):
+        if obj.created_at:
+            ist_time = timezone.localtime(obj.created_at, timezone=INDIAN_TZ)
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return None
+
+    def get_responded_at_ist(self, obj):
+        if obj.responded_at:
+            ist_time = timezone.localtime(obj.responded_at, timezone=INDIAN_TZ)
+            return ist_time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return None
+
+
+class PatientConcernCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating patient concerns"""
+    class Meta:
+        model = PatientConcern
+        fields = [
+            'therapist', 'appointment', 'session_date',
+            'category', 'subject', 'description', 'priority'
+        ]
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request.user, 'patient_profile'):
+            validated_data['patient'] = request.user.patient_profile
+        return super().create(validated_data)
+
+
+class PatientConcernAdminResponseSerializer(serializers.Serializer):
+    """Serializer for admin response to patient concerns"""
+    response_text = serializers.CharField(required=True)
+    requires_call = serializers.BooleanField(default=False)
+    status = serializers.ChoiceField(
+        choices=['acknowledged', 'in_progress', 'resolved', 'closed'],
+        default='acknowledged'
+    )

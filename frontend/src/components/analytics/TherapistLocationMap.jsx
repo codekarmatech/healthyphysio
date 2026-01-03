@@ -662,7 +662,7 @@ const TherapistLocationMap = ({
         console.error('Failed to set default view:', e);
       }
     }
-  }, [therapists, patients, showProximityAlerts, proximityThreshold, defaultCenter, zoom, selectedTherapistId, onTherapistSelect]);
+  }, [therapists, patients, showProximityAlerts, proximityThreshold, defaultCenter, zoom, selectedTherapistId, onTherapistSelect, mapType]);
 
   // Helper function to calculate distance between two points in meters
   const calculateDistance = (lat1, lon1, lat2, lon2) => {

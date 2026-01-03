@@ -396,6 +396,76 @@ class SessionTimeLog(models.Model):
         help_text="Time when patient confirmed therapist departure"
     )
 
+    # Therapist geo-coordinates when marking arrival/departure
+    therapist_arrival_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Therapist GPS latitude when marking arrival"
+    )
+    therapist_arrival_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Therapist GPS longitude when marking arrival"
+    )
+    therapist_arrival_accuracy = models.FloatField(
+        null=True, blank=True,
+        help_text="GPS accuracy in meters when therapist marked arrival"
+    )
+    therapist_departure_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Therapist GPS latitude when marking departure"
+    )
+    therapist_departure_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Therapist GPS longitude when marking departure"
+    )
+    therapist_departure_accuracy = models.FloatField(
+        null=True, blank=True,
+        help_text="GPS accuracy in meters when therapist marked departure"
+    )
+
+    # Patient geo-coordinates when confirming arrival/departure
+    patient_arrival_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Patient GPS latitude when confirming therapist arrival"
+    )
+    patient_arrival_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Patient GPS longitude when confirming therapist arrival"
+    )
+    patient_arrival_accuracy = models.FloatField(
+        null=True, blank=True,
+        help_text="GPS accuracy in meters when patient confirmed arrival"
+    )
+    patient_departure_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Patient GPS latitude when confirming therapist departure"
+    )
+    patient_departure_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Patient GPS longitude when confirming therapist departure"
+    )
+    patient_departure_accuracy = models.FloatField(
+        null=True, blank=True,
+        help_text="GPS accuracy in meters when patient confirmed departure"
+    )
+
+    # Track if location was added later (not at the time of confirmation)
+    therapist_arrival_location_added_later = models.BooleanField(
+        default=False,
+        help_text="Whether therapist arrival location was added after the initial confirmation"
+    )
+    therapist_departure_location_added_later = models.BooleanField(
+        default=False,
+        help_text="Whether therapist departure location was added after the initial confirmation"
+    )
+    patient_arrival_location_added_later = models.BooleanField(
+        default=False,
+        help_text="Whether patient arrival location was added after the initial confirmation"
+    )
+    patient_departure_location_added_later = models.BooleanField(
+        default=False,
+        help_text="Whether patient departure location was added after the initial confirmation"
+    )
+
     # Calculated durations (in minutes)
     therapist_duration_minutes = models.IntegerField(
         null=True,
@@ -453,21 +523,34 @@ class SessionTimeLog(models.Model):
     def __str__(self):
         return f"Session {self.appointment.session_code} - {self.date} - {self.status}"
 
-    def therapist_reached(self):
-        """Record therapist arrival at patient's house"""
+    def therapist_reached(self, location_data=None):
+        """Record therapist arrival at patient's house with optional geo-coordinates"""
         now = timezone.now().astimezone(INDIAN_TZ)
         self.therapist_reached_time = now
         self.status = 'therapist_reached'
+
+        # Store geo-coordinates if provided
+        if location_data:
+            self.therapist_arrival_latitude = location_data.get('latitude')
+            self.therapist_arrival_longitude = location_data.get('longitude')
+            self.therapist_arrival_accuracy = location_data.get('accuracy')
+
         self.save()
         return True
 
-    def therapist_leaving(self):
-        """Record therapist departure from patient's house"""
+    def therapist_leaving(self, location_data=None):
+        """Record therapist departure from patient's house with optional geo-coordinates"""
         if not self.therapist_reached_time:
             return False
 
         now = timezone.now().astimezone(INDIAN_TZ)
         self.therapist_leaving_time = now
+
+        # Store geo-coordinates if provided
+        if location_data:
+            self.therapist_departure_latitude = location_data.get('latitude')
+            self.therapist_departure_longitude = location_data.get('longitude')
+            self.therapist_departure_accuracy = location_data.get('accuracy')
 
         # Calculate duration
         duration = now - self.therapist_reached_time
@@ -480,23 +563,35 @@ class SessionTimeLog(models.Model):
         self._check_discrepancy()
         return True
 
-    def patient_confirm_arrival(self):
-        """Patient confirms therapist has arrived"""
+    def patient_confirm_arrival(self, location_data=None):
+        """Patient confirms therapist has arrived with optional geo-coordinates"""
         now = timezone.now().astimezone(INDIAN_TZ)
         self.patient_confirmed_arrival = now
+
+        # Store geo-coordinates if provided
+        if location_data:
+            self.patient_arrival_latitude = location_data.get('latitude')
+            self.patient_arrival_longitude = location_data.get('longitude')
+            self.patient_arrival_accuracy = location_data.get('accuracy')
 
         if self.status == 'pending':
             self.status = 'in_progress'
         self.save()
         return True
 
-    def patient_confirm_departure(self):
-        """Patient confirms therapist has left"""
+    def patient_confirm_departure(self, location_data=None):
+        """Patient confirms therapist has left with optional geo-coordinates"""
         if not self.patient_confirmed_arrival:
             return False
 
         now = timezone.now().astimezone(INDIAN_TZ)
         self.patient_confirmed_departure = now
+
+        # Store geo-coordinates if provided
+        if location_data:
+            self.patient_departure_latitude = location_data.get('latitude')
+            self.patient_departure_longitude = location_data.get('longitude')
+            self.patient_departure_accuracy = location_data.get('accuracy')
 
         # Calculate duration
         duration = now - self.patient_confirmed_arrival
@@ -565,3 +660,159 @@ class SessionTimeLog(models.Model):
         if hours > 0:
             return f"{hours}h {minutes}m"
         return f"{minutes}m"
+
+
+class PatientConcern(models.Model):
+    """
+    Model to track patient concerns/feedback about therapy sessions.
+    Allows patients to report issues with specific session dates for admin review.
+    Framed positively as "Session Feedback" rather than complaints.
+    """
+    CATEGORY_CHOICES = (
+        ('service_quality', 'Service Quality'),
+        ('timing', 'Timing or Punctuality'),
+        ('communication', 'Communication'),
+        ('treatment', 'Treatment Approach'),
+        ('professionalism', 'Professionalism'),
+        ('payment', 'Payment Related'),
+        ('other', 'Other'),
+    )
+
+    STATUS_CHOICES = (
+        ('pending', 'Pending Review'),
+        ('acknowledged', 'Acknowledged'),
+        ('in_progress', 'Being Addressed'),
+        ('resolved', 'Resolved'),
+        ('closed', 'Closed'),
+    )
+
+    PRIORITY_CHOICES = (
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    )
+
+    patient = models.ForeignKey(
+        'users.Patient',
+        on_delete=models.CASCADE,
+        related_name='concerns'
+    )
+    therapist = models.ForeignKey(
+        'users.Therapist',
+        on_delete=models.CASCADE,
+        related_name='patient_concerns',
+        null=True,
+        blank=True,
+        help_text="Therapist related to this concern (if applicable)"
+    )
+    appointment = models.ForeignKey(
+        'scheduling.Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='patient_concerns',
+        help_text="Specific appointment this concern relates to"
+    )
+    session_date = models.DateField(
+        help_text="Date of the session this concern relates to"
+    )
+    category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default='other'
+    )
+    subject = models.CharField(
+        max_length=200,
+        help_text="Brief subject/title of the concern"
+    )
+    description = models.TextField(
+        help_text="Detailed description of the concern"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
+    priority = models.CharField(
+        max_length=10,
+        choices=PRIORITY_CHOICES,
+        default='medium'
+    )
+
+    # Admin response
+    admin_response = models.TextField(
+        blank=True,
+        help_text="Admin's response to the patient's concern"
+    )
+    responded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='responded_concerns'
+    )
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    # Follow-up tracking
+    requires_call = models.BooleanField(
+        default=False,
+        help_text="Whether admin needs to call the patient"
+    )
+    call_completed = models.BooleanField(default=False)
+    call_notes = models.TextField(blank=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['patient', 'created_at']),
+            models.Index(fields=['therapist', 'created_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['category']),
+        ]
+
+    def __str__(self):
+        return f"Concern from {self.patient.user.get_full_name()} - {self.subject[:50]}"
+
+    def acknowledge(self, admin_user, response_text):
+        """Acknowledge the concern and send standard response"""
+        self.status = 'acknowledged'
+        self.admin_response = response_text
+        self.responded_by = admin_user
+        self.responded_at = timezone.now()
+        self.save()
+        return True
+
+    def mark_requires_call(self, admin_user):
+        """Mark that this concern requires a phone call to patient"""
+        self.requires_call = True
+        self.responded_by = admin_user
+        self.save()
+        return True
+
+    def complete_call(self, notes=''):
+        """Mark the follow-up call as completed"""
+        self.call_completed = True
+        self.call_notes = notes
+        self.save()
+        return True
+
+    def resolve(self, admin_user, resolution_notes=''):
+        """Mark concern as resolved"""
+        self.status = 'resolved'
+        if resolution_notes:
+            self.admin_response = f"{self.admin_response}\n\nResolution: {resolution_notes}" if self.admin_response else resolution_notes
+        self.responded_by = admin_user
+        self.responded_at = timezone.now()
+        self.save()
+        return True
+
+    def close(self):
+        """Close the concern"""
+        self.status = 'closed'
+        self.save()
+        return True

@@ -80,6 +80,7 @@ import AdminUserDetailPage from './pages/admin/AdminUserDetailPage';
 import AdminNewTherapistPage from './pages/admin/AdminNewTherapistPage';
 import AdminTherapistsPage from './pages/admin/AdminTherapistsPage';
 import AdminEditTherapistPage from './pages/admin/AdminEditTherapistPage';
+import AdminPatientsPage from './pages/admin/AdminPatientsPage';
 
 // Doctor Pages
 import DoctorPatientsPage from './pages/doctor/DoctorPatientsPage';
@@ -131,6 +132,16 @@ import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import BookConsultation from './pages/BookConsultation';
 import Areas from './pages/Areas';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
+
+// Patient Specific Pages
+import SessionFeedbackPage from './pages/patient/SessionFeedbackPage';
+import PatientPaymentHistoryPage from './pages/patient/PatientPaymentHistoryPage';
+import PatientAttendancePage from './pages/patient/PatientAttendancePage';
+
+// Admin Additional Pages
+import PatientConcernsPage from './pages/admin/PatientConcernsPage';
 
 function App() {
   // Dynamic favicon loading from backend branding settings
@@ -187,6 +198,8 @@ function App() {
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/book-consultation" element={<BookConsultation />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
 
           {/* Protected Routes - Common for all roles */}
           <Route element={<ProtectedRoute />}>
@@ -231,6 +244,7 @@ function App() {
             <Route path="/admin/attendance" element={<AdminAttendancePage />} />
             {/* New Report Routes for Admin */}
             <Route path="/admin/submitted-reports" element={<SubmittedReportsPage />} />
+            <Route path="/admin/patient-concerns" element={<PatientConcernsPage />} />
             <Route path="/admin/report/:id" element={<AdminReportViewPage />} />
             {/* Therapist Approvals */}
             <Route path="/admin/therapist-approvals" element={<TherapistApprovalsPage />} />
@@ -287,6 +301,8 @@ function App() {
             <Route path="/admin/therapists" element={<AdminTherapistsPage />} />
             <Route path="/admin/therapists/new" element={<AdminNewTherapistPage />} />
             <Route path="/admin/therapists/:id/edit" element={<AdminEditTherapistPage />} />
+            {/* Patient Management */}
+            <Route path="/admin/patients" element={<AdminPatientsPage />} />
           </Route>
 
           {/* Basic Therapist Routes - Accessible to all therapists */}
@@ -344,6 +360,9 @@ function App() {
             <Route path="/patient/dashboard" element={<PatientDashboard />} />
             <Route path="/patient/appointments" element={<PatientAppointmentsPage />} />
             <Route path="/patient/appointments/:id" element={<AppointmentDetailPage />} />
+            <Route path="/patient/attendance" element={<PatientAttendancePage />} />
+            <Route path="/patient/payments" element={<PatientPaymentHistoryPage />} />
+            <Route path="/patient/feedback" element={<SessionFeedbackPage />} />
             <Route path="/patient/exercises" element={<PatientExercisesPage />} />
             <Route path="/patient/progress" element={<PatientProgressPage />} />
             <Route path="/patient/equipment" element={<EquipmentListPage />} />

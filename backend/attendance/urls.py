@@ -8,12 +8,13 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'', views.AttendanceViewSet, basename='attendance')
 router.register(r'holidays', views.HolidayViewSet)
 router.register(r'leave', views.LeaveViewSet, basename='leave')
 router.register(r'change-requests', views.AttendanceChangeRequestViewSet, basename='attendance-change-request')
 router.register(r'availability', views.AvailabilityViewSet, basename='availability')
 router.register(r'session-time', views.SessionTimeLogViewSet, basename='session-time-log')
+router.register(r'patient-concerns', views.PatientConcernViewSet, basename='patient-concern')
+router.register(r'', views.AttendanceViewSet, basename='attendance')
 
 urlpatterns = [
     path('availability/', views.get_availability, name='get_availability'),

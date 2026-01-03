@@ -3,6 +3,35 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/layout/Navbar';
 import { COMPANY_INFO, CSS_CLASSES } from '../../constants';
+import { getAllSettings } from '../../services/siteSettingsService';
+
+const WalkingManAnimation = ({ isWalking, progress }) => {
+  return (
+    <div className="relative w-full h-16 bg-gradient-to-r from-green-100 via-blue-50 to-primary-100 rounded-xl overflow-hidden mb-4">
+      {/* Path/Road */}
+      <div className="absolute bottom-2 left-0 right-0 h-1 bg-gray-300 rounded"></div>
+      
+      {/* Start point - Home */}
+      <div className="absolute bottom-1 left-2 text-xl">🏠</div>
+      
+      {/* End point - Hospital */}
+      <div className="absolute bottom-1 right-2 text-xl">🏥</div>
+      
+      {/* Walking Person */}
+      <div 
+        className={`absolute bottom-1 text-2xl transition-all duration-1000 ease-out ${isWalking ? 'animate-bounce' : ''}`}
+        style={{ left: `calc(${Math.min(progress, 100)}% - 12px)`, minWidth: '24px' }}
+      >
+        🚶
+      </div>
+      
+      {/* Progress indicator */}
+      <div className="absolute top-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 font-medium">
+        {progress > 0 && progress < 100 ? 'Signing in...' : progress >= 100 ? 'Welcome!' : ''}
+      </div>
+    </div>
+  );
+};
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
@@ -11,7 +40,34 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [settings, setSettings] = useState(null);
+  const [walkProgress, setWalkProgress] = useState(5);
   const { login } = useAuth();
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const allSettings = await getAllSettings();
+        setSettings(allSettings);
+      } catch (err) {
+        console.warn('Failed to fetch settings', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Animate walking when loading
+  useEffect(() => {
+    if (loading) {
+      const interval = setInterval(() => {
+        setWalkProgress(prev => Math.min(prev + 15, 90));
+      }, 300);
+      return () => clearInterval(interval);
+    } else if (walkProgress > 5 && walkProgress < 100) {
+      // Reset if login failed
+      setWalkProgress(5);
+    }
+  }, [loading, walkProgress]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -119,6 +175,11 @@ const Login = () => {
     }
   };
 
+  const branding = settings?.branding || COMPANY_INFO;
+  const logoUrl = branding.logo_url || branding.logo;
+  const companyName = branding.company_name || COMPANY_INFO.name;
+  const tagline = branding.tagline || COMPANY_INFO.tagline;
+
   useEffect(() => {
     document.title = 'Login - PhysioWay | Access Your Account';
   }, []);
@@ -126,41 +187,45 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 relative overflow-hidden">
       <Navbar />
-      <div className="flex flex-col justify-center py-12 sm:px-6 lg:px-8 pt-20">
-      {/* Background Elements */}
-      <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary-100/20 to-transparent"></div>
-      <div className="absolute bottom-0 left-0 w-1/4 h-1/2 bg-gradient-to-t from-secondary-100/20 to-transparent"></div>
-      <div className="absolute top-20 right-20 w-20 h-20 bg-primary-200/30 rounded-full animate-float"></div>
-      <div className="absolute bottom-32 left-20 w-16 h-16 bg-secondary-200/30 rounded-full animate-pulse-slow"></div>
+      <div className="flex flex-col justify-center py-6 px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28">
+      {/* Background Elements - Hidden on mobile for cleaner look */}
+      <div className="hidden sm:block absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary-100/20 to-transparent"></div>
+      <div className="hidden sm:block absolute bottom-0 left-0 w-1/4 h-1/2 bg-gradient-to-t from-secondary-100/20 to-transparent"></div>
+      <div className="hidden md:block absolute top-20 right-20 w-20 h-20 bg-primary-200/30 rounded-full animate-float"></div>
+      <div className="hidden md:block absolute bottom-32 left-20 w-16 h-16 bg-secondary-200/30 rounded-full animate-pulse-slow"></div>
       
-      <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center group">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
-              <span className="text-3xl text-white">🏥</span>
+      <div className="relative mx-auto w-full max-w-sm sm:max-w-md">
+        {/* Logo and Header - Stack vertically on mobile */}
+        <div className="text-center mb-6 sm:mb-8">
+          <Link to="/" className="inline-flex flex-col sm:flex-row items-center group">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-2xl flex items-center justify-center mb-2 sm:mb-0 sm:mr-4 group-hover:scale-110 transition-transform duration-300 shadow-lg border border-gray-100 p-2 overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt={companyName} className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-2xl sm:text-3xl">🏥</span>
+              )}
             </div>
-            <div className="text-left">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-500 bg-clip-text text-transparent">
-                {COMPANY_INFO.name}
+            <div className="text-center sm:text-left">
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-500 bg-clip-text text-transparent">
+                {companyName}
               </h1>
-              <p className="text-sm text-gray-600 font-medium">{COMPANY_INFO.tagline}</p>
+              <p className="text-xs sm:text-sm text-gray-600 font-medium">{tagline}</p>
             </div>
           </Link>
         </div>
         
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+        <div className="text-center mb-4 sm:mb-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
             Welcome Back
           </h2>
-          <p className="text-gray-600">
-            Sign in to access your physiotherapy dashboard
+          <p className="text-sm sm:text-base text-gray-600">
+            Sign in to access your dashboard
           </p>
         </div>
       </div>
 
-      <div className="relative mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white/80 backdrop-blur-sm py-10 px-8 shadow-2xl rounded-3xl border border-white/20">
+      <div className="relative mt-4 sm:mt-6 mx-auto w-full max-w-sm sm:max-w-md px-2 sm:px-0">
+        <div className="bg-white/90 backdrop-blur-sm py-6 sm:py-8 px-4 sm:px-8 shadow-2xl rounded-2xl sm:rounded-3xl border border-white/20">
           {error && (
             <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
               <div className="flex">
@@ -176,43 +241,43 @@ const Login = () => {
             </div>
           )}
 
-          <form className="space-y-8" onSubmit={handleSubmit}>
-            <div className="space-y-6">
+          <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-4 sm:space-y-5">
               <div>
-                <label htmlFor="username" className="block text-sm font-semibold text-gray-800 mb-2">
+                <label htmlFor="username" className="block text-xs sm:text-sm font-semibold text-gray-800 mb-1.5 sm:mb-2">
                   Username / Email / Mobile
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-gray-400">👤</span>
+                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-400 text-sm sm:text-base">👤</span>
                   </div>
                   <input
                     id="username"
                     name="username"
                     type="text"
                     required
-                    className="block w-full pl-12 pr-4 py-4 border border-gray-200 rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white/70 backdrop-blur-sm transition-all duration-300 text-gray-900"
+                    className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 text-sm sm:text-base border border-gray-200 rounded-xl sm:rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white/70 backdrop-blur-sm transition-all duration-300 text-gray-900"
                     value={credentials.username}
                     onChange={handleChange}
-                    placeholder="Enter username, email or mobile number"
+                    placeholder="Enter username, email or mobile"
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-800 mb-2">
+                <label htmlFor="password" className="block text-xs sm:text-sm font-semibold text-gray-800 mb-1.5 sm:mb-2">
                   Password
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span className="text-gray-400">🔒</span>
+                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                    <span className="text-gray-400 text-sm sm:text-base">🔒</span>
                   </div>
                   <input
                     id="password"
                     name="password"
                     type="password"
                     required
-                    className="block w-full pl-12 pr-4 py-4 border border-gray-200 rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white/70 backdrop-blur-sm transition-all duration-300 text-gray-900"
+                    className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-4 text-sm sm:text-base border border-gray-200 rounded-xl sm:rounded-2xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white/70 backdrop-blur-sm transition-all duration-300 text-gray-900"
                     value={credentials.password}
                     onChange={handleChange}
                     placeholder="Enter your password"
@@ -221,7 +286,7 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
               <div className="flex items-center">
                 <input
                   id="remember_me"
@@ -229,27 +294,30 @@ const Login = () => {
                   type="checkbox"
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 />
-                <label htmlFor="remember_me" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="remember_me" className="ml-2 block text-xs sm:text-sm text-gray-900">
                   Remember me
                 </label>
               </div>
 
-              <div className="text-sm">
+              <div className="text-xs sm:text-sm">
                 <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
-                  Forgot your password?
+                  Forgot password?
                 </Link>
               </div>
             </div>
 
-            <div className="pt-4">
+            {/* Walking Animation */}
+            <WalkingManAnimation isWalking={loading} progress={walkProgress} />
+
+            <div>
               <button
                 type="submit"
                 disabled={loading}
-                className={`${CSS_CLASSES.button.primary} w-full py-4 text-lg font-semibold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+                className={`${CSS_CLASSES.button.primary} w-full py-3 sm:py-4 text-sm sm:text-lg font-semibold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none rounded-xl sm:rounded-2xl`}
               >
                 {loading ? (
                   <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-2"></div>
                     Signing in...
                   </div>
                 ) : (
@@ -259,45 +327,45 @@ const Login = () => {
             </div>
           </form>
 
-          <div className="mt-8">
+          <div className="mt-6 sm:mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200"></div>
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white/80 text-gray-500 font-medium">
+              <div className="relative flex justify-center text-xs sm:text-sm">
+                <span className="px-3 sm:px-4 bg-white/90 text-gray-500 font-medium">
                   New to PhysioWay?
                 </span>
               </div>
             </div>
 
-            <div className="mt-6 text-center space-y-4">
+            <div className="mt-4 sm:mt-6 text-center space-y-3 sm:space-y-4">
               <Link 
                 to="/register" 
-                className="block w-full py-3 px-4 border-2 border-primary-200 rounded-2xl text-primary-600 font-semibold hover:bg-primary-50 hover:border-primary-300 transition-all duration-300 transform hover:scale-105"
+                className="block w-full py-2.5 sm:py-3 px-4 border-2 border-primary-200 rounded-xl sm:rounded-2xl text-primary-600 text-sm sm:text-base font-semibold hover:bg-primary-50 hover:border-primary-300 transition-all duration-300 transform hover:scale-105"
               >
                 Create New Account
               </Link>
               
-              <div className="flex items-center justify-center space-x-4 text-sm">
+              <div className="flex items-center justify-center flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
                 <Link to="/forgot-password" className="text-primary-600 hover:text-primary-700 font-medium transition-colors">
                   Forgot Password?
                 </Link>
-                <span className="text-gray-300">•</span>
+                <span className="text-gray-300 hidden sm:inline">•</span>
                 <Link to="/contact" className="text-gray-600 hover:text-primary-600 transition-colors">
                   Need Help?
                 </Link>
               </div>
               
-              <div className="pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 mb-2">
+              <div className="pt-3 sm:pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-1 sm:mb-2">
                   24/7 Support Available
                 </p>
-                <div className="flex items-center justify-center space-x-4 text-xs">
-                  <a href={`mailto:${COMPANY_INFO.email}`} className="text-primary-600 hover:text-primary-700 transition-colors">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-4 text-xs">
+                  <a href={`mailto:${COMPANY_INFO.email}`} className="text-primary-600 hover:text-primary-700 transition-colors truncate max-w-full">
                     📧 {COMPANY_INFO.email}
                   </a>
-                  <span className="text-gray-300">•</span>
+                  <span className="text-gray-300 hidden sm:inline">•</span>
                   <a href={`tel:${COMPANY_INFO.phone}`} className="text-primary-600 hover:text-primary-700 transition-colors">
                     📞 {COMPANY_INFO.phone}
                   </a>

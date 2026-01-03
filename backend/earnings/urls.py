@@ -43,6 +43,9 @@ urlpatterns = [
     # Therapist payment history endpoint
     path('therapist/<int:therapist_id>/payment-history/', payment_views.therapist_payment_history, name='therapist-payment-history'),
 
+    # Patient payment history endpoint
+    path('patient/payment-history/', payment_views.patient_payment_history, name='patient-payment-history'),
+
     # Legacy URL pattern used by TherapistDashboard.jsx
     path('monthly/<int:therapist_id>/', simple_views.simple_therapist_monthly_earnings, name='legacy-monthly-earnings'),
 

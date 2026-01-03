@@ -14,7 +14,15 @@ const PatientsPage = () => {
     const fetchPatients = async () => {
       try {
         setLoading(true);
-        const response = await patientService.getByTherapist(user.id);
+        let response;
+        
+        // Admin sees all patients, therapist sees only assigned patients
+        if (user.role === 'admin') {
+          response = await patientService.getAllPatients();
+        } else {
+          response = await patientService.getByTherapist(user.id);
+        }
+        
         setPatients(response.data || []);
         setLoading(false);
       } catch (err) {

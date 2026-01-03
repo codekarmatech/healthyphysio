@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { locationService, visitsService } from '../../services/visitsService';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Spinner from '../../components/common/Spinner';
 import LocationMap from '../../components/visits/LocationMap';
 import { toast } from 'react-toastify';
+import api from '../../services/api';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -26,6 +27,24 @@ const LocationMonitoringPage = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [therapists, setTherapists] = useState([]);
   const [patients, setPatients] = useState([]);
+  const [therapistLiveLocations, setTherapistLiveLocations] = useState([]);
+  const [showLiveLocations, setShowLiveLocations] = useState(true);
+
+  // Fetch therapists with location permission
+  const fetchTherapistLiveLocations = useCallback(async () => {
+    try {
+      const response = await api.get('/users/therapists/with-location-permission/');
+      setTherapistLiveLocations(response.data || []);
+    } catch (err) {
+      console.error('Error fetching therapist live locations:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTherapistLiveLocations();
+    const interval = setInterval(fetchTherapistLiveLocations, 60000);
+    return () => clearInterval(interval);
+  }, [fetchTherapistLiveLocations]);
 
   // Fetch active visits
   useEffect(() => {
@@ -244,6 +263,74 @@ const LocationMonitoringPage = () => {
             )}
           </div>
 
+          {/* Therapist Live Locations Toggle */}
+          <div className="mb-4 flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showLiveLocations}
+                onChange={(e) => setShowLiveLocations(e.target.checked)}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Show Therapist Live Locations</span>
+            </label>
+            <span className="text-xs text-gray-500">
+              ({therapistLiveLocations.filter(t => t.has_location).length} therapists with location)
+            </span>
+            <button
+              onClick={fetchTherapistLiveLocations}
+              className="text-sm text-primary-600 hover:text-primary-700"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {/* Therapist Live Locations Cards */}
+          {showLiveLocations && therapistLiveLocations.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3">Therapist Live Locations</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {therapistLiveLocations.map((therapist) => (
+                  <div
+                    key={therapist.id}
+                    className={`p-3 rounded-lg border ${
+                      therapist.has_location && !therapist.is_stale
+                        ? 'bg-green-50 border-green-200'
+                        : therapist.has_location
+                        ? 'bg-yellow-50 border-yellow-200'
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-900">{therapist.name}</span>
+                      {therapist.has_location ? (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          therapist.is_stale ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {therapist.is_stale ? 'Stale' : 'Live'}
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                          No Location
+                        </span>
+                      )}
+                    </div>
+                    {therapist.has_location && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {therapist.latitude?.toFixed(4)}, {therapist.longitude?.toFixed(4)}
+                        {therapist.updated_at && (
+                          <span className="ml-2">
+                            Updated: {new Date(therapist.updated_at).toLocaleTimeString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Map */}
           <div className="mb-6">
             <h2 className="text-xl font-semibold mb-4">Location Map</h2>
@@ -251,10 +338,25 @@ const LocationMonitoringPage = () => {
               <div className="flex justify-center items-center h-96">
                 <Spinner size="lg" />
               </div>
-            ) : getFilteredLocations().length > 0 ? (
+            ) : getFilteredLocations().length > 0 || (showLiveLocations && therapistLiveLocations.some(t => t.has_location)) ? (
               <div className="h-96 border border-gray-200 rounded-lg overflow-hidden">
                 <LocationMap
-                  locations={getFilteredLocations()}
+                  locations={[
+                    ...getFilteredLocations(),
+                    ...(showLiveLocations ? therapistLiveLocations
+                      .filter(t => t.has_location)
+                      .map(t => ({
+                        id: `therapist-live-${t.id}`,
+                        latitude: t.latitude,
+                        longitude: t.longitude,
+                        user: t.id,
+                        user_type: 'therapist',
+                        user_name: t.name,
+                        timestamp: t.updated_at,
+                        is_live: true,
+                        is_stale: t.is_stale
+                      })) : [])
+                  ]}
                   height="100%"
                   zoom={14}
                 />

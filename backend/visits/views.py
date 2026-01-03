@@ -401,6 +401,52 @@ class ProximityAlertViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+    @action(detail=False, methods=['get'], url_path='active')
+    def active_alerts(self, request):
+        """Get all active proximity alerts"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can view all active alerts"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        from .proximity_utils import get_active_proximity_alerts
+        alerts = get_active_proximity_alerts()
+        serializer = self.get_serializer(alerts, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def alert_stats(self, request):
+        """Get proximity alert statistics"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can view alert stats"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        from .proximity_utils import get_proximity_alert_stats
+        stats = get_proximity_alert_stats()
+        return Response(stats)
+
+    @action(detail=False, methods=['post'], url_path='check-now')
+    def check_proximity_now(self, request):
+        """Manually trigger proximity check for all therapists"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can trigger proximity checks"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        from .proximity_utils import check_all_therapist_proximities
+        threshold = request.data.get('threshold_meters', 200)
+        alerts = check_all_therapist_proximities(threshold)
+        
+        return Response({
+            "message": f"Proximity check completed. {len(alerts)} new alerts created.",
+            "alerts_created": len(alerts),
+            "alert_ids": [a.id for a in alerts]
+        })
+
 
 class TherapistReportViewSet(viewsets.ModelViewSet):
     """API endpoint for managing therapist reports"""

@@ -489,6 +489,146 @@ class TherapistViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    @action(detail=False, methods=['post'], url_path='grant-location-permission')
+    def grant_location_permission(self, request):
+        """Therapist grants permission for location tracking"""
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            therapist.location_permission_granted = True
+            therapist.location_permission_date = timezone.now()
+            therapist.location_permission_revoked = False
+            therapist.location_permission_revoked_date = None
+            therapist.save()
+            
+            return Response({
+                "message": "Location permission granted",
+                "permission_granted": True,
+                "granted_at": therapist.location_permission_date
+            })
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=['post'], url_path='revoke-location-permission')
+    def revoke_location_permission(self, request):
+        """Therapist revokes permission for location tracking"""
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            therapist.location_permission_revoked = True
+            therapist.location_permission_revoked_date = timezone.now()
+            therapist.save()
+            
+            return Response({
+                "message": "Location permission revoked",
+                "permission_revoked": True,
+                "revoked_at": therapist.location_permission_revoked_date
+            })
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=['post'], url_path='update-current-location')
+    def update_current_location(self, request):
+        """Therapist updates their current location"""
+        try:
+            therapist = Therapist.objects.get(user=request.user)
+            
+            if not therapist.location_permission_granted or therapist.location_permission_revoked:
+                return Response(
+                    {"error": "Location permission not granted or has been revoked"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            location = request.data.get('location', {})
+            therapist.current_latitude = location.get('latitude')
+            therapist.current_longitude = location.get('longitude')
+            therapist.current_location_accuracy = location.get('accuracy')
+            therapist.current_location_updated_at = timezone.now()
+            therapist.save()
+            
+            return Response({
+                "message": "Location updated successfully",
+                "updated_at": therapist.current_location_updated_at
+            })
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['get'], url_path='current-location')
+    def get_current_location(self, request, pk=None):
+        """Admin gets the current location of a therapist"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can view therapist locations"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            therapist = Therapist.objects.get(id=pk)
+            
+            if not therapist.location_permission_granted or therapist.location_permission_revoked:
+                return Response({
+                    "error": "Therapist has not granted location permission",
+                    "permission_granted": therapist.location_permission_granted,
+                    "permission_revoked": therapist.location_permission_revoked
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            return Response({
+                "therapist_id": therapist.id,
+                "therapist_name": therapist.user.get_full_name(),
+                "latitude": float(therapist.current_latitude) if therapist.current_latitude else None,
+                "longitude": float(therapist.current_longitude) if therapist.current_longitude else None,
+                "accuracy": therapist.current_location_accuracy,
+                "updated_at": therapist.current_location_updated_at,
+                "permission_granted": therapist.location_permission_granted,
+                "is_stale": (
+                    therapist.current_location_updated_at is None or
+                    (timezone.now() - therapist.current_location_updated_at).total_seconds() > 300
+                )
+            })
+        except Therapist.DoesNotExist:
+            return Response(
+                {"error": "Therapist not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=['get'], url_path='with-location-permission')
+    def therapists_with_location_permission(self, request):
+        """Admin gets list of therapists with location permission"""
+        if not request.user.is_admin:
+            return Response(
+                {"error": "Only admins can view this"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        therapists = Therapist.objects.filter(
+            location_permission_granted=True,
+            location_permission_revoked=False
+        ).select_related('user')
+        
+        data = []
+        for t in therapists:
+            data.append({
+                "id": t.id,
+                "name": t.user.get_full_name(),
+                "has_location": t.current_latitude is not None,
+                "latitude": float(t.current_latitude) if t.current_latitude else None,
+                "longitude": float(t.current_longitude) if t.current_longitude else None,
+                "updated_at": t.current_location_updated_at,
+                "is_stale": (
+                    t.current_location_updated_at is None or
+                    (timezone.now() - t.current_location_updated_at).total_seconds() > 300
+                )
+            })
+        
+        return Response(data)
+
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer

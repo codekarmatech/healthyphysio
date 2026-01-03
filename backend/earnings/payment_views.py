@@ -601,3 +601,170 @@ def therapist_payment_history(request, therapist_id):
     }
 
     return Response(response_data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def patient_payment_history(request):
+    """
+    Get payment history for the authenticated patient
+    
+    Query parameters:
+    - start_date: Filter by start date (YYYY-MM-DD)
+    - end_date: Filter by end date (YYYY-MM-DD)
+    - status: Filter by payment status (paid, unpaid, pending, scheduled)
+    """
+    from django.db.models import Q, Sum
+    from datetime import datetime, date, timedelta
+    from users.models import Patient
+    
+    user = request.user
+    
+    # Only patients can view their own payment history
+    if not user.is_patient:
+        return Response(
+            {"error": "Only patients can access this endpoint"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        patient = Patient.objects.get(user=user)
+    except Patient.DoesNotExist:
+        return Response(
+            {"error": "Patient profile not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Build query filters
+    query = Q(patient=patient)
+    
+    # Date filtering
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+    payment_status = request.query_params.get('status')
+    
+    if start_date:
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query &= Q(date__gte=start_date)
+        except ValueError:
+            return Response(
+                {"error": "Invalid start_date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query &= Q(date__lte=end_date)
+        except ValueError:
+            return Response(
+                {"error": "Invalid end_date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    if payment_status and payment_status != 'all':
+        query &= Q(payment_status=payment_status)
+    
+    # Get all earnings records for this patient
+    earnings = EarningRecord.objects.filter(query).select_related(
+        'therapist__user', 'appointment'
+    ).order_by('-date')
+    
+    # Build payment history
+    payment_history = []
+    for record in earnings:
+        # Only show payment if session was completed
+        if record.status != 'completed' and record.status != 'COMPLETED':
+            continue
+            
+        payment_history.append({
+            'id': record.id,
+            'date': record.date.isoformat(),
+            'session_type': record.session_type,
+            'therapist_name': record.therapist.user.get_full_name(),
+            'amount': float(record.full_amount),
+            'payment_status': record.payment_status,
+            'payment_date': record.payment_date.isoformat() if record.payment_date else None,
+            'payment_method': record.payment_method,
+            'payment_scheduled_date': record.payment_scheduled_date.isoformat() if record.payment_scheduled_date else None,
+            'appointment_id': record.appointment.id if record.appointment else None,
+            'session_code': record.appointment.session_code if record.appointment else None,
+            'is_verified': record.is_verified,
+        })
+    
+    # Calculate summary statistics
+    today = timezone.now().date()
+    
+    # Total paid
+    total_paid = EarningRecord.objects.filter(
+        patient=patient,
+        payment_status=EarningRecord.PaymentStatus.PAID
+    ).aggregate(total=Sum('full_amount'))['total'] or 0
+    
+    # Total unpaid/pending
+    total_unpaid = EarningRecord.objects.filter(
+        patient=patient,
+        payment_status__in=[EarningRecord.PaymentStatus.UNPAID, EarningRecord.PaymentStatus.PENDING]
+    ).aggregate(total=Sum('full_amount'))['total'] or 0
+    
+    # Upcoming scheduled payments
+    upcoming_payments = EarningRecord.objects.filter(
+        patient=patient,
+        payment_status=EarningRecord.PaymentStatus.SCHEDULED,
+        payment_scheduled_date__gte=today
+    ).order_by('payment_scheduled_date')[:5]
+    
+    upcoming_list = [
+        {
+            'id': p.id,
+            'date': p.date.isoformat(),
+            'amount': float(p.full_amount),
+            'scheduled_date': p.payment_scheduled_date.isoformat() if p.payment_scheduled_date else None,
+            'therapist_name': p.therapist.user.get_full_name(),
+        }
+        for p in upcoming_payments
+    ]
+    
+    # Payment reminders (due within 7 days)
+    reminder_date = today + timedelta(days=7)
+    reminders = []
+    
+    # Get unpaid sessions that need attention
+    unpaid_sessions = EarningRecord.objects.filter(
+        patient=patient,
+        payment_status__in=[EarningRecord.PaymentStatus.UNPAID, EarningRecord.PaymentStatus.PENDING]
+    ).order_by('date')[:10]
+    
+    for session in unpaid_sessions:
+        days_since = (today - session.date).days
+        if days_since >= 0:
+            reminders.append({
+                'id': session.id,
+                'date': session.date.isoformat(),
+                'amount': float(session.full_amount),
+                'therapist_name': session.therapist.user.get_full_name(),
+                'days_overdue': days_since,
+                'urgency': 'high' if days_since > 14 else 'medium' if days_since > 7 else 'low'
+            })
+    
+    # Sessions not charged (cancelled, missed by therapist, etc.)
+    not_charged_count = EarningRecord.objects.filter(
+        patient=patient,
+        payment_status=EarningRecord.PaymentStatus.NOT_APPLICABLE
+    ).count()
+    
+    response_data = {
+        'payments': payment_history,
+        'summary': {
+            'total_paid': float(total_paid),
+            'total_unpaid': float(total_unpaid),
+            'total_sessions': len(payment_history),
+            'sessions_not_charged': not_charged_count,
+        },
+        'upcoming_payments': upcoming_list,
+        'reminders': reminders,
+        'patient_name': patient.user.get_full_name()
+    }
+    
+    return Response(response_data)

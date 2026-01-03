@@ -134,10 +134,24 @@ class Patient(models.Model):
     emergency_contact_name = models.CharField(max_length=255, blank=False)
     emergency_contact_phone = models.CharField(max_length=20, blank=False)
     emergency_contact_relationship = models.CharField(max_length=100, blank=False)
-    # Add direct reference to area for easier access - now required
+    # Direct reference to area for easier access - now required
     area = models.ForeignKey('areas.Area', on_delete=models.SET_NULL, null=True, blank=False,
                             related_name='direct_patients',
                             help_text="Patient's residential area (required)")
+
+    # Home location coordinates for safety tracking and proximity alerts
+    home_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Home location latitude for safety monitoring"
+    )
+    home_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Home location longitude for safety monitoring"
+    )
+    home_location_updated_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the home location was last updated"
+    )
 
     # Doctor who added this patient to the platform (null if self-registered)
     added_by_doctor = models.ForeignKey(
@@ -302,6 +316,42 @@ class Therapist(models.Model):
     experience = models.TextField(blank=True)  # Additional field for detailed experience
     residential_address = models.TextField(blank=True)
     preferred_areas = models.TextField(blank=True)
+
+    # Location permission for safety tracking (one-time consent)
+    location_permission_granted = models.BooleanField(
+        default=False,
+        help_text="Whether therapist has granted location permission for safety monitoring"
+    )
+    location_permission_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the therapist granted location permission"
+    )
+    location_permission_revoked = models.BooleanField(
+        default=False,
+        help_text="Whether therapist has revoked location permission"
+    )
+    location_permission_revoked_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the therapist revoked location permission"
+    )
+
+    # Current/last known location (updated on-demand when admin requests)
+    current_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Current/last known latitude"
+    )
+    current_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        help_text="Current/last known longitude"
+    )
+    current_location_accuracy = models.FloatField(
+        null=True, blank=True,
+        help_text="Accuracy of current location in meters"
+    )
+    current_location_updated_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the current location was last updated"
+    )
 
     # Custom manager
     objects = TherapistManager()

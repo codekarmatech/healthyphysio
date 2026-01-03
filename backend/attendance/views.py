@@ -22,12 +22,13 @@ from users.models import Therapist
 # User utilities
 from users.utils import get_therapist_from_user
 #Import local app models and serializers
-from .models import Attendance, Holiday, Leave, Availability, SessionTimeLog, INDIAN_TZ
+from .models import Attendance, Holiday, Leave, Availability, SessionTimeLog, PatientConcern, INDIAN_TZ
 from .admin_requests import AttendanceChangeRequest
 from .serializers import (
     AttendanceSerializer, HolidaySerializer, AttendanceMonthSerializer,
     LeaveSerializer, AttendanceChangeRequestSerializer, AvailabilitySerializer,
-    SessionTimeLogSerializer, SessionTimeLogListSerializer
+    SessionTimeLogSerializer, SessionTimeLogListSerializer,
+    PatientConcernSerializer, PatientConcernCreateSerializer, PatientConcernAdminResponseSerializer
 )
 from django.db.models import Count
 from rest_framework.decorators import api_view
@@ -1347,10 +1348,13 @@ class SessionTimeLogViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        session_log.patient_confirm_arrival()
+        # Extract location data from request if provided
+        location_data = request.data.get('location', None)
+        session_log.patient_confirm_arrival(location_data)
         serializer = self.get_serializer(session_log)
         return Response({
             "message": "Therapist arrival confirmed",
+            "location_captured": location_data is not None,
             "data": serializer.data
         })
 
@@ -1380,7 +1384,9 @@ class SessionTimeLogViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        success = session_log.patient_confirm_departure()
+        # Extract location data from request if provided
+        location_data = request.data.get('location', None)
+        success = session_log.patient_confirm_departure(location_data)
         if not success:
             return Response(
                 {"error": "Must confirm arrival before departure"},
@@ -1392,6 +1398,71 @@ class SessionTimeLogViewSet(viewsets.ModelViewSet):
             "message": "Therapist departure confirmed",
             "duration_minutes": session_log.patient_confirmed_duration_minutes,
             "has_discrepancy": session_log.has_discrepancy,
+            "data": serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='update-location')
+    def update_location(self, request, pk=None):
+        """Update location data that was not captured during initial confirmation"""
+        session_log = self.get_object()
+        location_type = request.data.get('location_type')
+        location_data = request.data.get('location')
+
+        if not location_type or not location_data:
+            return Response(
+                {"error": "location_type and location are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        valid_types = ['therapist_arrival', 'therapist_departure', 'patient_arrival', 'patient_departure']
+        if location_type not in valid_types:
+            return Response(
+                {"error": f"location_type must be one of: {', '.join(valid_types)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verify permissions
+        user = request.user
+        if location_type.startswith('therapist') and user.role == 'therapist':
+            if session_log.therapist.user != user:
+                return Response({"error": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
+        elif location_type.startswith('patient') and user.role == 'patient':
+            if session_log.patient.user != user:
+                return Response({"error": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
+        elif user.role != 'admin':
+            return Response({"error": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Update location fields
+        lat = location_data.get('latitude')
+        lng = location_data.get('longitude')
+        accuracy = location_data.get('accuracy')
+
+        if location_type == 'therapist_arrival':
+            session_log.therapist_arrival_latitude = lat
+            session_log.therapist_arrival_longitude = lng
+            session_log.therapist_arrival_accuracy = accuracy
+            session_log.therapist_arrival_location_added_later = True
+        elif location_type == 'therapist_departure':
+            session_log.therapist_departure_latitude = lat
+            session_log.therapist_departure_longitude = lng
+            session_log.therapist_departure_accuracy = accuracy
+            session_log.therapist_departure_location_added_later = True
+        elif location_type == 'patient_arrival':
+            session_log.patient_arrival_latitude = lat
+            session_log.patient_arrival_longitude = lng
+            session_log.patient_arrival_accuracy = accuracy
+            session_log.patient_arrival_location_added_later = True
+        elif location_type == 'patient_departure':
+            session_log.patient_departure_latitude = lat
+            session_log.patient_departure_longitude = lng
+            session_log.patient_departure_accuracy = accuracy
+            session_log.patient_departure_location_added_later = True
+
+        session_log.save()
+        serializer = self.get_serializer(session_log)
+        return Response({
+            "message": "Location updated successfully",
+            "added_later": True,
             "data": serializer.data
         })
 
@@ -1477,3 +1548,163 @@ class SessionTimeLogViewSet(viewsets.ModelViewSet):
                 {"error": "Session time log not found for this appointment"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class PatientConcernViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing patient concerns/feedback about therapy sessions.
+    Patients can create and view their own concerns.
+    Admins can view all concerns and respond to them.
+    """
+    queryset = PatientConcern.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return PatientConcernCreateSerializer
+        return PatientConcernSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = PatientConcern.objects.all()
+
+        # Filter based on user role
+        if user.role == 'patient':
+            queryset = queryset.filter(patient=user.patient_profile)
+        elif user.role == 'therapist':
+            queryset = queryset.filter(therapist=user.therapist_profile)
+        # Admin can see all
+
+        # Apply filters from query params
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category=category)
+
+        priority = self.request.query_params.get('priority')
+        if priority:
+            queryset = queryset.filter(priority=priority)
+
+        return queryset.select_related('patient__user', 'therapist__user', 'responded_by')
+
+    def create(self, request, *args, **kwargs):
+        """Create a new patient concern"""
+        if request.user.role != 'patient':
+            return Response(
+                {"error": "Only patients can submit concerns"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        # Return full serializer response
+        concern = PatientConcern.objects.get(id=serializer.instance.id)
+        response_serializer = PatientConcernSerializer(concern)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='respond')
+    def respond(self, request, pk=None):
+        """Admin responds to a patient concern"""
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can respond to concerns"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        concern = self.get_object()
+        serializer = PatientConcernAdminResponseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Update the concern
+        response_text = serializer.validated_data['response_text']
+        requires_call = serializer.validated_data.get('requires_call', False)
+        new_status = serializer.validated_data.get('status', 'acknowledged')
+
+        concern.admin_response = response_text
+        concern.status = new_status
+        concern.responded_by = request.user
+        concern.responded_at = timezone.now()
+        concern.requires_call = requires_call
+        concern.save()
+
+        return Response(PatientConcernSerializer(concern).data)
+
+    @action(detail=True, methods=['post'], url_path='mark-call-completed')
+    def mark_call_completed(self, request, pk=None):
+        """Mark that the follow-up call has been completed"""
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can mark calls as completed"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        concern = self.get_object()
+        notes = request.data.get('notes', '')
+        concern.complete_call(notes)
+
+        return Response(PatientConcernSerializer(concern).data)
+
+    @action(detail=True, methods=['post'], url_path='resolve')
+    def resolve_concern(self, request, pk=None):
+        """Resolve a patient concern"""
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can resolve concerns"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        concern = self.get_object()
+        resolution_notes = request.data.get('notes', '')
+        concern.resolve(request.user, resolution_notes)
+
+        return Response(PatientConcernSerializer(concern).data)
+
+    @action(detail=False, methods=['get'], url_path='pending')
+    def pending_concerns(self, request):
+        """Get all pending concerns for admin dashboard"""
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can view all pending concerns"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        queryset = PatientConcern.objects.filter(
+            status__in=['pending', 'acknowledged', 'in_progress']
+        ).select_related('patient__user', 'therapist__user')
+
+        serializer = PatientConcernSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def concern_stats(self, request):
+        """Get statistics about patient concerns for admin dashboard"""
+        if request.user.role != 'admin':
+            return Response(
+                {"error": "Only admins can view concern statistics"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        total = PatientConcern.objects.count()
+        pending = PatientConcern.objects.filter(status='pending').count()
+        acknowledged = PatientConcern.objects.filter(status='acknowledged').count()
+        in_progress = PatientConcern.objects.filter(status='in_progress').count()
+        resolved = PatientConcern.objects.filter(status='resolved').count()
+        requires_call = PatientConcern.objects.filter(requires_call=True, call_completed=False).count()
+
+        # Category breakdown
+        by_category = PatientConcern.objects.values('category').annotate(count=Count('id'))
+
+        return Response({
+            'total': total,
+            'pending': pending,
+            'acknowledged': acknowledged,
+            'in_progress': in_progress,
+            'resolved': resolved,
+            'requires_call': requires_call,
+            'by_category': list(by_category)
+        })

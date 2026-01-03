@@ -154,6 +154,21 @@ class AppointmentService extends BaseService {
   getChildAppointments(masterAppointmentId) {
     return api.get(`${this.basePath}?master_appointment=${masterAppointmentId}`);
   }
+
+  /**
+   * Get appointments for the current patient
+   * Uses the default list endpoint which filters by patient automatically
+   * @param {Object} params - Query parameters (status, date ranges, etc.)
+   * @returns {Promise} API response with patient's appointments
+   */
+  getPatientAppointments(params = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.append('status', params.status);
+    if (params.start_date) queryParams.append('datetime__gte', params.start_date);
+    if (params.end_date) queryParams.append('datetime__lte', params.end_date);
+    const queryString = queryParams.toString();
+    return api.get(`${this.basePath}${queryString ? `?${queryString}` : ''}`);
+  }
 }
 
 // Create and export a singleton instance

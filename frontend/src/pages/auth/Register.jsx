@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Navbar from '../../components/layout/Navbar';
-// Note: COMPANY_INFO and CSS_CLASSES imports removed as they're not used in this component
+import { COMPANY_INFO } from '../../constants';
+import { getAllSettings } from '../../services/siteSettingsService';
 
 const Register = () => {
   const [step, setStep] = useState(1);
@@ -53,7 +54,25 @@ const Register = () => {
   // State for managing areas loaded from the API
   const [loadingAreas, setLoadingAreas] = useState(false);
   const [areas, setAreas] = useState([]);
+  const [settings, setSettings] = useState(null);
   const navigate = useNavigate();
+
+  // Fetch branding settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const allSettings = await getAllSettings();
+        setSettings(allSettings);
+      } catch (err) {
+        console.warn('Failed to fetch settings', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const branding = settings?.branding || COMPANY_INFO;
+  const logoUrl = branding.logo_url || branding.logo;
+  const companyName = branding.company_name || COMPANY_INFO.name;
 
   // Add state for search term and dropdown visibility
   const [searchTerm, setSearchTerm] = useState('');
@@ -1011,46 +1030,76 @@ const Register = () => {
     }
   };
 
+  // Calculate walking progress based on step
+  const getWalkProgress = () => {
+    if (loading) return 95;
+    return ((step - 1) / 3) * 100 + 5;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 relative overflow-hidden">
       <Navbar />
 
-      {/* Dynamic Background Pattern */}
-      <div className="absolute inset-0 pattern-hexagon opacity-30"></div>
+      {/* Dynamic Background Pattern - Hidden on mobile */}
+      <div className="hidden sm:block absolute inset-0 pattern-hexagon opacity-30"></div>
 
-      {/* Dynamic Light Color Effects */}
-      <div className="absolute top-20 right-20 w-32 h-32 bg-gradient-to-br from-blue-400/10 via-purple-400/15 to-pink-400/10 blur-2xl opacity-60" style={{ animation: 'colorShift 8s ease-in-out infinite' }}></div>
-      <div className="absolute bottom-32 left-20 w-28 h-28 bg-gradient-to-br from-green-400/15 via-teal-400/20 to-cyan-400/15 blur-xl opacity-70" style={{ animation: 'colorShift 6s ease-in-out infinite 2s' }}></div>
-      <div className="absolute top-1/2 right-1/3 w-24 h-24 bg-gradient-to-br from-yellow-400/12 via-orange-400/18 to-red-400/12 blur-lg opacity-50" style={{ animation: 'colorShift 10s ease-in-out infinite 4s' }}></div>
+      {/* Dynamic Light Color Effects - Hidden on mobile */}
+      <div className="hidden md:block absolute top-20 right-20 w-32 h-32 bg-gradient-to-br from-blue-400/10 via-purple-400/15 to-pink-400/10 blur-2xl opacity-60" style={{ animation: 'colorShift 8s ease-in-out infinite' }}></div>
+      <div className="hidden md:block absolute bottom-32 left-20 w-28 h-28 bg-gradient-to-br from-green-400/15 via-teal-400/20 to-cyan-400/15 blur-xl opacity-70" style={{ animation: 'colorShift 6s ease-in-out infinite 2s' }}></div>
+      <div className="hidden lg:block absolute top-1/2 right-1/3 w-24 h-24 bg-gradient-to-br from-yellow-400/12 via-orange-400/18 to-red-400/12 blur-lg opacity-50" style={{ animation: 'colorShift 10s ease-in-out infinite 4s' }}></div>
 
-      <div className="flex flex-col justify-center py-12 sm:px-6 lg:px-8 pt-20">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <span className="text-3xl text-white">🏥</span>
+      <div className="flex flex-col justify-center py-6 px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28">
+        <div className="mx-auto w-full max-w-sm sm:max-w-md">
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow-lg border border-gray-100 p-1.5 sm:p-2 overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt={companyName} className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-2xl sm:text-3xl">🏥</span>
+              )}
             </div>
-            <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">
-              Join <span className="gradient-text-safe bg-gradient-to-r from-primary-600 to-secondary-500">PhysioWay</span>
+            <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">
+              Join <span className="gradient-text-safe bg-gradient-to-r from-primary-600 to-secondary-500 bg-clip-text text-transparent">{companyName}</span>
             </h1>
-            <h2 className="font-heading text-2xl font-semibold text-gray-700 mb-4">
+            <h2 className="font-heading text-lg sm:text-xl lg:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">
               Create your account
             </h2>
-            <div className="inline-flex items-center px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm">
-              <span className="text-primary-500 mr-2">📋</span>
-              <span className="font-sans text-sm font-medium text-gray-600">
-                Step {step} of 3: {step === 1 ? 'Account Basics' : step === 2 ? 'Personal Information' : 'Role Details'}
+            <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-white/80 backdrop-blur-sm rounded-full shadow-sm">
+              <span className="text-primary-500 mr-1.5 sm:mr-2 text-sm sm:text-base">📋</span>
+              <span className="font-sans text-xs sm:text-sm font-medium text-gray-600">
+                Step {step}/3: {step === 1 ? 'Account Basics' : step === 2 ? 'Personal Info' : 'Role Details'}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="max-w-xl mx-auto p-8 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-white/50">
+        <div className="mt-4 sm:mt-6 mx-auto w-full max-w-sm sm:max-w-md px-2 sm:px-0">
+          <div className="max-w-xl mx-auto p-4 sm:p-6 lg:p-8 bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-white/50">
+            {/* Walking Man Progress Animation */}
+            <div className="relative w-full h-14 sm:h-16 bg-gradient-to-r from-green-100 via-blue-50 to-primary-100 rounded-xl overflow-hidden mb-4 sm:mb-6">
+              <div className="absolute bottom-2 left-0 right-0 h-1 bg-gray-300 rounded"></div>
+              <div className="absolute bottom-1 left-2 text-lg sm:text-xl">🏠</div>
+              <div className="absolute bottom-1 right-2 text-lg sm:text-xl">🏥</div>
+              <div 
+                className={`absolute bottom-1 text-xl sm:text-2xl transition-all duration-700 ease-out ${loading ? 'animate-bounce' : ''}`}
+                style={{ left: `calc(${getWalkProgress()}% - 12px)`, minWidth: '24px' }}
+              >
+                🚶
+              </div>
+              <div className="absolute top-1 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 font-medium">
+                {step === 1 ? 'Starting...' : step === 2 ? 'Almost there...' : loading ? 'Creating account...' : 'Final step!'}
+              </div>
+              {/* Step markers */}
+              <div className="absolute bottom-3 left-1/4 w-2 h-2 rounded-full bg-primary-400"></div>
+              <div className="absolute bottom-3 left-1/2 w-2 h-2 rounded-full bg-primary-400"></div>
+              <div className="absolute bottom-3 left-3/4 w-2 h-2 rounded-full bg-primary-400"></div>
+            </div>
+
             {/* Progress Bar */}
-            <div className="flex items-center mb-8">
-              <div className={`flex-1 h-2 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
-              <div className={`flex-1 h-2 mx-2 rounded-full transition-all duration-500 ${step >= 2 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
-              <div className={`flex-1 h-2 rounded-full transition-all duration-500 ${step >= 3 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
+            <div className="flex items-center mb-4 sm:mb-6">
+              <div className={`flex-1 h-1.5 sm:h-2 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-1.5 sm:h-2 mx-1.5 sm:mx-2 rounded-full transition-all duration-500 ${step >= 2 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
+              <div className={`flex-1 h-1.5 sm:h-2 rounded-full transition-all duration-500 ${step >= 3 ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gray-200'}`} />
             </div>
 
             {error && (
@@ -1073,12 +1122,12 @@ const Register = () => {
               {step === 2 && renderStep2()}
               {step === 3 && renderStep3()}
 
-              <div className="flex justify-between mt-6">
+              <div className="flex justify-between mt-4 sm:mt-6 gap-3">
                 {step > 1 && (
                   <button
                     type="button"
                     onClick={() => setStep(s => s - 1)}
-                    className="px-4 py-2 border rounded hover:bg-gray-100"
+                    className="px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border border-gray-300 rounded-lg sm:rounded-xl hover:bg-gray-100 transition-colors"
                   >
                     Back
                   </button>
@@ -1088,16 +1137,16 @@ const Register = () => {
                     type={step < 3 ? 'button' : 'submit'}
                     onClick={step < 3 ? () => setStep(s => s + 1) : null}
                     disabled={loading}
-                    className="px-6 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    className="px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-primary-600 text-white rounded-lg sm:rounded-xl hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
                   >
-                    {step < 3 ? 'Next' : (loading ? 'Creating account...' : 'Create Account')}
+                    {step < 3 ? 'Next →' : (loading ? 'Creating...' : 'Create Account')}
                   </button>
                 </div>
               </div>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 sm:mt-6 text-center">
+              <p className="text-xs sm:text-sm text-gray-600">
                 Already have an account?{' '}
                 <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
                   Sign in

@@ -32,15 +32,15 @@ class AuditLog(models.Model):
     new_state = models.JSONField(null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(default=timezone.now, editable=False)
     integrity_hash = models.CharField(max_length=64)
     
     def save(self, *args, **kwargs):
-        # Generate timestamp if not provided
+        # Ensure timestamp is set (for verification consistency)
         if not self.timestamp:
             self.timestamp = timezone.now()
             
-        # Generate integrity hash
+        # Generate integrity hash before saving
         self.generate_integrity_hash()
         
         super().save(*args, **kwargs)

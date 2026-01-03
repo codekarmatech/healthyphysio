@@ -606,7 +606,7 @@ const AdminDashboard = () => {
               title: "Pending Approvals",
               value: stats.pendingApprovals,
               linkText: "View approvals",
-              linkUrl: "/admin/approvals"
+              linkUrl: "/admin/therapist-approvals"
             },
             {
               title: "Completed Appointments",
@@ -650,7 +650,7 @@ const AdminDashboard = () => {
               title: "Pending Approval",
               value: stats.pendingApproval,
               linkText: "View pending plans",
-              linkUrl: "/admin/treatment-plans/pending"
+              linkUrl: "/admin/treatment-plans"
             },
             {
               title: "Submitted Reports",
@@ -660,7 +660,7 @@ const AdminDashboard = () => {
               title: "Pending Review",
               value: stats.pendingReviews,
               linkText: "Review reports",
-              linkUrl: "/admin/reports/pending"
+              linkUrl: "/admin/submitted-reports"
             }
           ]}
           loading={loading}
@@ -732,7 +732,7 @@ const AdminDashboard = () => {
               title: "Active Visits",
               value: stats.activeVisits,
               linkText: "View active visits",
-              linkUrl: "/admin/visits/active"
+              linkUrl: "/admin/location-monitoring"
             },
             {
               title: "Completed Today",
@@ -807,7 +807,7 @@ const AdminDashboard = () => {
               title: "Pending Leave Requests",
               value: dashboardData?.attendance_stats?.pending_leave_requests || 2,
               linkText: "View requests",
-              linkUrl: "/admin/attendance/leave-requests"
+              linkUrl: "/admin/attendance"
             },
             {
               title: "Therapist Utilization",
@@ -870,7 +870,7 @@ const AdminDashboard = () => {
               title: "Upcoming",
               value: stats.upcomingAppointments,
               linkText: "View schedule",
-              linkUrl: "/admin/appointments/upcoming"
+              linkUrl: "/admin/appointments"
             },
             {
               title: "Cancellation Rate",
@@ -1033,7 +1033,7 @@ const AdminDashboard = () => {
             }
           ]}
           loading={loading}
-          viewAllLink="/admin/analytics"
+          viewAllLink="/admin/audit-dashboard"
           viewAllText="View Detailed Analytics"
         />
       </div>
@@ -1099,7 +1099,7 @@ const AdminDashboard = () => {
             }
           ]}
           loading={loading}
-          viewAllLink="/admin/system"
+          viewAllLink="/admin/audit-dashboard"
           viewAllText="View System Details"
         />
       </div>
@@ -1150,7 +1150,7 @@ const AdminDashboard = () => {
           }))}
           loading={loadingTherapists}
           emptyMessage="No pending approvals"
-          viewAllLink="/admin/approvals"
+          viewAllLink="/admin/therapist-approvals"
           viewAllText="View all approvals"
         />
 
@@ -1184,7 +1184,7 @@ const AdminDashboard = () => {
           }))}
           loading={loadingReschedules}
           emptyMessage="No pending reschedule requests"
-          viewAllLink="/admin/appointments/reschedule-requests"
+          viewAllLink="/admin/appointments"
           viewAllText="View all requests"
         />
       </div>
@@ -1269,7 +1269,7 @@ const AdminDashboard = () => {
           }))}
           loading={loadingReports}
           emptyMessage="No pending reports at this time"
-          viewAllLink="/admin/reports/pending"
+          viewAllLink="/admin/submitted-reports"
           viewAllText="View All Reports"
         />
       </div>

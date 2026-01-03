@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { formatLocalDate } from '../../utils/dateUtils';
 import api from '../../services/api';
 
 const AdminUsersPage = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('assignments');
+  const [searchParams] = useSearchParams();
+  const roleFilter = searchParams.get('role');
+  
+  // If role filter is provided, default to 'all' tab (All Users)
+  const [activeTab, setActiveTab] = useState(roleFilter ? 'all' : 'assignments');
   const [assignments, setAssignments] = useState([]);
   const [users, setUsers] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -14,6 +18,7 @@ const AdminUsersPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilterState, setRoleFilterState] = useState(roleFilter || '');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignType, setAssignType] = useState(null);
@@ -113,6 +118,12 @@ const AdminUsersPage = () => {
   });
 
   const filteredUsers = users.filter(user => {
+    // First apply role filter if set
+    if (roleFilterState && user.role !== roleFilterState) {
+      return false;
+    }
+    
+    // Then apply search filter
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (
@@ -188,8 +199,8 @@ const AdminUsersPage = () => {
           </nav>
         </div>
 
-        {/* Search */}
-        <div className="mb-6">
+        {/* Search and Role Filter */}
+        <div className="mb-6 flex flex-wrap gap-4">
           <input
             type="text"
             placeholder="Search..."
@@ -197,6 +208,19 @@ const AdminUsersPage = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
           />
+          {activeTab === 'all' && (
+            <select
+              value={roleFilterState}
+              onChange={(e) => setRoleFilterState(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            >
+              <option value="">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="doctor">Doctor</option>
+              <option value="therapist">Therapist</option>
+              <option value="patient">Patient</option>
+            </select>
+          )}
         </div>
 
         {/* Error */}

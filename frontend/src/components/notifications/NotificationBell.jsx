@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import notificationService from '../../services/notificationService';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 
 /**
@@ -10,6 +11,7 @@ import { formatDistanceToNow } from 'date-fns';
  * and a dropdown with recent notifications
  */
 const NotificationBell = () => {
+  const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,9 +21,21 @@ const NotificationBell = () => {
 
   // Fetch unread count and recent notifications
   useEffect(() => {
+    // Only fetch notifications if user is authenticated
+    if (!user) {
+      return;
+    }
+
+    // Check if token exists before making API calls
+    const token = localStorage.getItem('token');
+    if (!token) {
+      return;
+    }
+
     const fetchNotifications = async () => {
       try {
         setLoading(true);
+        setError(null);
 
         // Get unread count
         const countResponse = await notificationService.getUnreadCount();
@@ -33,8 +47,13 @@ const NotificationBell = () => {
 
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching notifications:', err);
-        setError('Failed to load notifications');
+        // Don't show error for 401 - user may not be fully authenticated yet
+        if (err.response?.status === 401) {
+          console.log('NotificationBell: User not authenticated, skipping notifications fetch');
+        } else {
+          console.error('Error fetching notifications:', err);
+          setError('Failed to load notifications');
+        }
         setLoading(false);
       }
     };
@@ -45,7 +64,7 @@ const NotificationBell = () => {
     const intervalId = setInterval(fetchNotifications, 30000); // Check every 30 seconds
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [user]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

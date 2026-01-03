@@ -778,10 +778,9 @@ class SessionFeeConfigViewSet(viewsets.ModelViewSet):
 
         # Check if we have any real data
         if not queryset.exists():
-            # No real data exists, return mock data
+            # No real data exists, return mock data directly (not through serializer)
             mock_data = SessionFeeConfigSerializer.generate_mock_data()
-            serializer = self.get_serializer(mock_data, many=True)
-            return Response(serializer.data)
+            return Response(mock_data)
 
         # Real data exists, proceed with normal processing
         page = self.paginate_queryset(queryset)
